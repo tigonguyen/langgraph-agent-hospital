@@ -1,10 +1,10 @@
 """Base agent for the hospital roles.
 
 Every role in the simulation (doctor, patient, examiner, ...) is an `Agent`:
-a name, a system prompt, an optional set of tools, and a chat model. The
-underlying LangChain `create_agent` graph is built lazily the first time the
-agent is asked to act, so creating an `Agent` is cheap and we only "shape"
-the real agent when it is actually needed.
+a name, a system prompt, an optional set of tools, optional middleware, and a
+chat model. The underlying LangChain `create_agent` graph is built lazily the
+first time the agent is asked to act, so creating an `Agent` is cheap and we
+only "shape" the real agent when it is actually needed.
 """
 
 from __future__ import annotations
@@ -25,12 +25,14 @@ class Agent:
         *,
         model: BaseChatModel | str,
         tools: Sequence[Callable[..., Any]] = (),
+        middleware: Sequence[Any] = (),
         response_format: Any | None = None,
     ) -> None:
         self.name = name
         self.system_prompt = system_prompt
         self.model = model
         self.tools = list(tools)
+        self.middleware = list(middleware)
         self.response_format = response_format
         self._runnable: Any | None = None  # compiled create_agent graph, built on demand
 
@@ -58,6 +60,8 @@ class Agent:
                 "tools": self.tools,
                 "system_prompt": self.system_prompt,
             }
+            if self.middleware:
+                kwargs["middleware"] = self.middleware
             if self.response_format is not None:
                 kwargs["response_format"] = self.response_format
             self._runnable = create_agent(**kwargs)
