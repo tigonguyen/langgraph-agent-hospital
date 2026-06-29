@@ -6,6 +6,7 @@ import pytest
 import requests
 
 from agent_hospital.agents.doctor import DiagnosisResult
+from agent_hospital.config import HospitalConfig
 from agent_hospital.diseases import MedQACase, load_medqa
 from agent_hospital.nodes.consultation import make_consultation_node
 from agent_hospital.nodes.diagnosis import make_diagnosis_node
@@ -104,7 +105,7 @@ def test_run_case_live():
         pytest.skip(f"model {TEST_MODEL!r} not pulled (have: {models})")
 
     case = load_medqa()[0]  # Myasthenia gravis case
-    final = run_case(case, model=TEST_MODEL, max_turns=3)
+    final = run_case(case, HospitalConfig(model=TEST_MODEL, consult_turns=3))
 
     assert isinstance(final["diagnosis"], str) and final["diagnosis"].strip()
     assert final["score"] in (0.0, 1.0)

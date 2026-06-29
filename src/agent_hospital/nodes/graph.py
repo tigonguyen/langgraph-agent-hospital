@@ -4,12 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Callable
 
-from langchain_core.language_models import BaseChatModel
 from langgraph.graph import END, START, StateGraph
 from typing_extensions import TypedDict
 
 from agent_hospital.agents.doctor import build_diagnoser, build_doctor_agent
 from agent_hospital.agents.patient import build_patient_agent
+from agent_hospital.config import HospitalConfig
 from agent_hospital.diseases.medqa import MedQACase
 from agent_hospital.nodes.consultation import make_consultation_node
 from agent_hospital.nodes.diagnosis import make_diagnosis_node
@@ -41,16 +41,12 @@ def build_hospital_graph(
     return graph.compile()
 
 
-def build_case_graph(
-    case: MedQACase,
-    model: BaseChatModel | str = "qwen2.5:7b",
-    *,
-    max_turns: int = 4,
-):
+def build_case_graph(case: MedQACase, config: HospitalConfig | None = None):
     """Convenience: build patient + doctor + diagnoser and compile the care loop."""
-    doctor = build_doctor_agent(case, model)
-    patient = build_patient_agent(case, model)
-    diagnose = build_diagnoser(model)
-    consultation_node = make_consultation_node(doctor, patient, max_turns)
+    config = config or HospitalConfig()
+    doctor = build_doctor_agent(case, config.role_model("doctor"))
+    patient = build_patient_agent(case, config.role_model("patient"))
+    diagnose = build_diagnoser(config.role_model("diagnoser"))
+    consultation_node = make_consultation_node(doctor, patient, config.consult_turns)
     diagnosis_node = make_diagnosis_node(diagnose)
     return build_hospital_graph(consultation_node, diagnosis_node)
