@@ -13,3 +13,7 @@ venv/
 
 # OS
 .DS_Store
+
+# RAG vector store + ingest logs (large, regenerable)
+data/chroma/
+data/ingest_full.log

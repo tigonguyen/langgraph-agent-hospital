@@ -1,132 +1,127 @@
 # Plan — Multi-Agent Medical Reasoning System
 
 ## Goal
-Build a medical reasoning application whose **accuracy gain is measured against a single-LLM
-baseline on MedQA-USMLE**, layering: retrieval (RAG), a multi-agent workflow, short- and
-long-term memory, and an evolving experience base. Local stack: LangGraph + LangChain v1 + Ollama.
+A patient-simulated, multi-agent medical consultation that **answers MedQA-USMLE questions**, with
+its **accuracy gain measured against a single-LLM baseline**. It layers retrieval (RAG), a multi-agent
+workflow, short-/long-term memory, and an evolving experience base. Local stack: LangGraph +
+LangChain v1 + Ollama.
 
-### Key assumption (correct me if wrong)
-The **primary evaluation task is MedQA-USMLE (multiple-choice)** — that's what components (1)
-baseline and (7) experience-on-wrong-answers imply. The OSCE consultation hospital we already
-built (`patient ↔ doctor ↔ diagnosis`) is a **related, secondary mode** that shares the same
-agent core, RAG, and memory; it is not the thing MedQA-USMLE scores. Components below are
-designed around the MCQ task.
+## Status (current)
+- ✅ **RAG knowledge base (component 3) BUILT** — full MedRAG Textbooks ingested: **125,847 snippets**
+  across all 18 books (Harrison's 32.6k, Surgery 14.3k, Neurology 12.4k, …) in Chroma `knowledge`
+  (`nomic-embed-text`, cosine, gated retriever). Tests passing.
+- 🔜 **Phase A (baseline)** + RAG-augmented single-reasoner answerer (first lift measurement).
+- ⬜ Multi-agent pipeline · case-conversion (OSCE) · experience base.
 
----
+## Primary task & data
+- **Dataset:** [`nnilayy/medqa-usmle`](https://huggingface.co/datasets/nnilayy/medqa-usmle) — 4-option
+  MCQ. Fields: `sent1` (vignette **+ question**), `ending0..3` (options), `label` (correct index).
+  Splits: **train 10,200 / val 1,270 / test 1,270**.
+- **MedQA answers vary** (diagnosis, treatment, next test, mechanism…), so the final step is **answer
+  the MCQ by picking an option** — scored by **exact option match** (not diagnosis-string match).
+- **One-time prep (conversion):** parse `sent1` (extraction, not fabrication — vignettes already
+  contain the findings) into an OSCE-style case: `history` → Patient · `exam`+`labs` → Examiner ·
+  `question`+`options` → reasoning agents. Keep `label` as the hidden answer key.
+- **Splits in use:** convert **~150 train** items for patient simulation + experience seeding; hold
+  out a **test** subset for final validation. Test answers are never stored.
 
 ## The 7 components → modules
+| # | Component | Here | Module(s) |
+|---|-----------|------|-----------|
+| 1 | Direct LLM baseline | single LLM reads full vignette+options → option; reference accuracy | `qa/baseline.py` |
+| 2 | Medical reasoning agent | reasoning **panel** (the diagnostic core) | `agents/specialist.py`, `agents/attending.py` |
+| 3 | RAG module | MedRAG Textbooks → Chroma `knowledge`; reasoning-distilled, gated retrieval | `knowledge/{ingest,retriever}.py` |
+| 4 | Short-term memory | LangGraph `QAState` (one case) | `qa/state.py` |
+| 5 | Long-term memory | persistent Chroma across runs | `memory/chroma_store.py` |
+| 6 | Multi-agent workflow (≥3) | Patient + Triage + Panel×2 + Examiner + Attending | `qa/pipeline.py`, `agents/*` |
+| 7 | Evolutionary optimization | wrong TRAIN answer → `experience` collection (incremental RAG) | `memory/experience.py` |
 
-| # | Component | What it is here | Module(s) |
-|---|-----------|-----------------|-----------|
-| 1 | **Direct LLM baseline** | one LLM answers the MCQ directly (no RAG, no agents) — the reference accuracy | `qa/baseline.py` |
-| 2 | **Medical reasoning agent** | specialist reasoner(s) that produce answer + rationale (grounded in RAG). *Not* the triage nurse — triage only routes | `agents/specialist.py` (reuses `Agent`) |
-| 3 | **RAG module** | MedRAG **Textbooks** → Chroma `knowledge` collection; retriever injects top-k into reasoning | `knowledge/ingest.py`, `knowledge/retriever.py` |
-| 4 | **Short-term memory** | LangGraph `State` for one question (options, retrieved docs, per-agent opinions, votes) | `qa/state.py` |
-| 5 | **Long-term memory** | persistent Chroma across runs (knowledge + experience collections) | `memory/chroma_store.py` |
-| 6 | **Multi-agent workflow (≥3)** | router → specialist panel → attending/aggregator, as a `StateGraph` | `qa/pipeline.py`, `agents/{router,attending}.py` |
-| 7 | **Evolutionary optimization** | on a wrong TRAIN answer, store (question, correct answer, distilled lesson) in `experience`; retrieve on similar future questions (incremental RAG / MedAgent-Zero) | `memory/experience.py` |
-
----
-
-## Multi-agent workflow (component 6, ≥3 agents)
-A LangGraph `StateGraph` over one MCQ:
+## Consultation flow — "Middle" info design (locked)
+The reasoning panel sees the **history + question** directly; the **Examiner** reveals exam/labs only
+when a test is ordered; RAG knowledge + (gated) experience are layered on top.
 
 ```
-START
-  → router        (classify specialty + build retrieval query)
-  → retrieve      (RAG: top-k textbook snippets + top-k experience hits)
-  → specialists   (1–2 reasoner agents, each: evidence → answer + rationale)   [the panel]
-  → attending     (aggregate opinions + evidence → final option choice)
-  → score         (compare to gold; if TRAIN & wrong → write experience)
-END
+case → Patient (history)
+     → Triage (route by chief complaint; no RAG)
+     → Reasoning panel ×2   (each: history + question + ordered labs
+          │                    + RAG knowledge[always] + experience[gated]  → answer + rationale)
+          ├─ order tests → Examiner (returns the case's hidden exam/labs; lookup, no RAG)
+          └─ RAG query = reasoning-distilled from findings + question  → similarity-gated, no-RAG fallback
+     → Attending (aggregate the 2 opinions + evidence → final option)
+     → score (option == label) → if wrong & TRAIN → write experience
 ```
-Agents (≥3): **router**, **specialist** (≥1, panel of 2 gives 4 total), **attending**. All are
-`Agent` instances with role prompts; `attending` may use `response_format` for a structured final
-choice. Reuses the `consultation → diagnosis → scoring` pattern already built.
 
-`QAState` (short-term memory, component 4):
+`QAState` (short-term memory):
 ```python
 class QAState(TypedDict, total=False):
-    question: str; options: dict[str,str]; gold: str
-    specialty: str; query: str
+    case: dict                       # history, exam, labs, question, options, label
+    specialty: str                   # triage output
+    transcript: list[dict]           # patient/doctor turns
+    ordered_labs: list[str]; lab_results: dict
     knowledge: list[str]; experience: list[str]
-    opinions: list[dict]            # per-specialist {answer, rationale}
+    opinions: list[dict]             # per-specialist {answer, rationale}
     answer: str; correct: bool | None
 ```
 
----
+## RAG design (locked) — framed in IR terms
+Modern RAG = a **dense Vector Space Model**: the embedding model is the *representation function*
+mapping documents and the query into one **shared concept-vector space**; **relevance = cosine
+similarity**; the gate is a relevance cutoff.
 
-## RAG design (component 3)
-- **Corpus:** MedRAG **Textbooks** (18 USMLE textbooks, ~125k pre-chunked snippets) — leakage-safe
-  (textbooks ≠ exam questions), USMLE-aligned. StatPearls optional later.
-- **Embeddings:** Ollama `nomic-embed-text` (local). MedCPT is a later upgrade.
-- **Store:** Chroma, persistent, two collections: `knowledge` (static) and `experience` (grows).
-- **Pipeline:** `load_dataset("MedRAG/textbooks")` → embed → `Chroma(collection="knowledge")` →
-  `as_retriever(k=4)`. Prototype on a subset (~10k snippets) before the full embed.
+- **Retrieval family:** **dense embeddings first** (matches the working obsidian-rag). *Documented
+  alternatives to revisit:* **hybrid** (BM25 sparse + dense — best for exact medical terms like
+  drug/lab names) and **sparse BM25 only**. Start dense; add hybrid if exact-term recall is weak.
+- **Embedding model:** **`nomic-embed-text`** (Ollama, local, 768-dim) — same stack as the working
+  obsidian-rag; the swap-point is `knowledge/embeddings.py:default_embeddings()`. (MedCPT was the
+  medical-domain pick but was dropped for now — its HF download is gated/throttled; revisit later by
+  returning a different `Embeddings` here, no other code changes.)
+- **Corpus:** MedRAG **Textbooks** — **prototype on a ~10k shuffled subset** (the corpus is ordered by
+  book, so a plain prefix covers only one book — use `shuffle_buffer` to span many), then embed the
+  full ~125k. StatPearls later.
+- **Store:** Chroma persistent at `data/chroma`; collections `knowledge` (static) + `experience`
+  (incremental). MedRAG snippets used as-is (no re-chunking).
+- **Relevance estimation:** cosine, `k=4`, **threshold gate + no-RAG fallback**; `knowledge` always
+  queried, `experience` gated. Query is **reasoning-distilled** (findings + question), embedded with
+  the **query encoder**. Two labeled sections ("Textbook evidence" / "Past lessons"). **Consumed by
+  the 2 specialists only**; triage & examiner are RAG-free.
+- **Retrieval evaluation:** **extrinsic** — MedQA has no gold passages, so judge retrieval by whether
+  it lifts MCQ accuracy (RAG vs no-RAG). (Optional: a tiny hand-labeled set for recall@k later.)
 
-## Memory & evolution (components 5, 7)
-- **Long-term (5):** Chroma persists across runs; both collections live here.
-- **Experience / evolution (7):** after a **train/dev** question, if the answer is wrong, store
-  `{question, correct option, one-line lesson}` into `experience`. At inference, `retrieve` pulls
-  similar experience hits into the attending agent's context. **Never store test items** (leakage).
+## Memory & evolution
+- **Long-term (5):** Chroma persists both collections across runs.
+- **Evolution (7):** after a **train/dev** case, if the predicted option is wrong, store
+  `{distilled question, correct option, one-line lesson}` in `experience`; retrieved (gated) on
+  similar future cases. Mirrors MedAgent-Zero. **Never store test items.**
 
----
-
-## Datasets & split discipline
-| Dataset | Role | Source |
-|---|---|---|
-| **MedQA-USMLE (4-option)** | baseline + eval + experience source | HF `GBaker/MedQA-USMLE-4-options` (confirm) |
-| **MedRAG Textbooks** | RAG knowledge base | HF `MedRAG/textbooks` |
-| OSCE `medqa.jsonl` (existing) | consultation hospital (secondary) | already vendored |
-
-Leakage rules: RAG corpus is textbooks only; experience is built **only** from train/dev mistakes;
-evaluation is on the held-out **test** split; test answers are never written anywhere.
-
----
-
-## Evaluation plan
-- **Metric:** accuracy (exact option match) on MedQA-USMLE test.
-- **Headline comparison:** baseline (1) vs full system (2–7) → **accuracy gain**.
-- **Ablation ladder** (isolates each component's contribution):
-  1. Baseline (single LLM)
-  2. + RAG (single agent + retrieval)
-  3. + Multi-agent (panel + attending, no RAG)
-  4. + RAG + Multi-agent
-  5. + Experience (full system)
-- Report per-ablation accuracy on a fixed test subset (e.g. 200–300 Qs first, then full).
-- **Optional separate track:** MedAgentBench (agentic tool-use) via an `AgentClient` adapter — a
-  different capability, reported on its own, not mixed into MCQ accuracy.
-
----
+## Evaluation
+- **Metric:** MCQ accuracy (option match) on the MedQA-USMLE **test** subset.
+- **Headline:** baseline (1) vs full system → accuracy gain.
+- **Ablation ladder:** baseline → +RAG → +panel → +RAG+panel → +experience (full). Isolates each
+  component's contribution.
+- **Honest note:** baseline and full system both derive from the same vignette, so gains come from
+  **RAG + experience + panel aggregation**, not from info-hiding. The "Middle" design keeps the
+  Examiner meaningful without capping accuracy.
 
 ## Phased build order (each phase runnable + measured)
-- **Phase A — Baseline (1).** `diseases/medqa_usmle.py` loader + `qa/baseline.py`. Output: baseline
-  accuracy on a test subset. *Verify:* offline loader tests; live accuracy number.
-- **Phase B — RAG (3).** `knowledge/ingest.py` (subset → Chroma) + `retriever.py` + a single
-  agent-with-retrieval answerer. *Verify:* retrieval returns relevant snippets; accuracy vs A.
-- **Phase C — Multi-agent (2,4,6).** `qa/state.py`, `agents/{router,specialist,attending}.py`,
-  `qa/pipeline.py` graph. *Verify:* offline graph wiring with stubs; live accuracy vs B.
-- **Phase D — Long-term memory + evolution (5,7).** `memory/{chroma_store,experience}.py`;
-  build experience from train mistakes; retrieve at inference. *Verify:* wrong train answer writes
-  an experience row; held-out accuracy vs C (the evolution lift).
-- **Phase E — (optional)** MedAgentBench adapter track; OSCE consultation integration.
+- **A — Baseline (1):** `diseases/medqa_usmle.py` loader + `qa/baseline.py` → baseline accuracy.
+- **B — Case conversion + RAG (3):** `sent1`→OSCE converter (~150 train + test subset);
+  `knowledge/ingest.py` (subset → Chroma) + `retriever.py`; single-reasoner+RAG answerer; lift vs A.
+- **C — Multi-agent (2,4,6):** `qa/state.py`, `agents/{triage,specialist,examiner,attending}.py`,
+  `qa/pipeline.py` graph (panel×2 + attending). Offline stub wiring + live accuracy vs B.
+- **D — Long-term memory + evolution (5,7):** `memory/{chroma_store,experience}.py`; build experience
+  from train mistakes; gated retrieval. Held-out accuracy vs C (the evolution lift).
+- **E — (optional):** MedAgentBench adapter track; OSCE consultation as its own task.
 
----
+## Future mode (stored, not built now)
+**Accuracy-max info design:** give the reasoning panel the full case directly (Patient/Examiner become
+presentation only, no info hidden) + RAG + experience. Best raw accuracy; revisit if the "Middle"
+design leaves accuracy on the table.
 
-## Reuse (already built — Phase 1)
-- `agents/base.py` `Agent` (tools, middleware, `response_format`, multi-provider) — the agent core.
-- `agents/patient.py`, `agents/doctor.py`, `nodes/{consultation,diagnosis,scoring,graph}.py` — the
-  consultation pattern the QA pipeline mirrors.
-- `config.py` `HospitalConfig` (extend with `retrieval_k`, panel size, embedding model).
-- `diseases/loader.py` `DatasetLoader` (subclass for MedQA-USMLE).
-- pytest harness; live tests skip if Ollama down.
-
-## New dependencies
-`chromadb`, `langchain-chroma`, HF `datasets` (corpus + MedQA-USMLE), `langchain-ollama`
-embeddings. Add via `pyproject.toml`.
-
-## Open decisions (to confirm before Phase A)
-1. MCQ as primary task (this plan) vs OSCE consultation as primary.
-2. MedQA-USMLE source/split (`GBaker/MedQA-USMLE-4-options` 4-option vs 5-option).
-3. Panel size (1 specialist = 3 agents minimum, vs 2 = 4 agents).
-4. RAG corpus scope (Textbooks only vs +StatPearls) and embeddings (`nomic-embed-text` vs MedCPT).
+## Reuse / dependencies / open items
+- **Reuse:** `agents/base.py` `Agent` (tools, middleware, `response_format`); the
+  `consultation→diagnosis→scoring` pattern; `HospitalConfig` (extend: `retrieval_k`, `sim_threshold`,
+  panel size, embedding model); `DatasetLoader` (subclass for MedQA-USMLE); pytest harness.
+- **New deps:** `chromadb`, `langchain-chroma`, HF `datasets`, `langchain-ollama` (for `nomic-embed-text`
+  embeddings). (via `pyproject.toml`)
+- **Open:** similarity-gate threshold value (tune in B); how many test items for validation (e.g. 200
+  then full 1,270); whether Triage adds measurable accuracy (ablate — it's mainly for fidelity).
