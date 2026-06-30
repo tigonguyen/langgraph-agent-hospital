@@ -116,8 +116,17 @@ answers "is the gain real?"; bootstrap CI bounds it. Retrieval is judged **extri
 Why: every variant differs by exactly one component and is scored identically, so any
 accuracy delta is attributable. V0→V1 = RAG; V1→V2 = multi-agent; etc.
 
+**D16 — Deterministic evaluation (temperature = 0).**
+Why: at default temperature, V1−V0 swung run-to-run — one run **+2 pts (McNemar p=0.69)**,
+another **exactly 0 (9/9/132, p=1.0)** — i.e. the sampling noise was *larger than the effect*.
+`build_variant` now resolves a string model to `ChatOllama(temperature=0)`, so runs are
+reproducible and paired McNemar isn't swamped by sampling.
+
 ---
 
 ## Status of evidence
-Measured so far (qwen2.5:14b, 150 items): **V0 0.720 / V1 0.740 (+2 pts, McNemar p=0.69, n.s.)**.
-The MedCPT vs nomic and V2 comparisons are the in-flight A/B (results to be appended).
+On qwen2.5:14b / 150 items, **single-agent RAG (V1) shows no significant gain over V0**: paired
+runs gave +2 pts (p=0.69) and +0 pts (9/9/132, p=1.0) — run-to-run sampling noise, never
+significant. This motivated **D16 (temperature=0)**. A deterministic V0/V1/V2 re-run is in
+progress (numbers to be appended). Takeaway: RAG is not the lever on MedQA; gains must come from
+multi-agent (V2) or the experience base.

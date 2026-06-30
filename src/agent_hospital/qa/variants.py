@@ -38,9 +38,20 @@ AnswerFn = Callable[[MCQItem], "int | None"]
 def build_variant(
     variant: str,
     model: BaseChatModel | str = DEFAULT_MODEL,
+    *,
+    temperature: float = 0.0,
     **kwargs,
 ) -> AnswerFn:
-    """Return the answer function for a variant id ('V0'..'V4')."""
+    """Return the answer function for a variant id ('V0'..'V4').
+
+    A string model is resolved to a deterministic `ChatOllama` (temperature=0 by
+    default) so evaluation is reproducible and paired comparisons aren't swamped by
+    sampling noise. Pass a `BaseChatModel` instance to control this yourself.
+    """
+    if isinstance(model, str):
+        from langchain_ollama import ChatOllama
+
+        model = ChatOllama(model=model, temperature=temperature)
     v = variant.upper()
     if v == "V0":
         return build_baseline_answerer(model=model)
