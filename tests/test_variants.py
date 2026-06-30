@@ -37,8 +37,13 @@ def test_lowercase_id_accepted():
     assert callable(build_variant("v0", model="dummy"))
 
 
+def test_v2_builds():
+    # V2 builds without touching the store/LLM (fake store, stub query fn).
+    assert callable(build_variant("V2", model="dummy", store=object(), query_fn=lambda it: "x"))
+
+
 def test_unbuilt_variants_raise():
-    for v in ("V2", "V3", "V4"):
+    for v in ("V3", "V4"):
         with pytest.raises(NotImplementedError):
             build_variant(v, model="dummy")
 
@@ -56,7 +61,7 @@ def test_variants_answer_live():
     from agent_hospital.diseases import load_medqa_usmle
 
     items = load_medqa_usmle(split="test", limit=2)
-    for vid in ("V0", "V1"):
+    for vid in ("V0", "V1", "V2"):
         answer = build_variant(vid, model=SMOKE_MODEL)
         for it in items:
             pred = answer(it)

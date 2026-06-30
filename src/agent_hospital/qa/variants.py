@@ -18,6 +18,7 @@ from langchain_core.language_models import BaseChatModel
 
 from agent_hospital.diseases.medqa_usmle import MCQItem
 from agent_hospital.qa.baseline import build_baseline_answerer
+from agent_hospital.qa.multi_agent import build_multiagent_answerer
 from agent_hospital.qa.rag_answer import build_rag_answerer
 
 DEFAULT_MODEL = "qwen2.5:14b"
@@ -45,6 +46,8 @@ def build_variant(
         return build_baseline_answerer(model=model)
     if v == "V1":
         return build_rag_answerer(model=model, **kwargs)
-    if v in ("V2", "V3", "V4"):
+    if v == "V2":
+        return build_multiagent_answerer(model=model, **kwargs)
+    if v in ("V3", "V4"):
         raise NotImplementedError(f"{v} ({VARIANTS[v]}) is not built yet")
     raise ValueError(f"unknown variant {variant!r}; choose from {list(VARIANTS)}")
