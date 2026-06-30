@@ -6,12 +6,23 @@ its **accuracy gain measured against a single-LLM baseline**. It layers retrieva
 workflow, short-/long-term memory, and an evolving experience base. Local stack: LangGraph +
 LangChain v1 + Ollama.
 
-## Status (current)
-- ✅ **RAG knowledge base (component 3) BUILT** — full MedRAG Textbooks ingested: **125,847 snippets**
-  across all 18 books (Harrison's 32.6k, Surgery 14.3k, Neurology 12.4k, …) in Chroma `knowledge`
-  (`nomic-embed-text`, cosine, gated retriever). Tests passing.
-- 🔜 **Phase A (baseline)** + RAG-augmented single-reasoner answerer (first lift measurement).
-- ⬜ Multi-agent pipeline · case-conversion (OSCE) · experience base.
+## Status (current — 2026-06-30)
+- ✅ **(3) RAG knowledge base BUILT** — 125,847 MedRAG Textbook snippets in Chroma (`nomic-embed-text`, cosine, gated). Tests pass.
+- ✅ **(1) Baseline + RAG answerer + accuracy eval** (Phase A) — committed.
+- 📊 **First measurement (50 items):** baseline 7B 0.68 / 32B 0.66; **RAG *hurt*** (−8 pts 7B, −2 pts 32B); 32B ≈ 7B.
+  → whole-vignette retrieval injects topical-but-non-discriminating context; **the query is the bottleneck, not model size.**
+
+## Resolved decisions (grill, 2026-06-30)
+- **Architecture:** **MCQ-direct multi-agent is the measured path** (router → panel → attending read the question). Patient-simulated consultation is **deferred** to a later phase as the *experience generator* (MedAgent-Zero), **not** the eval. Experience base meanwhile comes from **MedQA train mistakes**.
+- **RAG:** **query distillation** (retrieve on the focused question/findings, not the whole vignette); keep RAG only if the lift is non-negative.
+- **Eval:** **150 test items** for trustworthy numbers (50 is noise-level).
+- **Default model:** **qwen2.5:14b** for agent roles (5 pulled: 7b / 14b / mistral-small:24b / phi4 / 32b).
+
+## Next build order
+1. **Query distillation** → re-measure single-reasoner +RAG vs baseline (150 items, 14b & 7b). Gate the keep-RAG decision on this.
+2. **Multi-agent MCQ pipeline (2,4,6):** `qa/state.py` (`QAState`), router + specialist panel×2 + attending, `qa/pipeline.py` StateGraph; distilled RAG feeds the specialists. Measure vs baseline + single-reasoner.
+3. **Experience base (5,7):** store wrong MedQA *train* answers as lessons → gated retrieval into specialists; measure the evolution lift on held-out items.
+4. **(Later) patient-sim phase:** `sent1`→OSCE conversion + Patient/Examiner as a richer experience generator.
 
 ## Primary task & data
 - **Dataset:** [`nnilayy/medqa-usmle`](https://huggingface.co/datasets/nnilayy/medqa-usmle) — 4-option
