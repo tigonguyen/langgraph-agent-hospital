@@ -129,6 +129,52 @@ seam), `knowledge/retriever.py` (`open_store`, gated `retrieve`), `qa/rag_answer
 
 ---
 
+## Knowledge base deep-dive — MedRAG
+
+**MedRAG** (Xiong et al., 2024, *Benchmarking RAG for Medicine*) bundles three things: a corpus
+collection ("MedCorp"), the **MIRAGE** benchmark, and a retrieval toolkit.
+
+**Corpora (MedCorp):**
+
+| Corpus | Scale | Content | Local-friendly |
+|---|---|---|---|
+| **Textbooks** | 18 USMLE books, **~125,847** snippets | exam-aligned reference | ✅ **we use this** |
+| StatPearls | ~9,330 articles (chunked) | clinical point-of-care | ✅ feasible |
+| PubMed | ~23.9M snippets | biomedical abstracts | ❌ too big locally |
+| Wikipedia | ~29.9M snippets | general knowledge | ❌ too big locally |
+
+Each ships on HuggingFace pre-chunked (`id, title, content, contents`); we index `content`. We use
+**Textbooks only** — leakage-safe (reference text, not exam Q/A), USMLE-aligned, and small enough to
+embed locally.
+
+**MIRAGE** — a 5-dataset medical-QA benchmark (incl. MedQA, MedMCQA, PubMedQA, BioASQ, MMLU-Med).
+**Role in our app: reference only.** We run our own harness on MedQA-USMLE (one MIRAGE dataset), not
+MIRAGE itself; adopting the others later would show where RAG helps more.
+
+**Our embeddings vs MedRAG's precomputed embeddings:**
+
+| | MedRAG precomputed | Ours |
+|---|---|---|
+| Who embeds | MedRAG authors, shipped ready | we embed at ingest |
+| Model | MedCPT / Contriever / SPECTER (some **medical-tuned**) | `nomic-embed-text` (general) |
+| Cost | download vectors, no compute | we embed 125k snippets ourselves |
+| Index | their format/retriever | our **Chroma** (cosine + gate) |
+
+Vectors are **not interchangeable across models** (a `nomic` doc vector and a MedCPT query vector are in
+different spaces). We re-embedded locally with `nomic` because MedCPT's download stalled; the main thing
+given up is MedCPT's domain tuning.
+
+**Why RAG barely helped MedQA (the key insight):** RAG gains are **uneven across datasets**.
+Lookup-heavy sets (PubMedQA, BioASQ) benefit strongly; **reasoning/recall sets like MedQA barely do**,
+because a strong model already encodes the textbook knowledge and the work is *reasoning*, not
+fact-fetching. **This is exactly why our V1−V0 was a flat +2 pts (n.s.)** — MedQA is the reasoning kind,
+the hardest case for retrieval. It also points the next lever at **reasoning** (a reasoning agent that
+forms a sharper query, then the multi-agent pipeline), not more retrieval.
+
+**MedCPT (revisiting):** MedRAG's strongest, medical-domain-tuned retriever — an asymmetric bi-encoder
+(separate query/article encoders). Being retried as a drop-in via `knowledge/embeddings.py`; if it
+loads, re-embed Textbooks with the article encoder and retrieve with the query encoder.
+
 ## Evaluation
 
 - **Set:** 150 MedQA-USMLE **test** items (held out; train/val never scored).
