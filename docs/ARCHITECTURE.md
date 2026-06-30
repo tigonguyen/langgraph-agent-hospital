@@ -42,6 +42,23 @@ one-line change and every variant is evaluated identically.
 and is scored the same way, so accuracy differences are attributable. One switch + one metrics harness
 guarantees that.
 
+### MedQA-USMLE row schema (`nnilayy/medqa-usmle`)
+
+Each row is one 4-option MCQ in a SWAG-style schema:
+
+| Field | Type | Holds |
+|---|---|---|
+| `id` | string | unique question id |
+| `sent1` | string | clinical vignette **+** question stem (the full prompt; no separate question field) |
+| `sent2` | string | secondary SWAG stem — unused here (constant/empty) |
+| `ending0..3` | string | the four options (A–D) |
+| `label` | int 0–3 | index of the correct option |
+
+Cached locally as Arrow files (`~/.cache/huggingface/datasets/nnilayy___medqa-usmle/`), memory-mapped by
+`datasets`. Our loader (`diseases/medqa_usmle.py`) maps each row → `MCQItem`:
+`sent1 → question`, `[ending0..3] → options`, `label → answer_idx`; `sent2` is dropped. Splits:
+train 10,178 / validation 1,272 / test 1,273.
+
 ---
 
 ## V0 — Direct LLM (the control)
