@@ -11,6 +11,12 @@ LangChain v1 + Ollama.
 - ✅ **(1) Baseline + RAG answerer + accuracy eval** (Phase A) — committed.
 - 📊 **First measurement (50 items):** baseline 7B 0.68 / 32B 0.66; **RAG *hurt*** (−8 pts 7B, −2 pts 32B); 32B ≈ 7B.
   → whole-vignette retrieval injects topical-but-non-discriminating context; **the query is the bottleneck, not model size.**
+- ✅ **Variant switch + V0/V1 built** (`qa/variants.py:build_variant`), **query distillation** (`qa/rag_answer.py`),
+  and a **per-item metrics harness** (`qa/metrics.py`: accuracy + bootstrap CI, invalid-rate, Win/Loss/Tie, McNemar, latency).
+- 📊 **150-item V0 vs V1 (`qwen2.5:14b`):** V0 0.720 [.647,.793] · V1 0.740 [.673,.807]; **gain +2.0 pts,
+  WLT 14/11/125, McNemar p=0.69 → NOT significant**. Distillation flipped RAG from −8 to +2, but single-agent
+  RAG is **statistically flat** and **~11× slower** (6.4 vs 0.6 s/item); 0% invalid both. → real gain (if any) must
+  come from the **multi-agent pipeline (V2/V3)** or the **experience base**, not single-reasoner RAG.
 
 ## Resolved decisions (grill, 2026-06-30)
 - **Architecture:** **MCQ-direct multi-agent is the measured path** (router → panel → attending read the question). Patient-simulated consultation is **deferred** to a later phase as the *experience generator* (MedAgent-Zero), **not** the eval. Experience base meanwhile comes from **MedQA train mistakes**.
@@ -18,9 +24,18 @@ LangChain v1 + Ollama.
 - **Eval:** **150 test items** for trustworthy numbers (50 is noise-level).
 - **Default model:** **qwen2.5:14b** for agent roles (5 pulled: 7b / 14b / mistral-small:24b / phi4 / 32b).
 
+## System variants (the eval switch — `qa/variants.py`)
+| id | variant | status |
+|----|---------|--------|
+| V0 | Direct LLM | ✅ built |
+| V1 | RAG-only (distilled query) | ✅ built |
+| V2 | Multi-agent without memory | ⬜ next |
+| V3 | Full system (multi-agent + experience) | ⬜ |
+| V4 | Full system without verifier (optional) | ⬜ |
+
 ## Next build order
-1. **Query distillation** → re-measure single-reasoner +RAG vs baseline (150 items, 14b & 7b). Gate the keep-RAG decision on this.
-2. **Multi-agent MCQ pipeline (2,4,6):** `qa/state.py` (`QAState`), router + specialist panel×2 + attending, `qa/pipeline.py` StateGraph; distilled RAG feeds the specialists. Measure vs baseline + single-reasoner.
+1. ✅ **Query distillation + V0/V1 + metrics harness** — measured (150 items, 14b): V1−V0 = +2.0 pts, **not significant** (p=0.69).
+2. **V2 — Multi-agent MCQ pipeline (2,4,6):** `qa/state.py` (`QAState`), router + specialist panel×2 + attending, `qa/pipeline.py` StateGraph; distilled RAG feeds the specialists. Run the same metrics table (V0/V1/V2).
 3. **Experience base (5,7):** store wrong MedQA *train* answers as lessons → gated retrieval into specialists; measure the evolution lift on held-out items.
 4. **(Later) patient-sim phase:** `sent1`→OSCE conversion + Patient/Examiner as a richer experience generator.
 
