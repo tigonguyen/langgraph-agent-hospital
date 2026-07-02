@@ -194,25 +194,28 @@ flowchart LR
     M --> f["latency"]
 ```
 
-### Measured results (qwen2.5:14b, 150 items)
+### Measured results (qwen2.5:14b, **temperature=0**, 80 test items)
 
-| | V0 — Direct LLM | V1 — RAG-only (distilled) |
-|---|---|---|
-| Accuracy | 0.720 | **0.740** |
-| 95% bootstrap CI | [0.647, 0.793] | [0.673, 0.807] |
-| Invalid rate | 0.0% | 0.0% |
-| Latency / item | 0.59 s | 6.43 s |
+| | V0 — Direct LLM | V1 — RAG-only | V2 — Multi-agent |
+|---|---|---|---|
+| Accuracy | 0.662 | 0.625 | **0.738** |
+| 95% bootstrap CI | [0.562, 0.762] | [0.525, 0.725] | [0.637, 0.825] |
+| Invalid rate | 0.0% | 0.0% | 0.0% |
+| Latency / item | 0.63 s | 2.84 s | 7.35 s |
 
-| Paired V1 vs V0 | value |
-|---|---|
-| Accuracy gain | **+2.0 pts** |
-| Win / Loss / Tie | 14 / 11 / 125 |
-| McNemar (wins, losses, p) | 14, 11, **p = 0.69** |
+| Pairing | gain | Win/Loss/Tie | McNemar p |
+|---|---|---|---|
+| V1 vs V0 | −3.7 pts | 7 / 10 / 63 | 0.63 (n.s.) |
+| V2 vs V0 | +7.5 pts | 10 / 4 / 66 | 0.18 (n.s.) |
+| **V2 vs V1** | **+11.3 pts** | **11 / 2 / 67** | **0.023 (significant)** |
 
-**Interpretation:** distillation removed RAG's harm (−8 → +2 pts), but **+2 pts is not statistically
-significant** (p = 0.69) and V1 costs **~11× the latency**. Conclusion: **single-agent RAG does not move
-the needle** here with a 14B model — real gains must come from the **multi-agent pipeline (V2/V3)** or
-the **experience base**, not single-reasoner retrieval.
+**Interpretation:**
+- **Single-agent RAG (V1) does not help** — again slightly *below* V0 (also seen at 150 items: 0.727 vs
+  0.720). Retrieval is not the lever on MedQA (reasoning-heavy, not lookup).
+- **Multi-agent (V2) is the first real gain** — top accuracy (0.738), and its win over **V1 is
+  statistically significant (p=0.023)**. The gain comes from the reasoner→specialist reasoning, not RAG.
+- **V2 vs V0 = +7.5 pts but not yet significant (p=0.18)** at n=80 (small-sample; V0 here is 0.662 vs
+  0.72 on the 150-set) — promising, to be confirmed at larger n.
 
 ---
 

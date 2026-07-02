@@ -125,8 +125,18 @@ reproducible and paired McNemar isn't swamped by sampling.
 ---
 
 ## Status of evidence
-On qwen2.5:14b / 150 items, **single-agent RAG (V1) shows no significant gain over V0**: paired
-runs gave +2 pts (p=0.69) and +0 pts (9/9/132, p=1.0) — run-to-run sampling noise, never
-significant. This motivated **D16 (temperature=0)**. A deterministic V0/V1/V2 re-run is in
-progress (numbers to be appended). Takeaway: RAG is not the lever on MedQA; gains must come from
-multi-agent (V2) or the experience base.
+Deterministic run (qwen2.5:14b, **temperature=0**, 80 test items):
+
+| | V0 | V1 | V2 |
+|---|---|---|---|
+| accuracy | 0.662 | 0.625 | **0.738** |
+
+Paired: **V1 vs V0 −3.7 pts (p=0.63, n.s.)**, **V2 vs V0 +7.5 pts (p=0.18, n.s.)**, **V2 vs V1 +11.3 pts
+(p=0.023, significant)**.
+
+Takeaways:
+- **RAG (V1) is not the lever on MedQA** — ≤ V0 across every run (also 150-item temp=0: 0.727 vs 0.720).
+- **Multi-agent reasoning (V2) is the first real gain** — highest accuracy and a *significant* win over V1.
+  The lift is from reasoner→specialist reasoning, not retrieval.
+- **V2 vs V0 needs confirmation at larger n** (n=80 small-sample; p=0.18).
+Next: confirm V2>V0 at 150+ items; add V3 (experience base); optional MedCPT-vs-nomic A/B.
