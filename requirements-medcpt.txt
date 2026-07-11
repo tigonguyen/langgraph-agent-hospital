@@ -1,0 +1,4 @@
+# Optional — only needed to use the MedCPT medical-domain embedder (see README).
+transformers>=5.0
+torch>=2.0
+hf_transfer>=0.1
