@@ -70,6 +70,9 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 
 ## 5. Git Commits
 
+**Never commit or push until the user explicitly says to.** Make the changes, leave them
+uncommitted in the working tree, and let the user review the diff first. No auto-commits.
+
 **Format — conventional-commit style: `<type>: <summary>`.**
 
 - Types: `feat`, `fix`, `docs`, `test`, `refactor`, `chore`, `perf`, `build`, `ci`, `style`. Optional scope: `feat(spec): …`.
