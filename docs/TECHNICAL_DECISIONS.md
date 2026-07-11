@@ -22,16 +22,13 @@ Rejected: **32B** — measured **≈ 7B accuracy** (0.66 vs 0.68) at ~4× latenc
 ## Data & task
 
 **D3 — Eval dataset = `nnilayy/medqa-usmle` (4-option MCQ).**
-Why: standard USMLE benchmark with a real train/val/test split; the measured task for
-V0–V2. The MedAgentSim OSCE `medqa.jsonl` is a *different* artifact, reserved for the
-deferred patient-simulation path.
+Why: standard USMLE benchmark with a real train/val/test split; the measured task for all variants.
 
-**D4 — Task = MCQ-direct multi-agent; patient simulation deferred.**
-Why: the KPI is MedQA accuracy, and a patient-sim consultation can only *lose*
-information relative to reading the vignette (both derive from the same `sent1`).
-Per the Agent Hospital paper, patient-sim is the *experience generator* (training
-env), not the eval — so it's a later phase. Meanwhile the experience base is built
-from MedQA train mistakes.
+**D4 — Task = MCQ answering (no patient simulation).**
+Why: the KPI is MedQA accuracy. An earlier patient-simulated consultation track was built and then
+**removed** — a consultation can only *lose* information relative to reading the vignette (both derive
+from the same `sent1`). The experience base (V3) instead comes from **MedQA train mistakes** (retrieving
+solved-question rationales), not simulated patients.
 
 **D5 — Scoring = exact MCQ option match; unparseable → `None` (invalid).**
 Why: MedQA answers vary (dx / treatment / next step), so the unit is "pick the right
