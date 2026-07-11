@@ -25,9 +25,6 @@ RAG_SYS = (
     "own knowledge. Choose the single best answer."
 )
 
-# Backward-compatible alias: the reasoning agent is the query-conversion step.
-build_query_distiller = build_reasoning_agent
-
 
 def build_rag_answerer(
     model: BaseChatModel | str = "qwen2.5:14b",
