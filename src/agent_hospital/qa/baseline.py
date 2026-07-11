@@ -1,7 +1,7 @@
-"""Direct single-LLM baseline for MedQA-USMLE (component 1).
+"""Direct single-LLM baseline (variant V0) for MedQA-USMLE.
 
 Presents the question + options, asks for a single letter, parses the choice.
-This is the reference accuracy every later component is compared against.
+The reference accuracy every other variant is compared against.
 """
 
 from __future__ import annotations

@@ -1,10 +1,8 @@
-"""Base agent for the hospital roles.
+"""Base agent — a lazy wrapper over LangChain's `create_agent`.
 
-Every role in the simulation (doctor, patient, examiner, ...) is an `Agent`:
-a name, a system prompt, an optional set of tools, optional middleware, and a
-chat model. The underlying LangChain `create_agent` graph is built lazily the
-first time the agent is asked to act, so creating an `Agent` is cheap and we
-only "shape" the real agent when it is actually needed.
+An `Agent` is a role: a name, a system prompt, optional tools, optional middleware,
+and a chat model. The `create_agent` graph is built lazily on first use, so creating
+an `Agent` is cheap.
 """
 
 from __future__ import annotations
