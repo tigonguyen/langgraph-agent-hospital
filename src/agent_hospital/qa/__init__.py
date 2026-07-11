@@ -1,5 +1,4 @@
 from agent_hospital.qa.baseline import build_baseline_answerer, format_mcq, parse_choice
-from agent_hospital.qa.evaluate import AccuracyResult, evaluate_accuracy
 from agent_hospital.qa.multi_agent import build_multiagent_answerer
 from agent_hospital.qa.metrics import (
     EpisodeRecord,
@@ -25,8 +24,6 @@ __all__ = [
     "VARIANTS",
     "format_mcq",
     "parse_choice",
-    "evaluate_accuracy",
-    "AccuracyResult",
     "EpisodeRecord",
     "run_variant",
     "accuracy",
