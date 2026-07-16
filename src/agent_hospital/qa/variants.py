@@ -1,64 +1,60 @@
-"""System variants for ablation — the single switch point.
-
-Pick a variant by id and get back a uniform answer function
-`MCQItem -> int | None`, so every variant is evaluated the same way:
+"""System variants — the single switch point, built on LangGraph.
 
     from agent_hospital.qa import build_variant
-    answer = build_variant("V1", model="qwen2.5:14b")
-    idx = answer(item)
+    answer = build_variant("V2", model="qwen2.5:14b")   # -> answer(item) -> int | None
 
-V0/V1 are built; V2-V4 are registered placeholders that raise until implemented.
+Each variant is a preset `RunConfig` compiled into a `StateGraph` by `build_graph`.
+`**overrides` tweak the config for experiments, e.g.
+    build_variant("V1", rag=RagConfig(collection="knowledge_medcpt", embedder="medcpt"))
 """
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Callable
 
-from langchain_core.language_models import BaseChatModel
-
+from agent_hospital.config import RagConfig, RunConfig
 from agent_hospital.diseases.medqa_usmle import MCQItem
-from agent_hospital.qa.baseline import build_baseline_answerer
-from agent_hospital.qa.multi_agent import build_multiagent_answerer
-from agent_hospital.qa.rag_answer import build_rag_answerer
+from agent_hospital.graph import build_graph
 
 DEFAULT_MODEL = "qwen2.5:14b"
 
-# variant id -> human description
 VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only",
-    "V2": "Multi-agent without memory",
-    "V3": "Full system",
+    "V2": "Multi-agent (reasoner + specialist)",
+    "V3": "Full system (panel + attending + verifier)",
     "V4": "Full system without verifier",
 }
 
 AnswerFn = Callable[[MCQItem], "int | None"]
 
+_PRESETS: dict[str, RunConfig] = {
+    "V0": RunConfig(answer_role="baseline", rag=None),
+    "V1": RunConfig(answer_role="rag-answerer", rag=RagConfig()),
+    "V2": RunConfig(answer_role="specialist", rag=RagConfig()),
+    "V3": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=True),
+    "V4": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=False),
+}
 
-def build_variant(
-    variant: str,
-    model: BaseChatModel | str = DEFAULT_MODEL,
-    *,
-    temperature: float = 0.0,
-    **kwargs,
-) -> AnswerFn:
+
+def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0, **overrides) -> AnswerFn:
     """Return the answer function for a variant id ('V0'..'V4').
 
-    A string model is resolved to a deterministic `ChatOllama` (temperature=0 by
-    default) so evaluation is reproducible and paired comparisons aren't swamped by
-    sampling noise. Pass a `BaseChatModel` instance to control this yourself.
+    A string model becomes a deterministic `ChatOllama` (temperature=0 by default) so
+    evaluation is reproducible. `overrides` set any `RunConfig` field (rag, panel_size, …).
     """
+    v = variant.upper()
+    if v not in _PRESETS:
+        raise ValueError(f"unknown variant {variant!r}; choose from {list(VARIANTS)}")
     if isinstance(model, str):
         from langchain_ollama import ChatOllama
 
         model = ChatOllama(model=model, temperature=temperature)
-    v = variant.upper()
-    if v == "V0":
-        return build_baseline_answerer(model=model)
-    if v == "V1":
-        return build_rag_answerer(model=model, **kwargs)
-    if v == "V2":
-        return build_multiagent_answerer(model=model, **kwargs)
-    if v in ("V3", "V4"):
-        raise NotImplementedError(f"{v} ({VARIANTS[v]}) is not built yet")
-    raise ValueError(f"unknown variant {variant!r}; choose from {list(VARIANTS)}")
+    cfg = replace(_PRESETS[v], model=model, **overrides)
+    graph = build_graph(cfg)
+
+    def answer(item: MCQItem) -> int | None:
+        return graph.invoke({"item": item}).get("answer")
+
+    return answer
