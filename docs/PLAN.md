@@ -10,8 +10,10 @@ Full details + results: [ARCHITECTURE.md](ARCHITECTURE.md). The LangGraph rebuil
 | V0 | Direct LLM | ✅ built |
 | V1 | RAG-only (reasoning-distilled query) | ✅ built |
 | V2 | Multi-agent (reasoner + specialist) | ✅ built |
-| V3 | Full system (+ experience base) | ⬜ next |
-| V4 | Full system without verifier | ⬜ |
+| V3 | Full system (panel + attending + verifier) | ✅ built (not yet measured at scale) |
+| V4 | Full system without verifier | ✅ built (not yet measured at scale) |
+
+All five are now config-driven LangGraph presets — see [REFACTOR_PLAN.md](REFACTOR_PLAN.md).
 
 ## Status (deterministic, qwen2.5:14b, temp=0)
 - **V0 ≈ V1** — RAG does not help MedQA (reasoning-heavy, not lookup).
@@ -19,10 +21,10 @@ Full details + results: [ARCHITECTURE.md](ARCHITECTURE.md). The LangGraph rebuil
 - See [ARCHITECTURE.md](ARCHITECTURE.md) for the full metrics table.
 
 ## Next
-1. **Refactor V0–V2 onto config-driven LangGraph** (behavior-preserving) — [REFACTOR_PLAN.md](REFACTOR_PLAN.md).
-2. **V3 — experience base:** retrieve solved-question rationales from **MedQA train mistakes** (the real
-   MedQA lever) + panel + verifier.
-3. **Confirm V2 > V0 at 150 test items** (n=80 was underpowered, p=0.18).
+1. **Measure V3/V4** at 150 test items — full-system accuracy and **V3 − V4** (the verifier's marginal effect).
+2. **Confirm V2 > V0 at 150 test items** (n=80 was underpowered, p=0.18).
+3. **Optional** — MedCPT-vs-nomic embedder A/B; an episodic experience base (retrieve solved-question
+   rationales from MedQA train mistakes) as a future V3+ lever.
 
 ## Data & stack
 - **Dataset:** [`nnilayy/medqa-usmle`](https://huggingface.co/datasets/nnilayy/medqa-usmle) — 4-option MCQ

@@ -4,15 +4,17 @@ A local medical **question-answering** system on MedQA-USMLE, built as an ablati
 variants (V0–V4) and measured with paired significance. Stack: **LangChain v1 + LangGraph + Ollama**
 (fully local, no API keys).
 
-| id | variant | status |
-|----|---------|--------|
-| V0 | Direct LLM | ✅ |
-| V1 | RAG-only (reasoning-distilled query) | ✅ |
-| V2 | Multi-agent (reasoner + specialist) | ✅ |
-| V3 | Full system (+ experience base) | ⬜ |
-| V4 | Full system without verifier | ⬜ |
+| id | variant | graph | status |
+|----|---------|-------|--------|
+| V0 | Direct LLM | `answer` | ✅ |
+| V1 | RAG-only (reasoning-distilled query) | `reason → retrieve → answer` | ✅ |
+| V2 | Multi-agent (reasoner + specialist) | `reason → retrieve → answer` | ✅ |
+| V3 | Full system (panel + attending + verifier) | `reason → retrieve → panel → aggregate → verify` | ✅ |
+| V4 | Full system without verifier | `reason → retrieve → panel → aggregate` | ✅ |
 
-Design details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · decisions: [docs/TECHNICAL_DECISIONS.md](docs/TECHNICAL_DECISIONS.md).
+Every variant is a **LangGraph `StateGraph`** assembled from an internal `RunConfig`; `build_variant(id)`
+is the single switch. Design details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · decisions:
+[docs/TECHNICAL_DECISIONS.md](docs/TECHNICAL_DECISIONS.md).
 
 ---
 
@@ -77,7 +79,7 @@ from agent_hospital.qa import build_variant, run_variant, accuracy, bootstrap_ci
 
 items = load_medqa_usmle("test", limit=50)          # a small slice; use more for real numbers
 recs = {}
-for vid in ["V0", "V1", "V2"]:
+for vid in ["V0", "V1", "V2", "V3", "V4"]:
     recs[vid] = run_variant(items, build_variant(vid, model="qwen2.5:14b"))  # temp=0 by default
     lo, hi = bootstrap_ci(recs[vid])
     print(f"{vid}: acc={accuracy(recs[vid]):.3f}  CI=[{lo:.3f},{hi:.3f}]")
@@ -108,10 +110,13 @@ ingest_textbooks(store=open_store('knowledge_medcpt', embeddings=default_embeddi
 ```
 src/agent_hospital/
   agents/base.py      # Agent — lazy create_agent wrapper (any provider/model)
+  config.py           # RunConfig, RagConfig — the per-variant flexibility surface
+  roles.py            # ROLE_PROMPTS registry (baseline · rag-answerer · specialist · attending · verifier)
+  graph/              # state.py (QAState) · nodes.py (node factories) · build.py (build_graph)
   diseases/           # MedQA-USMLE loader
   knowledge/          # RAG: ingest · embeddings (nomic/medcpt) · retriever
-  qa/                 # variants (V0/V1/V2) · reasoning · metrics
-tests/                # offline + live (auto-skip) tests
+  qa/                 # variants (V0–V4 presets) · mcq (format/parse) · reasoning · metrics
+tests/                # offline + live (auto-skip) tests · golden/ (exact-match gate)
 docs/                 # ARCHITECTURE · TECHNICAL_DECISIONS · PLAN · REFACTOR_PLAN
 ```
 

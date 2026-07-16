@@ -1,30 +1,33 @@
-# Architecture — System Variants (V0 & V1)
+# Architecture — System Variants (V0–V4)
 
-This document describes what is **built and measured today**: the two answer-only variants
-(V0 Direct LLM, V1 RAG-only), every component they use, and **why** each was chosen.
-Variants V2–V4 (multi-agent, full system, no-verifier) are registered placeholders, not yet built.
+This document describes what is **built and measured today**: the five-variant ablation ladder
+(V0 Direct LLM → V4 full multi-agent system), every component it uses, and **why** each was chosen.
 
-All variants expose the same interface — `answer(item: MCQItem) -> int | None` — and are selected
-through a single switch (`qa/variants.py`):
+Every variant is a **LangGraph `StateGraph`**, assembled from an internal `RunConfig` by
+`graph/build.py:build_graph(cfg)`. All variants expose the same interface —
+`answer(item: MCQItem) -> int | None` — and are selected through a single switch (`qa/variants.py`):
 
 ```python
 from agent_hospital.qa import build_variant
-answer = build_variant("V0", model="qwen2.5:14b")   # or "V1"
+answer = build_variant("V3", model="qwen2.5:14b")   # V0..V4
 ```
 
 ```mermaid
 flowchart LR
-    item["MCQItem<br/>vignette + 4 options"] --> sw{"build_variant(id, model)"}
-    sw -->|V0| v0["V0 · Direct LLM"]
-    sw -->|V1| v1["V1 · RAG-only (distilled)"]
-    sw -.->|V2-V4| stub["multi-agent / full / no-verifier<br/>(not built)"]
-    v0 --> ans["option index"]
-    v1 --> ans
+    item["MCQItem<br/>vignette + 4 options"] --> sw{"build_variant(id, model)<br/>→ build_graph(RunConfig)"}
+    sw -->|V0| v0["answer"]
+    sw -->|V1| v1["reason → retrieve → answer"]
+    sw -->|V2| v2["reason → retrieve → answer"]
+    sw -->|V3| v3["reason → retrieve → panel → aggregate → verify"]
+    sw -->|V4| v4["reason → retrieve → panel → aggregate"]
+    v0 & v1 & v2 & v3 & v4 --> ans["option index"]
     ans --> eval["Metrics harness<br/>accuracy, CI, invalid-rate, WLT, McNemar, latency"]
 ```
 
-`build_variant` is the only place a variant is wired, so adding V2–V4 or swapping a model is a
-one-line change and every variant is evaluated identically.
+Each variant is a preset `RunConfig` (`qa/variants.py:_PRESETS`) compiled into a graph. Adding a
+variant or A/B-testing a knob (model, embedder, panel size, verifier on/off) is a config change, not
+new code, and every variant is evaluated identically. `RunConfig` is internal;
+`build_variant(id, model=, temperature=, **overrides)` is the public surface.
 
 ---
 
@@ -34,13 +37,17 @@ one-line change and every variant is evaluated identically.
 |---|---|---|
 | **Agent** | thin lazy wrapper over LangChain v1 `create_agent`; builds the graph on first use | `agents/base.py` |
 | **Model access** | any `BaseChatModel`; a bare string → local `ChatOllama` (provider-agnostic) | `agents/base.py` |
-| **Variant switch** | `build_variant(id, model, **kw)` → uniform `answer` fn | `qa/variants.py` |
+| **Config** | `RunConfig` (answer role, rag, panel_size, aggregate, verify, per-role models) + `RagConfig` | `config.py` |
+| **Roles** | `ROLE_PROMPTS` registry — baseline · rag-answerer · specialist · attending · verifier | `roles.py` |
+| **Graph** | `QAState` + node factories (reason/retrieve/answer/panel/aggregate/verify) + `build_graph(cfg)` | `graph/` |
+| **Variant switch** | `_PRESETS` (V0–V4) + `build_variant(id, model, **overrides)` → uniform `answer` fn | `qa/variants.py` |
 | **Eval harness** | per-item records → accuracy+CI, invalid-rate, Win/Loss/Tie, McNemar, latency | `qa/metrics.py` |
-| **Data** | `nnilayy/medqa-usmle` (4-option MCQ; train 10,200 / val 1,270 / test 1,270) | `diseases/medqa_usmle.py` |
+| **Data** | `nnilayy/medqa-usmle` (4-option MCQ; train 10,178 / val 1,272 / test 1,273) | `diseases/medqa_usmle.py` |
 
 **Why this shape:** the goal is an **ablation ladder** — every variant differs by *exactly one thing*
-and is scored the same way, so accuracy differences are attributable. One switch + one metrics harness
-guarantees that.
+and is scored the same way, so accuracy differences are attributable. A single config-driven graph
+builder + one metrics harness guarantees that: V0→V1 adds RAG, V1→V2 swaps the answer role, V2→V3 adds
+the panel/attending/verifier, V3→V4 drops the verifier.
 
 ### MedQA-USMLE row schema (`nnilayy/medqa-usmle`)
 
@@ -71,9 +78,9 @@ flowchart LR
     parse --> idx["option index<br/>(None if unparseable)"]
 ```
 
-- **No retrieval, no agents, no memory** (`qa/baseline.py` imports only `Agent` + `MCQItem` — verified
-  no `retrieve`/`knowledge`/store reference on this path).
-- Prompt = vignette + four options + "respond with only the letter".
+- **No retrieval, no reasoning, no panel** — the graph is a single `answer` node (`answer_role="baseline"`,
+  `rag=None`); `build_graph` wires only `START → answer → END`.
+- Prompt = vignette + four options + "respond with only the letter" (`roles.py:BASELINE`, `qa/mcq.py:format_mcq`).
 - `parse_choice` extracts A–D (`Answer: X`, else a lone letter); unparseable → `None` (an invalid
   response, never a silent wrong).
 
@@ -110,7 +117,45 @@ flowchart TB
 ```
 
 Files: `knowledge/ingest.py` (streamed incremental embedding), `knowledge/embeddings.py` (embedder
-seam), `knowledge/retriever.py` (`open_store`, gated `retrieve`), `qa/rag_answer.py` (distiller + answerer).
+seam), `knowledge/retriever.py` (`open_store`, gated `retrieve`), `qa/reasoning.py` (query distiller),
+`graph/nodes.py` (`make_reason_node`, `make_retrieve_node`, `make_answer_node`). V1's answer role is
+`rag-answerer`; V2 swaps it for `specialist` — the only difference between them.
+
+---
+
+## V2–V4 — Multi-agent
+
+V2–V4 share the same front end as V1 (`reason → retrieve`) and differ in how the answer is produced.
+All roles/prompts live in `roles.py`; all nodes in `graph/nodes.py`; the wiring is `graph/build.py`.
+
+```mermaid
+flowchart LR
+    q["MCQItem"] --> rz["reason<br/>distill query"]
+    rz --> rt["retrieve<br/>gated top-k evidence"]
+    rt --> br{answer role?}
+    br -->|"V2 · specialist"| sp["answer<br/>single specialist"]
+    br -->|"V3/V4 · panel"| pn["panel<br/>2 specialists,<br/>distinct perspectives"]
+    pn --> ag["aggregate<br/>attending weighs opinions"]
+    ag --> vf{"verify? (V3 only)"}
+    vf -->|V3| vr["verify<br/>verifier confirms/revises"]
+    vf -->|V4| out["option index"]
+    sp --> out
+    vr --> out
+```
+
+- **V2 — single specialist:** `answer_role="specialist"` — one clinician-framed answerer over the same
+  evidence. This is the first variant that beat V1 significantly (p=0.023); the lift is *reasoning*, not RAG.
+- **V3 — full system:** a **panel** of `panel_size=2` specialists, each given a distinct perspective
+  (`roles.PERSPECTIVES`: "favor the single most likely answer" vs "rule out dangerous/confused
+  alternatives") so a temperature-0 panel still produces diverse opinions; an **attending** aggregates
+  them (`aggregate=True`); a **verifier** does a final confirm/revise pass (`verify=True`). Parse failure
+  at any late stage keeps the prior answer rather than emitting `None`.
+- **V4 — full system without verifier:** identical to V3 with `verify=False` — isolates the verifier's
+  contribution (V3 − V4 = the verifier's marginal effect).
+
+> **Note — experience/memory base not built.** Earlier plans framed V3 around retrieving rationales from
+> solved MedQA-train mistakes. That was descoped; the built V3 gets its gain from a diverse-perspective
+> panel + attending + verifier, with no episodic-memory retrieval. An experience base remains future work.
 
 ---
 
@@ -216,6 +261,10 @@ flowchart LR
   statistically significant (p=0.023)**. The gain comes from the reasoner→specialist reasoning, not RAG.
 - **V2 vs V0 = +7.5 pts but not yet significant (p=0.18)** at n=80 (small-sample; V0 here is 0.662 vs
   0.72 on the 150-set) — promising, to be confirmed at larger n.
+
+**V3/V4 status:** built and functionally verified end-to-end (graph runs, 0 invalid), but **not yet
+measured at n ≥ 80**. The scale run of V3 (panel+attending+verifier) and V4 (no verifier) — plus V3 vs V4
+to isolate the verifier — is the next evaluation step.
 
 ---
 

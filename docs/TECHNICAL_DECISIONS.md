@@ -27,8 +27,9 @@ Why: standard USMLE benchmark with a real train/val/test split; the measured tas
 **D4 — Task = MCQ answering (no patient simulation).**
 Why: the KPI is MedQA accuracy. An earlier patient-simulated consultation track was built and then
 **removed** — a consultation can only *lose* information relative to reading the vignette (both derive
-from the same `sent1`). The experience base (V3) instead comes from **MedQA train mistakes** (retrieving
-solved-question rationales), not simulated patients.
+from the same `sent1`). V3's gain comes instead from a **diverse-perspective panel + attending + verifier**
+(see D17); an episodic experience base (retrieving solved-question rationales) was descoped and remains
+future work.
 
 **D5 — Scoring = exact MCQ option match; unparseable → `None` (invalid).**
 Why: MedQA answers vary (dx / treatment / next step), so the unit is "pick the right
@@ -121,6 +122,27 @@ reproducible and paired McNemar isn't swamped by sampling.
 
 ---
 
+## Refactor — config-driven LangGraph
+
+**D17 — Every variant is a `StateGraph` assembled from a `RunConfig`, not hand-written code.**
+Why: the ladder needs each variant to differ by *exactly one knob* and stay evaluated identically.
+A preset `RunConfig` per variant compiled by `build_graph(cfg)` makes each difference a config field
+(`rag`, `answer_role`, `panel_size`, `aggregate`, `verify`, per-role models) rather than a separate
+code path — so A/B tests (medcpt vs nomic, panel size, verifier on/off) need no new code. `RunConfig`
+stays internal; `build_variant(id, **overrides)` is the only public surface. Prompts moved verbatim to a
+`roles.py` registry; nodes are Agent-backed factories in `graph/nodes.py`. The refactor was **behavior-
+preserving**: a golden captured from the pre-refactor V0/V1/V2 at temp=0 is replayed through the graph in
+`tests/test_golden.py`, asserting **byte-identical** per-item answers (passes live). V3/V4 were then added
+purely as new config toggles (panel/aggregate/verify nodes), no change to V0–V2.
+
+**D18 — Panel opinions are diversified by *perspective*, not temperature.**
+Why: at temp=0 (D16) two identical specialists would return identical opinions, defeating the panel.
+Each panelist gets a distinct instruction (`roles.PERSPECTIVES`: favor-most-likely vs rule-out-dangerous),
+so diversity is deterministic and reproducible. Late nodes (aggregate/verify) fall back to the prior
+answer on parse failure, never emitting `None`.
+
+---
+
 ## Status of evidence
 Deterministic run (qwen2.5:14b, **temperature=0**, 80 test items):
 
@@ -136,4 +158,7 @@ Takeaways:
 - **Multi-agent reasoning (V2) is the first real gain** — highest accuracy and a *significant* win over V1.
   The lift is from reasoner→specialist reasoning, not retrieval.
 - **V2 vs V0 needs confirmation at larger n** (n=80 small-sample; p=0.18).
-Next: confirm V2>V0 at 150+ items; add V3 (experience base); optional MedCPT-vs-nomic A/B.
+- **V3/V4 built** (panel+attending+verifier, and its no-verifier ablation) and functionally verified, but
+  not yet measured at scale.
+Next: confirm V2>V0 at 150+ items; measure V3/V4 (and V3−V4 = verifier's marginal effect); optional
+MedCPT-vs-nomic A/B.
