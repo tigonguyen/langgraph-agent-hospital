@@ -1,0 +1,15 @@
+"""Shared state threaded through every variant graph (plain overwrite fields)."""
+
+from __future__ import annotations
+
+from typing import TypedDict
+
+from agent_hospital.diseases.medqa_usmle import MCQItem
+
+
+class QAState(TypedDict, total=False):
+    item: MCQItem
+    query: str
+    evidence: str          # formatted evidence block ("" = none)
+    opinions: list[str]    # panel replies (V3/V4)
+    answer: int | None     # final chosen option index
