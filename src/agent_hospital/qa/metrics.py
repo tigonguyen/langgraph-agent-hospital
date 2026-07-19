@@ -32,13 +32,22 @@ class EpisodeRecord:
         return self.pred == self.gold
 
 
-def run_variant(items: list[MCQItem], answer_fn: Callable[[MCQItem], int | None]) -> list[EpisodeRecord]:
-    """Run an answer fn over items, timing each, returning per-item records."""
+def run_variant(
+    items: list[MCQItem],
+    answer_fn: Callable[[MCQItem], int | None],
+    progress: Callable[[int, int, EpisodeRecord], None] | None = None,
+) -> list[EpisodeRecord]:
+    """Run an answer fn over items, timing each, returning per-item records.
+
+    `progress(done, total, record)` is called after each item, for live logging.
+    """
     records: list[EpisodeRecord] = []
     for it in items:
         t = time.time()
         pred = answer_fn(it)
         records.append(EpisodeRecord(it.id, pred, it.answer_idx, time.time() - t))
+        if progress:
+            progress(len(records), len(items), records[-1])
     return records
 
 
