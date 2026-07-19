@@ -11,6 +11,7 @@ from __future__ import annotations
 import argparse
 
 from agent_hospital.diseases import load_medqa_usmle
+from agent_hospital.diseases.medqa_usmle import MCQItem
 from agent_hospital.qa import (
     VARIANTS,
     accuracy,
@@ -19,6 +20,23 @@ from agent_hospital.qa import (
     mean_latency,
     run_variant,
 )
+
+
+def warm_up(answer_fn) -> None:
+    """Run one throwaway question so the timed loop isn't charged for one-off costs.
+
+    Exercises the real path: Ollama model load, the lazy `create_agent` build, and
+    (for RAG variants) opening the Chroma store + loading the embedder. Uses a
+    synthetic item, never a scored one — re-running a scored item would leave its
+    prompt in Ollama's cache and make that item look artificially fast.
+    """
+    dummy = MCQItem(
+        id="warmup",
+        question="A patient presents with a sore throat. What is the next best step?",
+        options=["Observation", "Throat culture", "Chest x-ray", "Lumbar puncture"],
+        answer_idx=1,
+    )
+    answer_fn(dummy)
 
 
 def main() -> None:
@@ -38,7 +56,8 @@ def main() -> None:
     limit = args.limit or None
     items = load_medqa_usmle(args.split, limit=limit)
     print(f"Running {args.variant} ({VARIANTS[args.variant]}) on {len(items)} "
-          f"{args.split} items with {args.model} (temp=0)...\n")
+          f"{args.split} items with {args.model} (temp=0)")
+    print("warming up (one throwaway item; spin-up excluded from latency)...\n")
 
     letters = "ABCD"
     hits = 0
@@ -52,6 +71,7 @@ def main() -> None:
               f"{mark:<7} {r.latency_s:5.1f}s  running_acc={hits / done:.3f}", flush=True)
 
     answer = build_variant(args.variant, model=args.model)
+    warm_up(answer)
     records = run_variant(items, answer, progress=None if args.quiet else log)
     if not args.quiet:
         print()
