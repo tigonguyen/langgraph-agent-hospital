@@ -13,10 +13,10 @@ from typing import Any
 
 @dataclass(frozen=True)
 class RagConfig:
-    collection: str = "knowledge"          # or "knowledge_medcpt"
-    embedder: str = "nomic-embed-text"     # or "medcpt"
+    collection: str = "knowledge_medcpt"   # or "knowledge" (nomic-embedded)
+    embedder: str = "medcpt"               # or "nomic-embed-text"
     k: int = 4
-    threshold: float = 0.5
+    threshold: float = 0.60                # MedCPT (asymmetric) tops out ~0.69, so 0.6 is strict
     distill_query: bool = True
 
 
