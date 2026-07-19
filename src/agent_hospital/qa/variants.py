@@ -15,7 +15,6 @@ from typing import Callable
 
 from agent_hospital.config import RagConfig, RunConfig
 from agent_hospital.diseases.medqa_usmle import MCQItem
-from agent_hospital.graph import build_graph
 
 DEFAULT_MODEL = "qwen2.5:14b"
 
@@ -44,6 +43,8 @@ def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0
     A string model becomes a deterministic `ChatOllama` (temperature=0 by default) so
     evaluation is reproducible. `overrides` set any `RunConfig` field (rag, panel_size, …).
     """
+    from agent_hospital.graph import build_graph  # lazy: graph.nodes imports back into qa
+
     v = variant.upper()
     if v not in _PRESETS:
         raise ValueError(f"unknown variant {variant!r}; choose from {list(VARIANTS)}")

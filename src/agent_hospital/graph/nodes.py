@@ -37,16 +37,36 @@ def make_reason_node(cfg: RunConfig) -> Node:
 
 
 def make_retrieve_node(cfg: RunConfig) -> Node:
+    """Retrieval stage — invokes the `search_textbooks` tool directly (no LLM call)."""
+    search = make_search_tool(cfg)
+
+    def node(state: dict) -> dict:
+        return {"evidence": search.invoke({"query": state["query"]})}
+
+    return node
+
+
+def make_search_tool(cfg: RunConfig):
+    """A `search_textbooks` tool over the knowledge store (gated retrieval).
+
+    The retrieve node invokes it directly, so it costs no LLM call. Binding it to an
+    agent instead would let the model choose when to search, at the cost of one extra
+    model invocation per call (the model must be re-invoked on the tool result).
+    """
+    from langchain_core.tools import tool
+
     rag = cfg.rag
     holder: dict[str, Any] = {}
 
-    def node(state: dict) -> dict:
+    @tool
+    def search_textbooks(query: str) -> str:
+        """Search medical textbooks for passages relevant to a clinical query."""
         if "store" not in holder:
             holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
-        hits = retrieve(state["query"], k=rag.k, threshold=rag.threshold, store=holder["store"])
-        return {"evidence": format_evidence(hits)}
+        hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"])
+        return format_evidence(hits)          # "" = nothing cleared the gate (no-RAG fallback)
 
-    return node
+    return search_textbooks
 
 
 def make_answer_node(cfg: RunConfig) -> Node:
