@@ -50,6 +50,25 @@ ollama pull nomic-embed-text  # RAG embeddings
 ```
 Any tool-calling chat model works — override with `model="..."` (e.g. `qwen2.5:7b` is faster).
 
+### Using a cloud provider instead
+
+Model specs are `provider:model`; a bare string means Ollama, so `qwen2.5:7b` keeps working.
+
+| spec | provider | needs |
+|---|---|---|
+| `qwen2.5:14b` | Ollama (default) | — |
+| `anthropic:claude-sonnet-5` | Anthropic | `langchain-anthropic`, `ANTHROPIC_API_KEY` |
+| `openai:gpt-4o` | OpenAI | `langchain-openai`, `OPENAI_API_KEY` |
+| `google:gemini-2.0-flash` | Google | `langchain-google-genai`, `GOOGLE_API_KEY` |
+| `openrouter:meta-llama/llama-3.3-70b-instruct` | OpenRouter | `langchain-openai`, `OPENROUTER_API_KEY` |
+
+```bash
+.venv/bin/pip install -r requirements-providers.txt   # or just the one you need
+export ANTHROPIC_API_KEY=...
+PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 20 -m anthropic:claude-sonnet-5
+```
+Provider packages are imported lazily — only the one you actually use must be installed.
+
 ## 3. Build the RAG knowledge base (needed for V1/V2)
 
 Downloads the MedRAG **Textbooks** corpus (~125k snippets) and embeds it into a local Chroma store at
@@ -110,6 +129,7 @@ ingest_textbooks(store=open_store('knowledge_medcpt', embeddings=default_embeddi
 ```
 src/agent_hospital/
   agents/base.py      # Agent — lazy create_agent wrapper (any provider/model)
+  models.py           # resolve_model — 'provider:model' spec → chat model
   config.py           # RunConfig, RagConfig — the per-variant flexibility surface
   roles.py            # ROLE_PROMPTS registry (baseline · rag-answerer · specialist · attending · verifier)
   graph/              # state.py (QAState) · nodes.py (node factories) · build.py (build_graph)
