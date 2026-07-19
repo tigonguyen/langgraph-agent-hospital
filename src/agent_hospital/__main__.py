@@ -48,7 +48,9 @@ def main() -> None:
     p.add_argument("-n", "--limit", type=int, default=10,
                    help="number of questions, or 0 for the whole split (default: 10)")
     p.add_argument("-m", "--model", default="qwen2.5:7b",
-                   help="Ollama chat model (default: qwen2.5:7b)")
+                   help="model spec 'provider:model'; bare = Ollama. e.g. qwen2.5:14b, "
+                        "anthropic:claude-sonnet-5, openai:gpt-4o, google:gemini-2.0-flash, "
+                        "openrouter:meta-llama/llama-3.3-70b-instruct (default: qwen2.5:7b)")
     p.add_argument("-q", "--quiet", action="store_true",
                    help="suppress the per-item log, print only the summary")
     args = p.parse_args()

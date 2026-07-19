@@ -48,9 +48,9 @@ def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0
     if v not in _PRESETS:
         raise ValueError(f"unknown variant {variant!r}; choose from {list(VARIANTS)}")
     if isinstance(model, str):
-        from langchain_ollama import ChatOllama
+        from agent_hospital.models import resolve_model
 
-        model = ChatOllama(model=model, temperature=temperature)
+        model = resolve_model(model, temperature=temperature)
     cfg = replace(_PRESETS[v], model=model, **overrides)
     graph = build_graph(cfg)
 

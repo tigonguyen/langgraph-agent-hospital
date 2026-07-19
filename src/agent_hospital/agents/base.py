@@ -39,12 +39,12 @@ class Agent:
 
         Any provider's `BaseChatModel` instance is used as-is — that is how the
         agent adapts across providers (`ChatOllama`, `ChatAnthropic`, `ChatOpenAI`,
-        ...). A bare string is a convenience that defaults to a local Ollama model.
+        ...). A string is resolved as a `provider:model` spec (bare = Ollama).
         """
         if isinstance(self.model, str):
-            from langchain_ollama import ChatOllama
+            from agent_hospital.models import resolve_model
 
-            return ChatOllama(model=self.model)
+            return resolve_model(self.model)
         return self.model
 
     @property
