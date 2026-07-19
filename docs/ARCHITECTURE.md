@@ -98,14 +98,14 @@ retrieval at inference.
 flowchart TB
     subgraph KB["Knowledge base — built once (offline)"]
       direction LR
-      corpus["MedRAG Textbooks<br/>18 USMLE books · 125,847 snippets"] --> e1["nomic-embed-text<br/>768-d (local)"]
+      corpus["MedRAG Textbooks<br/>18 USMLE books · 125,847 snippets"] --> e1["MedCPT Article encoder<br/>768-d (local)"]
       e1 --> store[("Chroma · knowledge<br/>cosine / HNSW, persisted")]
     end
     subgraph INF["Inference — per question"]
       direction TB
       q["MCQItem"] --> d["1 · Query distillation<br/>LLM → focused query"]
-      d --> e2["2 · Embed query<br/>nomic-embed-text 768-d"]
-      e2 --> r["3 · Retrieve<br/>cosine · top-k=4 · gate >= 0.5"]
+      d --> e2["2 · Embed query<br/>MedCPT Query encoder 768-d"]
+      e2 --> r["3 · Retrieve (search_textbooks tool)<br/>cosine · top-k=4 · gate >= 0.60"]
       r --> g{"evidence above gate?"}
       g -->|yes| p1["4 · evidence + MCQ prompt"]
       g -->|"no — fallback"| p2["4 · MCQ prompt only"]
@@ -118,8 +118,13 @@ flowchart TB
 
 Files: `knowledge/ingest.py` (streamed incremental embedding), `knowledge/embeddings.py` (embedder
 seam), `knowledge/retriever.py` (`open_store`, gated `retrieve`), `qa/reasoning.py` (query distiller),
-`graph/nodes.py` (`make_reason_node`, `make_retrieve_node`, `make_answer_node`). V1's answer role is
-`rag-answerer`; V2 swaps it for `specialist` — the only difference between them.
+`graph/nodes.py` (`make_reason_node`, `make_search_tool`, `make_retrieve_node`, `make_answer_node`).
+V1's answer role is `rag-answerer`; V2 swaps it for `specialist` — the only difference between them.
+
+**Retrieval is packaged as a `search_textbooks` tool** that the retrieve node invokes directly. Calling
+it from the graph costs **no LLM call** (only the ~22 ms MedCPT query embedding; the HNSW search itself is
+sub-millisecond). Binding the same tool to an agent instead — letting the model decide when to search —
+costs one extra model invocation per call, because the model must be re-invoked to consume the result.
 
 ---
 
@@ -165,9 +170,9 @@ flowchart LR
 |---|---|---|
 | **RAG source / corpus** | **MedRAG Textbooks** — 18 USMLE textbooks, **125,847** pre-chunked snippets | **Leakage-safe** (reference text, not exam Q/A); the **exam is written against these books**, matching the query distribution; open + **pre-chunked**. PubMed/Wikipedia rejected — ~24–30M snippets, too big to embed locally. |
 | **Chunking** | MedRAG snippets **as-is** | already chunked by the authors; avoids re-chunking guesswork now. |
-| **Embedding model** | **`nomic-embed-text`** (Ollama, 768-d, local) | fully local/free, no extra deps, same stack as the user's obsidian-rag. **MedCPT** (medical-tuned) was first pick but its HF download **hard-stalled (0 MB/s)** → dropped; kept as a one-line swap via `knowledge/embeddings.py:default_embeddings()`. |
+| **Embedding model** | **MedCPT** (medical-domain, asymmetric bi-encoder, 768-d, local) | domain-tuned for biomedical retrieval. Its HF download originally hard-stalled (0 MB/s) so `nomic-embed-text` was the interim default; MedCPT was fetched via `curl` (D13), re-ingested into its own collection (D12), and is now the default. `nomic` remains a one-line swap via `default_embeddings()`. |
 | **Vector store** | **Chroma**, persistent, **cosine (HNSW)** | local, no server, native LangChain integration; cosine space set explicitly so relevance scores feed the gate. |
-| **Retrieval algorithm** | **dense VSM** — cosine, **top-k = 4**, **similarity gate ≥ 0.5 + no-RAG fallback** | dense captures clinical **paraphrase/synonyms** sparse misses; the **gate** stops off-topic snippets degrading answers (RAG was **−8 pts** without a sharp query/gate); k=4 balances evidence vs context bloat. Sparse/BM25 + **hybrid** are documented future options. |
+| **Retrieval algorithm** | **dense VSM** — cosine, **top-k = 4**, **similarity gate ≥ 0.60 + no-RAG fallback** | dense captures clinical **paraphrase/synonyms** sparse misses; the **gate** stops off-topic snippets degrading answers (RAG was **−8 pts** without a sharp query/gate); k=4 balances evidence vs context bloat. Threshold is embedder-specific — MedCPT's asymmetric scores top out ≈0.69, so 0.60 is strict (evidence on ~4/6 sampled items). Sparse/BM25 + **hybrid** are documented future options. |
 | **Query strategy** | **LLM query distillation** (retrieve on the focused question, not the raw vignette) | whole-vignette retrieval pulled **topical-but-non-discriminating** passages → **−8 pts**; distillation **flipped the lift to +2 pts**. |
 | **Answering LLM** | **`qwen2.5:14b`** (Ollama, tool-calling) | best **capability/speed** on a 48 GB Mac; **32B gave no gain** (0.66 vs 0.68) at ~4× latency; 7B is the cheap baseline. Swappable via `build_variant(model=…)`. |
 | **Scoring** | exact **MCQ option match** vs `label`; `None` = invalid | MedQA answers vary (dx/treatment/next-step), so the unit is "pick the right option", not a diagnosis string. |
@@ -206,8 +211,9 @@ MIRAGE itself; adopting the others later would show where RAG helps more.
 | Index | their format/retriever | our **Chroma** (cosine + gate) |
 
 Vectors are **not interchangeable across models** (a `nomic` doc vector and a MedCPT query vector are in
-different spaces). We re-embedded locally with `nomic` because MedCPT's download stalled; the main thing
-given up is MedCPT's domain tuning.
+different spaces), which is why each embedder needs its own collection. Both are now built:
+`knowledge` (nomic) and `knowledge_medcpt` (MedCPT), 125,847 vectors each — so the embedder A/B is a
+one-line config change.
 
 **Why RAG barely helped MedQA (the key insight):** RAG gains are **uneven across datasets**.
 Lookup-heavy sets (PubMedQA, BioASQ) benefit strongly; **reasoning/recall sets like MedQA barely do**,

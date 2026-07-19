@@ -101,6 +101,41 @@ answer = parse_choice(reply)
 
 ---
 
+## 3b. System Design — V1 (RAG)
+
+### Graph
+`START → reason → retrieve → answer → END`. V1 = V0 plus retrieval; the only new `QAState` fields are
+`query` and `evidence`, plus the answer role changes `baseline → rag-answerer`.
+
+| node | what it does | cost |
+|---|---|---|
+| `reason` | reasoning agent distils the vignette into a ≤20-word search query | **LLM call 1** |
+| `retrieve` | invokes the `search_textbooks` tool: embed query → cosine top-4 → gate → format | **no LLM**, ~22 ms |
+| `answer` | evidence prepended to the MCQ prompt, letter parsed out | **LLM call 2** |
+
+### Retrieval configuration
+| setting | value |
+|---|---|
+| corpus | MedRAG Textbooks, 125,847 snippets |
+| embedder | **MedCPT** (asymmetric bi-encoder: Article encoder for docs, Query encoder for queries) |
+| collection | `knowledge_medcpt` (Chroma, cosine/HNSW) |
+| top-k | 4 |
+| **gate threshold** | **0.60** |
+| fallback | no hits above gate → `evidence=""` → prompt collapses to V0's shape |
+
+### Why retrieval is a tool but not agent-driven
+`search_textbooks` is defined once as a `@tool`, then **invoked by the retrieve node** rather than chosen
+by the model. Measured both ways (see D19): agent-driven costs 3 LLM calls / 542 generated chars /
+3.78 s, graph-invoked costs 2 / 51 / 0.90 s. The tool remains bindable to an agent, so agentic RAG is a
+one-line change if wanted as a future arm.
+
+### Why the gate is 0.60, not 0.9
+MedCPT's asymmetric scores top out ≈0.69 on real queries (measured: 0.567–0.686). A 0.9 gate would admit
+**nothing**, silently turning V1 into V0-plus-a-wasted-call. At 0.60, evidence is present on ~4/6 sampled
+items. **Thresholds do not transfer between embedders** — re-tune whenever the embedder changes.
+
+---
+
 ## 4. Experimental Setup
 
 | item | value |
@@ -145,6 +180,14 @@ Prior deterministic run (qwen2.5:14b, temp=0, 80 test items): **V0 accuracy 0.66
    chars) was among the *fastest* items; all replies are 1 character.
 5. **Cloud models weaken determinism.** temp=0 is set, but APIs don't guarantee reproducibility
    the way local greedy decoding does. Keep the golden gate pinned to a local model.
+6. **A tool-using agent cannot be told "respond with ONLY the letter."** That instruction forbids any
+   non-letter output, so the model emits **zero** tool calls (measured: 0/5 items). Allowing reasoning
+   fixed it (1/1 tool calls) but grew output ~10× and latency 2.8×. Terse output and tool use are
+   mutually exclusive.
+7. **Gate thresholds are embedder-specific.** MedCPT tops out ≈0.69 because it is asymmetric; a
+   threshold borrowed from another embedder can silently disable retrieval entirely.
+8. **Retrieval is not the bottleneck.** The whole retrieve step is ~22 ms (~1.5% of V1 latency);
+   cosine search over 125,847 vectors is sub-millisecond. Cost lives in token generation.
 
 ---
 

@@ -46,7 +46,7 @@ python3.12 -m venv .venv
 
 ```bash
 ollama pull qwen2.5:14b       # default answering model
-ollama pull nomic-embed-text  # RAG embeddings
+ollama pull nomic-embed-text  # fallback RAG embeddings (MedCPT is the default — see below)
 ```
 Any tool-calling chat model works — override with `model="..."` (e.g. `qwen2.5:7b` is faster).
 
@@ -110,19 +110,25 @@ PY
 `build_variant(id, model=…, temperature=0, **overrides)` is the single entry point; the metrics harness
 (`qa/metrics.py`) gives accuracy, bootstrap CI, invalid-rate, Win/Loss/Tie, McNemar, and latency.
 
-## Optional — MedCPT (medical-domain embedder)
+## MedCPT — the default embedder
 
-MedCPT often retrieves better than `nomic` but is heavier. See
-[docs/TECHNICAL_DECISIONS.md](docs/TECHNICAL_DECISIONS.md) (D11–D13) for the full rationale and the
-`curl` download commands. In short:
+V1–V4 retrieve with **MedCPT** (medical-domain asymmetric bi-encoder) from the `knowledge_medcpt`
+collection. Setup: install the extra deps, download the two encoders into `data/medcpt/`, and ingest:
 
 ```bash
 uv pip install --python .venv -r requirements-medcpt.txt
-# download the two encoders into data/medcpt/ (curl — see docs), then re-ingest into its own collection:
+# download the two encoders into data/medcpt/ (curl — see docs/TECHNICAL_DECISIONS.md D13), then:
 PYTHONPATH=src .venv/bin/python -c "
 from agent_hospital.knowledge import open_store, ingest_textbooks, default_embeddings
 ingest_textbooks(store=open_store('knowledge_medcpt', embeddings=default_embeddings('medcpt')))"
 ```
+
+To fall back to the lighter `nomic-embed-text` (the `knowledge` collection), override the config:
+```python
+build_variant("V1", rag=RagConfig(collection="knowledge", embedder="nomic-embed-text", threshold=0.5))
+```
+**Re-tune `threshold` when changing embedder** — scores are not comparable across embedders
+(MedCPT tops out ≈0.69; see D20).
 
 ## Project layout
 

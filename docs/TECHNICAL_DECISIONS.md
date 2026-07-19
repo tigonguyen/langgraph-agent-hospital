@@ -49,9 +49,11 @@ distribution match.
 Why: local, no server, native LangChain integration; cosine set explicitly so relevance
 scores drive the gate.
 
-**D8 — Retrieval = dense VSM, top-k=4, similarity gate ≥ 0.5 + no-RAG fallback.**
+**D8 — Retrieval = dense VSM, top-k=4, similarity gate + no-RAG fallback.**
 Why: dense captures clinical paraphrase/synonyms; the gate stops off-topic snippets from
 degrading answers. Evidence: ungated whole-vignette RAG measured **−8 pts**.
+**Threshold is embedder-specific and must be re-tuned when the embedder changes** — it is
+now **0.60** for MedCPT (was 0.5 for nomic). See D19.
 
 **D9 — Query = reasoning-agent distillation, not the raw vignette.**
 Why: retrieving on the whole vignette pulls topical-but-non-discriminating passages.
@@ -61,8 +63,12 @@ Evidence: distillation moved the V1−V0 lift from **−8 → +2 pts**.
 
 ## Embeddings & why MedCPT requires a re-ingest
 
-**D10 — Default embedder = `nomic-embed-text` (Ollama, 768-d, local).**
-Why: local/free, no extra deps, proven in the user's obsidian-rag.
+**D10 — Default embedder = MedCPT** (was `nomic-embed-text` while MedCPT's download was blocked).
+Why: MedCPT is medical-domain-tuned and is MedRAG's strongest retriever. Once the weights were
+obtained (D13) and the corpus re-ingested into `knowledge_medcpt` (D12), it became the default in
+`RagConfig`. `nomic-embed-text` stays available as a one-line swap, and both collections are built
+(125,847 vectors each), so the embedder A/B is config-only. Applied at the **default** level so V1–V4
+all use the same retriever — mixing embedders across rungs would confound the ablation.
 
 **D11 — MedCPT added as a *selectable* embedder, not the default.**
 Why: MedCPT is medical-domain-tuned (likely better retrieval) but heavier (torch +
@@ -100,6 +106,33 @@ fixed the *rate limit* (config files flow) but not the client hang; the `hf-mirr
 endpoint was unreachable. The durable fix: `curl` the files (retry+resume) and load
 MedCPT from the local dirs. Only `model.safetensors` is fetched (skip the redundant
 `pytorch_model.bin`) → ~434 MB/encoder.
+
+---
+
+## Retrieval packaging
+
+**D19 — Retrieval is a `search_textbooks` tool, invoked by the graph rather than chosen by the model.**
+Why: packaging retrieval as a tool keeps one reusable definition (and leaves agentic RAG one line away),
+while invoking it from the node keeps V1 at **2 LLM calls** and fully deterministic.
+Measured both ways on the same items (qwen2.5:7b, temp=0):
+
+| | LLM calls/item | generated chars/item | latency |
+|---|---|---|---|
+| tool **bound to the agent** (model decides) | 3.0 | 542 | 3.78 s |
+| tool **invoked by the graph** (current) | 2.0 | 51 | 0.90 s |
+
+The extra call is inherent: a model-chosen tool call requires re-invoking the model on the result. The
+larger cost was generation — a tool-using agent **cannot** be told "respond with ONLY the letter" (that
+forbids emitting a tool call), so it must be allowed to reason, and output grew ~10×. Retrieval itself is
+~22 ms (MedCPT query embedding; HNSW search is sub-millisecond), i.e. **~1.5% of V1's latency** — the
+bottleneck is token generation, not the vector store.
+
+**D20 — Gate threshold is embedder-specific; 0.60 for MedCPT.**
+Why: MedCPT is an **asymmetric** bi-encoder (separate query/article encoders), so query-to-passage cosine
+is systematically lower than a symmetric embedder's — measured scores top out ≈**0.69**. A threshold
+carried over from another embedder is meaningless: **0.9 would admit nothing**, making V1 byte-identical
+to V0 plus a wasted reasoning call. 0.60 is strict but functional — evidence present on ~4/6 sampled
+items, the rest exercising the no-RAG fallback.
 
 ---
 
