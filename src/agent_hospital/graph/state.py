@@ -11,5 +11,6 @@ class QAState(TypedDict, total=False):
     item: MCQItem
     query: str
     evidence: str          # formatted evidence block ("" = none)
+    rationale: str         # clinical reasoner's analysis, no letter (V2)
     opinions: list[str]    # panel replies (V3/V4)
     answer: int | None     # final chosen option index

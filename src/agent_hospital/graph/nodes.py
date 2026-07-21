@@ -12,17 +12,17 @@ from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import format_mcq, parse_choice
+from agent_hospital.qa.mcq import ANALYSE_ONLY, LETTER_ONLY, format_mcq, parse_choice
 from agent_hospital.qa.reasoning import build_reasoning_agent
 
 Node = Callable[[dict], dict]
 _LETTERS = "ABCD"
 
 
-def _prompt(state: dict, extra: str = "") -> str:
+def _prompt(state: dict, extra: str = "", closing: str = LETTER_ONLY) -> str:
     ev = state.get("evidence", "")
     head = f"{ev}\n\n" if ev else ""
-    return f"{head}{format_mcq(state['item'])}{extra}"
+    return f"{head}{format_mcq(state['item'], closing)}{extra}"
 
 
 def make_reason_node(cfg: RunConfig) -> Node:
@@ -69,11 +69,25 @@ def make_search_tool(cfg: RunConfig):
     return search_textbooks
 
 
+def make_clinical_reason_node(cfg: RunConfig) -> Node:
+    """Clinical reasoning stage — emits an analysis, deliberately no answer letter."""
+    agent = Agent("clinical-reasoner", roles.ROLE_PROMPTS["clinical-reasoner"],
+                  model=cfg.model_for("clinical-reasoner"))
+
+    def node(state: dict) -> dict:
+        analysis = agent.say(_prompt(state, closing=ANALYSE_ONLY)).strip()
+        return {"rationale": analysis}
+
+    return node
+
+
 def make_answer_node(cfg: RunConfig) -> Node:
     agent = Agent(cfg.answer_role, roles.ROLE_PROMPTS[cfg.answer_role], model=cfg.model_for(cfg.answer_role))
 
     def node(state: dict) -> dict:
-        return {"answer": parse_choice(agent.say(_prompt(state)))}
+        rationale = state.get("rationale", "")
+        extra = f"\n\nClinical analysis:\n{rationale}" if rationale else ""
+        return {"answer": parse_choice(agent.say(_prompt(state, extra=extra)))}
 
     return node
 

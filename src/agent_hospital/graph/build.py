@@ -22,6 +22,10 @@ def build_graph(cfg: RunConfig):
         g.add_node("retrieve", nodes.make_retrieve_node(cfg))
         seq += ["reason", "retrieve"]
 
+    if cfg.clinical_reason:
+        g.add_node("clinical_reason", nodes.make_clinical_reason_node(cfg))
+        seq.append("clinical_reason")
+
     if cfg.panel_size > 1 or cfg.aggregate:
         g.add_node("panel", nodes.make_panel_node(cfg))
         g.add_node("aggregate", nodes.make_aggregate_node(cfg))

@@ -26,6 +26,7 @@ class RunConfig:
     role_models: dict[str, Any] = field(default_factory=dict)
     answer_role: str = "baseline"          # role for the single-answer node (V0-V2)
     rag: RagConfig | None = None           # None = no retrieval (V0)
+    clinical_reason: bool = False          # clinical reasoning stage before answering (V2)
     panel_size: int = 1                    # >1 or aggregate → panel + attending (V3/V4)
     aggregate: bool = False
     verify: bool = False                   # verifier node (V3 on, V4 off)
