@@ -5,7 +5,8 @@ This document describes what is **built and measured today**: the five-variant a
 
 Every variant is a **LangGraph `StateGraph`**, assembled from an internal `RunConfig` by
 `graph/build.py:build_graph(cfg)`. All variants expose the same interface —
-`answer(item: MCQItem) -> int | None` — and are selected through a single switch (`qa/variants.py`):
+`answer(item: MCQItem) -> AnswerResult(answer, rationale)` — and are selected through a single switch
+(`qa/variants.py`). Every variant returns a short (≤30 word) explanation alongside its choice, per spec §3:
 
 ```python
 from agent_hospital.qa import build_variant
@@ -17,10 +18,10 @@ flowchart LR
     item["MCQItem<br/>vignette + 4 options"] --> sw{"build_variant(id, model)<br/>→ build_graph(RunConfig)"}
     sw -->|V0| v0["answer"]
     sw -->|V1| v1["reason → retrieve → answer"]
-    sw -->|V2| v2["reason → retrieve → answer"]
+    sw -->|V2| v2["reason → retrieve → clinical_reason → answer"]
     sw -->|V3| v3["reason → retrieve → panel → aggregate → verify"]
     sw -->|V4| v4["reason → retrieve → panel → aggregate"]
-    v0 & v1 & v2 & v3 & v4 --> ans["option index"]
+    v0 & v1 & v2 & v3 & v4 --> ans["AnswerResult<br/>option index + short explanation"]
     ans --> eval["Metrics harness<br/>accuracy, CI, invalid-rate, WLT, McNemar, latency"]
 ```
 
@@ -37,17 +38,20 @@ new code, and every variant is evaluated identically. `RunConfig` is internal;
 |---|---|---|
 | **Agent** | thin lazy wrapper over LangChain v1 `create_agent`; builds the graph on first use | `agents/base.py` |
 | **Model access** | any `BaseChatModel`; a bare string → local `ChatOllama` (provider-agnostic) | `agents/base.py` |
-| **Config** | `RunConfig` (answer role, rag, panel_size, aggregate, verify, per-role models) + `RagConfig` | `config.py` |
-| **Roles** | `ROLE_PROMPTS` registry — baseline · rag-answerer · specialist · attending · verifier | `roles.py` |
-| **Graph** | `QAState` + node factories (reason/retrieve/answer/panel/aggregate/verify) + `build_graph(cfg)` | `graph/` |
+| **Config** | `RunConfig` (answer role, rag, clinical_reason, panel_size, aggregate, verify, per-role models) + `RagConfig` | `config.py` |
+| **Roles** | `ROLE_PROMPTS` — baseline · rag-answerer · clinical-reasoner · decider · specialist · attending · verifier | `roles.py` |
+| **Graph** | `QAState` + node factories (reason/retrieve/clinical_reason/answer/panel/aggregate/verify) + `build_graph(cfg)` | `graph/` |
 | **Variant switch** | `_PRESETS` (V0–V4) + `build_variant(id, model, **overrides)` → uniform `answer` fn | `qa/variants.py` |
-| **Eval harness** | per-item records → accuracy+CI, invalid-rate, Win/Loss/Tie, McNemar, latency | `qa/metrics.py` |
+| **Eval harness** | per-item records (pred, gold, latency, rationale) → accuracy+CI, invalid-rate, Win/Loss/Tie, McNemar | `qa/metrics.py` |
 | **Data** | `openlifescienceai/medqa` (4-option MCQ; train 10,178 / val 1,272 / test 1,273) | `diseases/medqa_usmle.py` |
 
 **Why this shape:** the goal is an **ablation ladder** — every variant differs by *exactly one thing*
 and is scored the same way, so accuracy differences are attributable. A single config-driven graph
-builder + one metrics harness guarantees that: V0→V1 adds RAG, V1→V2 swaps the answer role, V2→V3 adds
-the panel/attending/verifier, V3→V4 drops the verifier.
+builder + one metrics harness guarantees that: V0→V1 adds RAG, V1→V2 adds the clinical reasoning stage,
+V2→V3 swaps it for the panel/attending/verifier, V3→V4 drops the verifier.
+
+> **Open caveat:** V1/V2 retrieve from **MedMCQA** while V3/V4 retrieve **textbook prose**, so `V2 → V3`
+> currently confounds corpus with architecture. Resolve before the ladder goes in the report.
 
 ### MedQA-USMLE row schema (`openlifescienceai/medqa`)
 
@@ -85,7 +89,8 @@ flowchart LR
 
 - **No retrieval, no reasoning, no panel** — the graph is a single `answer` node (`answer_role="baseline"`,
   `rag=None`); `build_graph` wires only `START → answer → END`.
-- Prompt = vignette + four options + "respond with only the letter" (`roles.py:BASELINE`, `qa/mcq.py:format_mcq`).
+- Prompt = vignette + four options + a ≤30-word justification then `Answer: X` (`roles.py:BASELINE`,
+  `qa/mcq.py:format_mcq` with `REASON_THEN_ANSWER`).
 - `parse_choice` extracts A–D (`Answer: X`, else a lone letter); unparseable → `None` (an invalid
   response, never a silent wrong).
 
@@ -124,7 +129,8 @@ flowchart TB
 Files: `knowledge/ingest.py` (streamed incremental embedding), `knowledge/embeddings.py` (embedder
 seam), `knowledge/retriever.py` (`open_store`, gated `retrieve`), `qa/reasoning.py` (query distiller),
 `graph/nodes.py` (`make_reason_node`, `make_search_tool`, `make_retrieve_node`, `make_answer_node`).
-V1's answer role is `rag-answerer`; V2 swaps it for `specialist` — the only difference between them.
+V1's answer role is `rag-answerer`. **V1 retrieves from MedMCQA** (`knowledge_medmcqa`, 182,822 solved
+exam questions, gate 0.65) rather than textbook prose — see D19/D20 and REPORT_NOTES §3b.
 
 **Retrieval is packaged as a `search_textbooks` tool** that the retrieve node invokes directly. Calling
 it from the graph costs **no LLM call** (only the ~22 ms MedCPT query embedding; the HNSW search itself is
@@ -143,7 +149,7 @@ flowchart LR
     q["MCQItem"] --> rz["reason<br/>distill query"]
     rz --> rt["retrieve<br/>gated top-k evidence"]
     rt --> br{answer role?}
-    br -->|"V2 · specialist"| sp["answer<br/>single specialist"]
+    br -->|"V2 · clinical reasoner"| sp["clinical_reason → decider"]
     br -->|"V3/V4 · panel"| pn["panel<br/>2 specialists,<br/>distinct perspectives"]
     pn --> ag["aggregate<br/>attending weighs opinions"]
     ag --> vf{"verify? (V3 only)"}
@@ -153,8 +159,9 @@ flowchart LR
     vr --> out
 ```
 
-- **V2 — single specialist:** `answer_role="specialist"` — one clinician-framed answerer over the same
-  evidence. This is the first variant that beat V1 significantly (p=0.023); the lift is *reasoning*, not RAG.
+- **V2 — clinical reasoner + decider:** a `clinical-reasoner` writes a structured analysis (findings →
+  what is asked → each option for/against) but **never names an option**; a `decider` then commits.
+  3 agents, meeting spec §4.6. Inherits V1's corpus and gate, so `V2 − V1` isolates the answering stage.
 - **V3 — full system:** a **panel** of `panel_size=2` specialists, each given a distinct perspective
   (`roles.PERSPECTIVES`: "favor the single most likely answer" vs "rule out dangerous/confused
   alternatives") so a temperature-0 panel still produces diverse opinions; an **attending** aggregates

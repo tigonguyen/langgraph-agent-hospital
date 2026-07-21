@@ -136,6 +136,27 @@ items, the rest exercising the no-RAG fallback.
 
 ---
 
+## Answer + explanation
+
+**D21 — Variants return `AnswerResult(answer, rationale)`, not a bare option index.**
+Why: §3 requires an answer *plus a short explanation*. The graph already produced a rationale, but
+`build_variant` extracted only `answer`, so it was discarded at the variant boundary and never
+reached the metrics harness or CLI. `EpisodeRecord` now carries it, which also supplies §9's
+prediction files without a second pass. `run_variant` still accepts a bare int, so ad-hoc answer
+functions keep working.
+
+**D22 — Explanations are capped at 30 words; internal deliberation is not.**
+Why: §3 asks for a *short* explanation and unconstrained replies ran ~200 words. Four closing
+instructions now exist because one cannot serve every role: `REASON_THEN_ANSWER` (≤30 words) for
+answering nodes, `ANALYSE_ONLY` for V2's clinical reasoner (must **not** name an option, or the
+decider would just copy it), `DELIBERATE` for V3/V4 panel opinions (internal input to the
+attending — capping them would degrade the deliberation V3 exists to test), and `LETTER_ONLY`
+retained as the default.
+**Cost:** V0 rose 0.66 s → ~1.5 s/item. **Consequence:** every measurement taken under the
+letter-only prompts is superseded, and the golden file pins nothing until the ladder settles.
+
+---
+
 ## Evaluation
 
 **D14 — n = 150 test items; metrics = accuracy + 95% bootstrap CI, invalid-rate, Win/Loss/Tie, McNemar, latency.**

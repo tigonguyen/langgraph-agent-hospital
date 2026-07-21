@@ -235,6 +235,49 @@ answer leaks** on a smoke run; rationales ran 1,890–3,625 chars.
 
 ---
 
+## 3d. Answer + explanation (spec §3)
+
+§3 requires *"exactly one final answer option plus a short explanation"*. Every variant returns
+both, via a single interface:
+
+```python
+answer_fn(item) -> AnswerResult(answer: int | None, rationale: str)
+```
+
+`EpisodeRecord` carries the rationale too, so the metrics harness and (future) prediction files
+have it without a second pass.
+
+### Where each variant's explanation comes from
+| variant | produced by | closing instruction |
+|---|---|---|
+| V0 | the single answerer | `REASON_THEN_ANSWER` (≤30 words) |
+| V1 | the answerer, over retrieved evidence | `REASON_THEN_ANSWER` |
+| V2 | the **decider** — a short justification of its own | `REASON_THEN_ANSWER` |
+| V3 | the **verifier** (last node to write `answer`) | `REASON_THEN_ANSWER` |
+| V4 | the **attending** | `REASON_THEN_ANSWER` |
+
+### Three closings, because one instruction cannot serve every role
+| constant | used by | text |
+|---|---|---|
+| `LETTER_ONLY` | default (kept for reference) | "Respond with ONLY the letter…" |
+| `REASON_THEN_ANSWER` | every answering node | "In at most 30 words, say why the best option is best, then… 'Answer: X'" |
+| `ANALYSE_ONLY` | V2's clinical reasoner | "Analyse the case and the options. Do NOT state a final answer." |
+| `DELIBERATE` | V3/V4 panel | "Reason about the key findings and the options, then… 'Answer: X'" |
+
+**Why the panel is exempt from the 30-word cap:** panel opinions are *internal* — they are the
+attending's input, not user-facing output. Capping them would degrade the deliberation V3 exists
+to test. Only the final answering node is constrained.
+
+**Why V2's decider explains rather than passing the analysis through:** the clinical reasoner
+emits ~2,000 chars, which is not "a short explanation". The analysis still drives the decision;
+the decider writes the user-facing sentence.
+
+### Cost
+Explanations are not free. V0 went from **0.66 s → ~1.5 s/item** at 30 words (it was ~8.5 s when
+replies ran ~200 words). Any comparison against the earlier letter-only numbers is invalid.
+
+---
+
 ## 4. Experimental Setup
 
 | item | value |
