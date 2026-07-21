@@ -11,6 +11,9 @@ _LETTERS = "ABCD"
 
 LETTER_ONLY = "Respond with ONLY the letter (A, B, C, or D) of the best answer."
 ANALYSE_ONLY = "Analyse the case and the options. Do NOT state a final answer."
+REASON_THEN_ANSWER = (
+    "Reason briefly, then on the LAST line write 'Answer: X' where X is A, B, C, or D."
+)
 
 
 def format_mcq(item: MCQItem, closing: str = LETTER_ONLY) -> str:

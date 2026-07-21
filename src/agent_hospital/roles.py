@@ -10,12 +10,12 @@ from __future__ import annotations
 # --- V0-V2 (verbatim) ---
 BASELINE = (
     "You are an expert physician answering a medical board (USMLE) multiple-choice "
-    "question. Choose the single best answer."
+    "question. Choose the single best answer, with a brief justification."
 )
 RAG_ANSWERER = (
     "You are an expert physician answering a USMLE multiple-choice question. "
-    "Use the provided textbook evidence when it is relevant; otherwise rely on your "
-    "own knowledge. Choose the single best answer."
+    "Use the provided evidence when it is relevant; otherwise rely on your "
+    "own knowledge. Choose the single best answer, with a brief justification."
 )
 SPECIALIST = (
     "You are an expert physician on a case panel answering a USMLE multiple-choice question. "

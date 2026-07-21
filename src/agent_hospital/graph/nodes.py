@@ -12,7 +12,8 @@ from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import ANALYSE_ONLY, LETTER_ONLY, format_mcq, parse_choice
+from agent_hospital.qa.mcq import (ANALYSE_ONLY, LETTER_ONLY, REASON_THEN_ANSWER,
+                                   format_mcq, parse_choice)
 from agent_hospital.qa.reasoning import build_reasoning_agent
 
 Node = Callable[[dict], dict]
@@ -84,10 +85,19 @@ def make_clinical_reason_node(cfg: RunConfig) -> Node:
 def make_answer_node(cfg: RunConfig) -> Node:
     agent = Agent(cfg.answer_role, roles.ROLE_PROMPTS[cfg.answer_role], model=cfg.model_for(cfg.answer_role))
 
+    # The decider is handed an analysis already, so it just commits to a letter.
+    # Every other answer role explains itself (spec §3: answer + short explanation).
+    explains = cfg.answer_role != "decider"
+    closing = REASON_THEN_ANSWER if explains else LETTER_ONLY
+
     def node(state: dict) -> dict:
-        rationale = state.get("rationale", "")
-        extra = f"\n\nClinical analysis:\n{rationale}" if rationale else ""
-        return {"answer": parse_choice(agent.say(_prompt(state, extra=extra)))}
+        prior = state.get("rationale", "")
+        extra = f"\n\nClinical analysis:\n{prior}" if prior else ""
+        reply = agent.say(_prompt(state, extra=extra, closing=closing))
+        out: dict = {"answer": parse_choice(reply)}
+        if explains:
+            out["rationale"] = reply.strip()
+        return out
 
     return node
 
@@ -100,7 +110,7 @@ def make_panel_node(cfg: RunConfig) -> Node:
         agents.append(Agent(f"specialist-{i}", prompt, model=cfg.model_for("specialist")))
 
     def node(state: dict) -> dict:
-        base = _prompt(state)
+        base = _prompt(state, closing=REASON_THEN_ANSWER)
         return {"opinions": [a.say(base) for a in agents]}
 
     return node
@@ -111,7 +121,9 @@ def make_aggregate_node(cfg: RunConfig) -> Node:
 
     def node(state: dict) -> dict:
         ops = "\n\n".join(f"Panelist {i + 1}:\n{o}" for i, o in enumerate(state.get("opinions", [])))
-        return {"answer": parse_choice(agent.say(_prompt(state, extra=f"\n\nPanel opinions:\n{ops}")))}
+        reply = agent.say(_prompt(state, extra=f"\n\nPanel opinions:\n{ops}",
+                                  closing=REASON_THEN_ANSWER))
+        return {"answer": parse_choice(reply), "rationale": reply.strip()}
 
     return node
 
@@ -122,7 +134,9 @@ def make_verify_node(cfg: RunConfig) -> Node:
     def node(state: dict) -> dict:
         cur = state.get("answer")
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
-        revised = parse_choice(agent.say(_prompt(state, extra=f"\n\nProposed answer: {cur_letter}")))
-        return {"answer": revised if revised is not None else cur}
+        reply = agent.say(_prompt(state, extra=f"\n\nProposed answer: {cur_letter}",
+                                  closing=REASON_THEN_ANSWER))
+        revised = parse_choice(reply)
+        return {"answer": revised if revised is not None else cur, "rationale": reply.strip()}
 
     return node

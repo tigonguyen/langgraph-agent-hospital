@@ -15,21 +15,6 @@
     "train-00010",
     "train-00011"
   ],
-  "answers": {
-    "V0": {
-      "train-00000": 3,
-      "train-00001": 0,
-      "train-00002": 1,
-      "train-00003": 0,
-      "train-00004": 3,
-      "train-00005": 0,
-      "train-00006": 3,
-      "train-00007": 0,
-      "train-00008": 0,
-      "train-00009": 3,
-      "train-00010": 3,
-      "train-00011": 2
-    }
-  },
-  "note": "V1/V2 were rebuilt after capture (MedMCQA corpus, clinical reasoner); only V0 is pinned."
+  "answers": {},
+  "note": "All variants were rebuilt after capture (MedMCQA corpus, clinical reasoner, reason-then-answer prompts), so no pre-refactor answers remain valid to pin."
 }
