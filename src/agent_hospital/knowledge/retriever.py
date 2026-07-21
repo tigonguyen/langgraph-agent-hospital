@@ -50,9 +50,24 @@ def retrieve(
 
 
 def format_evidence(hits: list[tuple[Document, float]], max_chars: int = 500) -> str:
-    """Render retrieved hits as a labeled evidence block (empty string if none)."""
+    """Render retrieved hits as a labeled evidence block (empty string if none).
+
+    MedMCQA records store only the question as page_content — the answer and
+    explanation live in metadata — so they get their own rendering.
+    """
     if not hits:
         return ""
+    if all(doc.metadata.get("source") == "medmcqa" for doc, _ in hits):
+        lines = ["Related exam questions and their answers:"]
+        for doc, _score in hits:
+            md = doc.metadata
+            line = f"- Q: {doc.page_content.strip()}\n  A: {md.get('answer', '').strip()}"
+            exp = (md.get("explanation") or "").strip()
+            if exp:
+                line += f"\n  Why: {exp[:max_chars]}"
+            lines.append(line)
+        return "\n".join(lines)
+
     lines = ["Textbook evidence:"]
     for doc, _score in hits:
         title = doc.metadata.get("title", "").strip()
