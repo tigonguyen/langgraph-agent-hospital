@@ -1,14 +1,17 @@
 # Report Notes
 
 Working notes for the midterm report, organised against the required report structure.
-Sections are filled in as each variant is built. **Status: architecture + V0 + V1 complete.**
+Sections are filled in as each variant is built. **Status: architecture + V0 + V1 + V2 complete.**
 
 Companion docs: [ARCHITECTURE.md](ARCHITECTURE.md) (what is wired to what) ·
-[TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md) (why, with evidence).
+[TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md) (why, with evidence) ·
+[diagrams/](diagrams/) (report-ready SVGs).
 
 ---
 
 ## 2. System Architecture
+
+![Ablation ladder](diagrams/ladder_overview.svg)
 
 ### The organising idea
 Every variant is the **same graph skeleton with different nodes switched on**. A variant is
@@ -24,7 +27,7 @@ RAG nodes, V2→V3 by exactly the panel/attending/verifier, V3→V4 by exactly t
 |---|---|---|
 | V0 | `answer` | 1 |
 | V1 | `reason → retrieve → answer` | 2 |
-| V2 | `reason → retrieve → answer` (specialist role) | 2 |
+| V2 | `reason → retrieve → clinical_reason → answer` | 3 |
 | V3 | `reason → retrieve → panel → aggregate → verify` | 5 |
 | V4 | `reason → retrieve → panel → aggregate` | 4 |
 
@@ -33,7 +36,7 @@ RAG nodes, V2→V3 by exactly the panel/attending/verifier, V3→V4 by exactly t
 |---|---|
 | `config.py` | `RunConfig` / `RagConfig` — the only flexibility surface |
 | `roles.py` | `ROLE_PROMPTS` registry — every system prompt lives here |
-| `graph/state.py` | `QAState` — `item`, `query`, `evidence`, `opinions`, `answer` |
+| `graph/state.py` | `QAState` — `item`, `query`, `evidence`, `rationale`, `opinions`, `answer` |
 | `graph/nodes.py` | node factories, one per pipeline stage |
 | `graph/build.py` | `build_graph(cfg)` — assembles + compiles the graph |
 | `qa/variants.py` | `_PRESETS` (V0–V4) + `build_variant()` — the public switch |
@@ -48,12 +51,16 @@ RAG nodes, V2→V3 by exactly the panel/attending/verifier, V3→V4 by exactly t
   a graph touches no network, so tests and graph construction are offline-safe.
 - **Uniform interface** — every variant is `answer(item) -> int | None`, so one metrics harness
   scores all of them identically.
-- **Behaviour-preservation gate** — `tests/test_golden.py` replays pre-refactor V0/V1/V2 answers
-  and asserts byte-identical results, so refactors provably don't move the numbers.
+- **Behaviour-preservation gate** — `tests/test_golden.py` replays captured answers and asserts
+  byte-identical results. It currently pins **nothing**: every variant changed intentionally
+  (MedMCQA corpus, clinical reasoner, reason-then-answer prompts), so the old captures expired.
+  Re-capture once the ladder settles.
 
 ---
 
 ## 3. System Design — V0 (Direct LLM baseline)
+
+![V0 flow](diagrams/v0_flow.svg)
 
 ### Purpose
 The **control**. Every reported gain is `Accuracy(Vn) − Accuracy(V0)`, so V0 must be the purest
@@ -71,7 +78,7 @@ node; `verify=False` adds nothing after. Compiled graph: **`START → answer →
 ### Prompt (verbatim — required for §10 reproducibility)
 System prompt (`roles.py:BASELINE`):
 > You are an expert physician answering a medical board (USMLE) multiple-choice question.
-> Choose the single best answer.
+> Choose the single best answer, with a brief justification.
 
 User turn (`qa/mcq.py:format_mcq`):
 ```
@@ -82,26 +89,29 @@ B. {option 1}
 C. {option 2}
 D. {option 3}
 
-Respond with ONLY the letter (A, B, C, or D) of the best answer.
+Reason briefly, then on the LAST line write 'Answer: X' where X is A, B, C, or D.
 ```
-No evidence is prepended — `_prompt()` finds `state["evidence"]` empty because no retrieve node ran.
+(V0 was letter-only until §3's explanation requirement was implemented; that change
+invalidated the earlier 200-item numbers.) No evidence is prepended — `_prompt()` finds `state["evidence"]` empty because no retrieve node ran.
 
 ### Answer extraction
 `parse_choice` tries `Answer: X` / `answer is X` (case-insensitive), then falls back to the first
 standalone `A|B|C|D`. Returns index `0–3`, or `None` = **invalid** (never a silent wrong).
-In practice the model replies a bare `"B"` and the fallback catches it — **invalid rate 0.0%**.
+The `Answer: X` pattern catches the reason-then-answer replies — **invalid rate 0.0%** throughout.
 
 ### Execution, condensed
 ```python
 agent  = Agent("baseline", BASELINE, model=resolve_model(spec, temperature=0))
-reply  = agent.say(format_mcq(item))   # exactly one LLM call, no tools
-answer = parse_choice(reply)
+reply  = agent.say(format_mcq(item, REASON_THEN_ANSWER))   # one LLM call, no tools
+answer = parse_choice(reply)                                # rationale = reply
 ```
-`QAState` carries `item` in and `answer` out; `query` / `evidence` / `opinions` are never set.
+`QAState` carries `item` in, `answer` + `rationale` out; `query` / `evidence` / `opinions` unset.
 
 ---
 
 ## 3b. System Design — V1 (RAG)
+
+![V1 flow](diagrams/v1_flow.svg)
 
 ### Graph
 `START → reason → retrieve → answer → END`. V1 = V0 plus retrieval; the only new `QAState` fields are
@@ -145,8 +155,9 @@ flowchart TB
 | evidence format | `Q: … / A: … / Why: …`, explanation tapered 250 chars (rank 0) then 125 |
 | fallback | no hits above gate → `evidence=""` → prompt collapses to V0's shape |
 
-V2–V4 still retrieve **textbook prose** (`knowledge_medcpt`, gate 0.60). That is deliberate — it enables
-a corpus A/B — but it means `V2 − V1` currently confounds corpus with answerer role.
+**V2 inherits this corpus and gate unchanged**, so `V2 − V1` isolates the answering stage. V3/V4 still
+retrieve **textbook prose** (`knowledge_medcpt`, gate 0.60), so `V2 → V3` confounds corpus with
+architecture — resolve before the ladder goes in the report.
 
 ### Why the corpus changed from textbooks to MedMCQA
 Textbook RAG measurably **hurt** (V1 0.625 vs V0 0.662), and the published literature reports the same:
@@ -195,6 +206,35 @@ per-item effect was erratic — one item with just 375 chars of evidence still t
 from no-evidence to any-evidence dominates, not evidence size** (likely prompt-cache behaviour). Dedupe
 is kept regardless: it is a pure information win (4 distinct hits instead of ~2 facts twice).
 
+## 3c. System Design — V2 (multi-agent)
+
+![V2 flow](diagrams/v2_flow.svg)
+
+### Graph
+`START → reason → retrieve → clinical_reason → answer → END`. Inherits V1's entire front end
+byte-identically, so **V2 − V1 is attributable to the answering stage alone**.
+
+| # | agent | role | output |
+|---|---|---|---|
+| 1 | `reasoner` | distils the vignette into a search query | `query` |
+| — | *(retrieve — tool, no LLM)* | gated MedMCQA retrieval | `evidence` |
+| 2 | **`clinical-reasoner`** | key findings → what is asked → each option for/against | `rationale` |
+| 3 | **`decider`** | weighs the analysis, commits to a letter | `answer` |
+
+**3 agents, 3 LLM calls/item** — satisfies §4.6 (≥3 agents) and §4.2 (medical reasoning agent).
+
+### Why the reasoner may not name an option
+`CLINICAL_REASONER` is instructed *"Do NOT choose an answer… Never write 'Answer:'"*, and the
+user turn ends with `ANALYSE_ONLY` rather than the letter-only closing. If it named a letter the
+decider would simply copy it and the split into two agents would buy nothing. **Verified: 0/10
+answer leaks** on a smoke run; rationales ran 1,890–3,625 chars.
+
+### Measured (smoke, qwen2.5:14b, 10 train items)
+9/10 correct, 0 invalid, **28.9 s/item** — ~5× V1 and ~44× V0, because the reasoner generates
+~2,500 chars and generation dominates latency. Not yet measured at scale; n=10 proves nothing.
+
+---
+
 ## 4. Experimental Setup
 
 | item | value |
@@ -219,7 +259,31 @@ no network — `HF_HUB_OFFLINE=1` just skips a slow metadata check that can 504.
 
 ---
 
-## 5. Evaluation Results — V0
+## 5. Evaluation Results
+
+### V0 vs V1 — 200 train items, qwen2.5:14b, temp=0 (letter-only prompts, now superseded)
+
+| | accuracy | 95% CI | invalid | latency |
+|---|---|---|---|---|
+| V0 | 0.700 | [0.635, 0.770] | 0.0% | 0.66 s |
+| V1 | 0.705 | [0.640, 0.770] | 0.0% | 5.58 s |
+
+**V1 − V0 = +0.5 pts · W/L/T = 11/10/179 · McNemar p = 1.0000** — a null result at 8.5× the latency.
+179/200 items were unaffected; of the 21 retrieval changed, it helped 11 and hurt 10.
+
+Conditioning on whether the gate fired (168/200 items did): V1 scored **0.690 with evidence** vs
+V0's **0.696 on those same items** — retrieval is inert, not merely weak. V1's higher score on the
+32 no-evidence items (0.781) reflects those being easier questions, not a retrieval effect.
+
+**Interpretation.** Both corpora now tested: textbooks −3.7 pts, MedMCQA +0.5 pts (n.s.). The
+limitation is not the corpus — MedQA is reasoning-bound, not knowledge-bound. A 14B model already
+holds the facts; retrieving more facts does not help it *integrate* them. This is the empirical
+case for V2+ targeting reasoning structure rather than retrieval.
+
+**Superseded:** these numbers predate the §3 explanation change (all variants now reason-then-answer),
+so they must be re-measured before the report.
+
+### V0 (historic)
 
 Prior deterministic run (qwen2.5:14b, temp=0, 80 test items): **V0 accuracy 0.662**,
 95% bootstrap CI [0.562, 0.762], invalid rate 0.0%, 0.63 s/item. On a 150-item run V0 measured
@@ -249,6 +313,14 @@ Prior deterministic run (qwen2.5:14b, temp=0, 80 test items): **V0 accuracy 0.66
    threshold borrowed from another embedder can silently disable retrieval entirely.
 8. **Retrieval is not the bottleneck.** The whole retrieve step is ~22 ms (~1.5% of V1 latency);
    cosine search over 125,847 vectors is sub-millisecond. Cost lives in token generation.
+9. **A user-turn instruction silently overrides the system prompt.** Hit three times: (a) a
+   tool-using agent under "respond with ONLY the letter" emitted **0/5** tool calls; (b) the
+   clinical reasoner would have been told both to analyse and to answer; (c) V3's panel agents
+   were told "Reason briefly" by their system prompt but "ONLY the letter" by the user turn — so
+   the panel emitted **bare letters and never actually deliberated** (opinions 0 → ~2,500 chars
+   once fixed). Any node whose system prompt asks for reasoning must pass a matching closing.
+10. **Gate hit-rate drifts from calibration.** Calibrated at 65% on 20 queries; the 200-item run
+   fired on **84%** (168/200). Small calibration samples under-estimate hit rate.
 
 ---
 

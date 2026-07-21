@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="680" height="606" viewBox="0 0 680 606" font-family="Helvetica, Arial, sans-serif">
+  <title>V1 — RAG with MedMCQA</title>
+  <defs>
+    <marker id="a1" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
+    </marker>
+  </defs>
+  <text x="340" y="22" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">V1 — RAG-only (MedMCQA exemplars)</text>
+
+  <rect x="40" y="44" width="66" height="40" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="73" y="69" text-anchor="middle" font-size="12" font-weight="500" fill="#334155">START</text>
+  <rect x="136" y="44" width="128" height="40" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="200" y="61" text-anchor="middle" font-size="13" font-weight="500" fill="#5B21B6">reason</text>
+  <text x="200" y="76" text-anchor="middle" font-size="11" fill="#6D28D9">LLM call 1</text>
+  <rect x="294" y="44" width="128" height="40" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="358" y="61" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">retrieve</text>
+  <text x="358" y="76" text-anchor="middle" font-size="11" fill="#0F766E">no LLM · ~40 ms</text>
+  <rect x="452" y="44" width="128" height="40" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="516" y="61" text-anchor="middle" font-size="13" font-weight="500" fill="#5B21B6">answer</text>
+  <text x="516" y="76" text-anchor="middle" font-size="11" fill="#6D28D9">LLM call 2</text>
+  <rect x="610" y="44" width="30" height="40" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="625" y="69" text-anchor="middle" font-size="12" fill="#334155">→</text>
+
+  <line x1="106" y1="64" x2="130" y2="64" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="264" y1="64" x2="288" y2="64" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="422" y1="64" x2="446" y2="64" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="580" y1="64" x2="604" y2="64" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="276" y="36" text-anchor="middle" font-size="11" fill="#475569">query</text>
+  <text x="434" y="36" text-anchor="middle" font-size="11" fill="#475569">evidence</text>
+
+  <line x1="358" y1="84" x2="358" y2="106" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="4 4"/>
+  <text x="358" y="124" text-anchor="middle" font-size="11" fill="#475569">inside retrieve — the search_textbooks tool</text>
+
+  <rect x="40" y="140" width="140" height="62" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="110" y="166" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">embed query</text>
+  <text x="110" y="184" text-anchor="middle" font-size="11" fill="#0F766E">MedCPT Query enc.</text>
+  <rect x="204" y="140" width="140" height="62" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="274" y="166" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">over-fetch k×3</text>
+  <text x="274" y="184" text-anchor="middle" font-size="11" fill="#0F766E">12 of 182,822</text>
+  <rect x="368" y="140" width="140" height="62" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="438" y="166" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">gate</text>
+  <text x="438" y="184" text-anchor="middle" font-size="11" fill="#0F766E">score ≥ 0.65</text>
+  <rect x="532" y="140" width="108" height="62" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="586" y="166" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">dedupe</text>
+  <text x="586" y="184" text-anchor="middle" font-size="11" fill="#0F766E">top 4 distinct</text>
+
+  <line x1="180" y1="171" x2="198" y2="171" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="344" y1="171" x2="362" y2="171" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="508" y1="171" x2="526" y2="171" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <path d="M586 202 L586 224 L358 224 L358 242" fill="none" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#a1)"/>
+
+  <rect x="264" y="242" width="188" height="40" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="358" y="267" text-anchor="middle" font-size="13" font-weight="500" fill="#334155">any hits left?</text>
+  <line x1="264" y1="262" x2="196" y2="262" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <line x1="452" y1="262" x2="520" y2="262" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <text x="228" y="254" text-anchor="middle" font-size="11" fill="#475569">yes ~65%</text>
+  <text x="488" y="254" text-anchor="middle" font-size="11" fill="#475569">no ~35%</text>
+
+  <rect x="40" y="300" width="156" height="96" rx="8" fill="#DCFCE7" stroke="#16A34A"/>
+  <text x="118" y="326" text-anchor="middle" font-size="13" font-weight="500" fill="#166534">format evidence</text>
+  <text x="118" y="345" text-anchor="middle" font-size="11" fill="#15803D">Q / A / Why blocks</text>
+  <text x="118" y="363" text-anchor="middle" font-size="11" fill="#15803D">taper 250 then 125</text>
+  <text x="118" y="381" text-anchor="middle" font-size="11" fill="#15803D">~927 chars</text>
+
+  <rect x="484" y="300" width="156" height="96" rx="8" fill="#FEF3C7" stroke="#D97706"/>
+  <text x="562" y="326" text-anchor="middle" font-size="13" font-weight="500" fill="#92400E">no-RAG fallback</text>
+  <text x="562" y="345" text-anchor="middle" font-size="11" fill="#B45309">evidence = ""</text>
+  <text x="562" y="363" text-anchor="middle" font-size="11" fill="#B45309">no header added</text>
+  <text x="562" y="381" text-anchor="middle" font-size="11" fill="#B45309">prompt = V0's</text>
+
+  <path d="M118 396 L118 420 L300 420 L300 440" fill="none" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#a1)"/>
+  <path d="M562 396 L562 420 L380 420 L380 440" fill="none" stroke="#94A3B8" stroke-width="1.5" marker-end="url(#a1)"/>
+
+  <rect x="196" y="440" width="288" height="62" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="340" y="466" text-anchor="middle" font-size="13" font-weight="500" fill="#5B21B6">answer node — LLM call 2</text>
+  <text x="340" y="485" text-anchor="middle" font-size="11" fill="#6D28D9">6.6 s with evidence · 1.6 s without</text>
+  <line x1="340" y1="502" x2="340" y2="524" stroke="#64748B" stroke-width="1.5" marker-end="url(#a1)"/>
+  <rect x="196" y="524" width="288" height="48" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="340" y="545" text-anchor="middle" font-size="13" font-weight="500" fill="#5B21B6">parse_choice</text>
+  <text x="340" y="562" text-anchor="middle" font-size="11" fill="#6D28D9">letter → 0-3, or None = invalid</text>
+
+  <text x="340" y="594" text-anchor="middle" font-size="11" fill="#64748B">purple = LLM call · teal = retrieval (no LLM) · green/amber = the two prompt paths</text>
+</svg>
