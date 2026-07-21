@@ -10,10 +10,11 @@ from agent_hospital.qa.metrics import (
     win_loss_tie,
 )
 from agent_hospital.qa.reasoning import build_reasoning_agent
-from agent_hospital.qa.variants import VARIANTS, build_variant
+from agent_hospital.qa.variants import VARIANTS, AnswerResult, build_variant
 
 __all__ = [
     "build_variant",
+    "AnswerResult",
     "VARIANTS",
     "build_reasoning_agent",
     "format_mcq",

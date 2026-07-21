@@ -10,7 +10,7 @@ Each variant is a preset `RunConfig` compiled into a `StateGraph` by `build_grap
 
 from __future__ import annotations
 
-from dataclasses import replace
+from dataclasses import dataclass, replace
 from typing import Callable
 
 from agent_hospital.config import RagConfig, RunConfig
@@ -26,7 +26,15 @@ VARIANTS: dict[str, str] = {
     "V4": "Full system without verifier",
 }
 
-AnswerFn = Callable[[MCQItem], "int | None"]
+@dataclass(frozen=True)
+class AnswerResult:
+    """What a variant returns: the chosen option, and why (spec §3)."""
+
+    answer: int | None          # option index 0-3, or None = unparseable
+    rationale: str = ""         # short explanation; "" if the variant produced none
+
+
+AnswerFn = Callable[[MCQItem], AnswerResult]
 
 _PRESETS: dict[str, RunConfig] = {
     "V0": RunConfig(answer_role="baseline", rag=None),
@@ -45,7 +53,7 @@ _PRESETS: dict[str, RunConfig] = {
 
 
 def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0, **overrides) -> AnswerFn:
-    """Return the answer function for a variant id ('V0'..'V4').
+    """Return the answer function for a variant id ('V0'..'V4') -> AnswerResult.
 
     A string model becomes a deterministic `ChatOllama` (temperature=0 by default) so
     evaluation is reproducible. `overrides` set any `RunConfig` field (rag, panel_size, …).
@@ -62,7 +70,8 @@ def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0
     cfg = replace(_PRESETS[v], model=model, **overrides)
     graph = build_graph(cfg)
 
-    def answer(item: MCQItem) -> int | None:
-        return graph.invoke({"item": item}).get("answer")
+    def answer(item: MCQItem) -> AnswerResult:
+        out = graph.invoke({"item": item})
+        return AnswerResult(answer=out.get("answer"), rationale=out.get("rationale", ""))
 
     return answer

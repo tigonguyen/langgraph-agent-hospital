@@ -54,4 +54,6 @@ def test_variants_answer_live():
     for vid in ("V0", "V1", "V2"):
         answer = build_variant(vid, model=SMOKE_MODEL)
         for it in items:
-            assert answer(it) in (None, 0, 1, 2, 3)
+            res = answer(it)
+            assert res.answer in (None, 0, 1, 2, 3)
+            assert isinstance(res.rationale, str)

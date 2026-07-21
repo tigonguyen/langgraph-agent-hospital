@@ -11,7 +11,7 @@ import math
 import random
 import time
 from dataclasses import dataclass
-from typing import Callable
+from typing import Any, Callable
 
 from agent_hospital.diseases.medqa_usmle import MCQItem
 
@@ -22,6 +22,7 @@ class EpisodeRecord:
     pred: int | None
     gold: int
     latency_s: float
+    rationale: str = ""      # the variant's explanation (spec §3)
 
     @property
     def valid(self) -> bool:
@@ -34,7 +35,7 @@ class EpisodeRecord:
 
 def run_variant(
     items: list[MCQItem],
-    answer_fn: Callable[[MCQItem], int | None],
+    answer_fn: Callable[[MCQItem], Any],
     progress: Callable[[int, int, EpisodeRecord], None] | None = None,
 ) -> list[EpisodeRecord]:
     """Run an answer fn over items, timing each, returning per-item records.
@@ -44,8 +45,11 @@ def run_variant(
     records: list[EpisodeRecord] = []
     for it in items:
         t = time.time()
-        pred = answer_fn(it)
-        records.append(EpisodeRecord(it.id, pred, it.answer_idx, time.time() - t))
+        res = answer_fn(it)
+        # Accept a bare index too, so ad-hoc answer fns still work.
+        pred = getattr(res, "answer", res)
+        rationale = getattr(res, "rationale", "")
+        records.append(EpisodeRecord(it.id, pred, it.answer_idx, time.time() - t, rationale))
         if progress:
             progress(len(records), len(items), records[-1])
     return records
