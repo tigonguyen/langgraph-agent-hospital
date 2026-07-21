@@ -30,7 +30,11 @@ AnswerFn = Callable[[MCQItem], "int | None"]
 
 _PRESETS: dict[str, RunConfig] = {
     "V0": RunConfig(answer_role="baseline", rag=None),
-    "V1": RunConfig(answer_role="rag-answerer", rag=RagConfig()),
+    # V1 retrieves solved exam questions (MedMCQA); V2-V4 retrieve textbook prose.
+    # 0.65 matches the textbook gate's selectivity (~65% of items get evidence), so the
+    # corpus A/B isn't confounded by one gate firing more often than the other.
+    "V1": RunConfig(answer_role="rag-answerer",
+                    rag=RagConfig(collection="knowledge_medmcqa", threshold=0.65)),
     "V2": RunConfig(answer_role="specialist", rag=RagConfig()),
     "V3": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=True),
     "V4": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=False),
