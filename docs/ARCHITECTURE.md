@@ -42,29 +42,34 @@ new code, and every variant is evaluated identically. `RunConfig` is internal;
 | **Graph** | `QAState` + node factories (reason/retrieve/answer/panel/aggregate/verify) + `build_graph(cfg)` | `graph/` |
 | **Variant switch** | `_PRESETS` (V0–V4) + `build_variant(id, model, **overrides)` → uniform `answer` fn | `qa/variants.py` |
 | **Eval harness** | per-item records → accuracy+CI, invalid-rate, Win/Loss/Tie, McNemar, latency | `qa/metrics.py` |
-| **Data** | `nnilayy/medqa-usmle` (4-option MCQ; train 10,178 / val 1,272 / test 1,273) | `diseases/medqa_usmle.py` |
+| **Data** | `openlifescienceai/medqa` (4-option MCQ; train 10,178 / val 1,272 / test 1,273) | `diseases/medqa_usmle.py` |
 
 **Why this shape:** the goal is an **ablation ladder** — every variant differs by *exactly one thing*
 and is scored the same way, so accuracy differences are attributable. A single config-driven graph
 builder + one metrics harness guarantees that: V0→V1 adds RAG, V1→V2 swaps the answer role, V2→V3 adds
 the panel/attending/verifier, V3→V4 drops the verifier.
 
-### MedQA-USMLE row schema (`nnilayy/medqa-usmle`)
+### MedQA-USMLE row schema (`openlifescienceai/medqa`)
 
-Each row is one 4-option MCQ in a SWAG-style schema:
+Each row nests the item under a `data` dict:
 
 | Field | Type | Holds |
 |---|---|---|
-| `id` | string | unique question id |
-| `sent1` | string | clinical vignette **+** question stem (the full prompt; no separate question field) |
-| `sent2` | string | secondary SWAG stem — unused here (constant/empty) |
-| `ending0..3` | string | the four options (A–D) |
-| `label` | int 0–3 | index of the correct option |
+| `id` | string | upstream UUID (**not** used — see below) |
+| `data.Question` | string | clinical vignette **+** question stem (the full prompt) |
+| `data.Options` | dict | `{"A": …, "B": …, "C": …, "D": …}` |
+| `data.Correct Option` | string | the correct letter, e.g. `"B"` |
+| `subject_name` | string | often empty |
 
-Cached locally as Arrow files (`~/.cache/huggingface/datasets/nnilayy___medqa-usmle/`), memory-mapped by
-`datasets`. Our loader (`diseases/medqa_usmle.py`) maps each row → `MCQItem`:
-`sent1 → question`, `[ending0..3] → options`, `label → answer_idx`; `sent2` is dropped. Splits:
+Cached locally as Arrow files (`~/.cache/huggingface/datasets/`), memory-mapped by `datasets`.
+Our loader (`diseases/medqa_usmle.py`) maps each row → `MCQItem`: `data.Question → question`,
+`Options[A..D] → options`, `index("ABCD", Correct Option) → answer_idx`. Splits are named
+`train` / **`dev`** / `test` upstream; `"validation"` is aliased to `dev`, so
 train 10,178 / validation 1,272 / test 1,273.
+
+**Ids are positional** (`test-00000`), not upstream UUIDs, so they stay stable across dataset
+mirrors — the golden file and prediction files key on them. Verified against the previous mirror:
+**0 question and 0 gold-answer mismatches** across all 1,273 test items.
 
 ---
 

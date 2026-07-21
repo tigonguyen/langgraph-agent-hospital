@@ -21,7 +21,7 @@ Rejected: **32B** — measured **≈ 7B accuracy** (0.66 vs 0.68) at ~4× latenc
 
 ## Data & task
 
-**D3 — Eval dataset = `nnilayy/medqa-usmle` (4-option MCQ).**
+**D3 — Eval dataset = `openlifescienceai/medqa` (MedQA-USMLE, 4-option MCQ).**
 Why: standard USMLE benchmark with a real train/val/test split; the measured task for all variants.
 
 **D4 — Task = MCQ answering (no patient simulation).**

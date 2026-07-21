@@ -27,7 +27,7 @@ All five are now config-driven LangGraph presets — see [REFACTOR_PLAN.md](REFA
    rationales from MedQA train mistakes) as a future V3+ lever.
 
 ## Data & stack
-- **Dataset:** [`nnilayy/medqa-usmle`](https://huggingface.co/datasets/nnilayy/medqa-usmle) — 4-option MCQ
+- **Dataset:** [`openlifescienceai/medqa`](https://huggingface.co/datasets/openlifescienceai/medqa) — 4-option MCQ
   (train 10,178 / val 1,272 / test 1,273); scored by exact option match.
 - **Code:** `agents/base.py` (Agent) · `knowledge/` (MedRAG Textbooks → Chroma, `nomic`/`medcpt`) ·
   `qa/` (variants + metrics harness).

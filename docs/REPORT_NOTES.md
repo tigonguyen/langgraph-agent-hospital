@@ -140,7 +140,7 @@ items. **Thresholds do not transfer between embedders** — re-tune whenever the
 
 | item | value |
 |---|---|
-| Dataset | `nnilayy/medqa-usmle` — train 10,178 / validation 1,272 / **test 1,273** |
+| Dataset | `openlifescienceai/medqa` (Jin et al. 2020) — train 10,178 / validation 1,272 / **test 1,273** |
 | Dev split | `train` (debugging/tuning only) |
 | Official split | `test`, n=1273 — the §7 denominator; used **once** |
 | Default model | `qwen2.5:7b` (CLI default), `qwen2.5:14b` (library default) |
