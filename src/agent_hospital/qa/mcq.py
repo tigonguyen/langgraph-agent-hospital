@@ -11,8 +11,14 @@ _LETTERS = "ABCD"
 
 LETTER_ONLY = "Respond with ONLY the letter (A, B, C, or D) of the best answer."
 ANALYSE_ONLY = "Analyse the case and the options. Do NOT state a final answer."
+# Panel opinions are internal — they feed the attending, so they stay unconstrained.
+DELIBERATE = (
+    "Reason about the key findings and the options, then on the LAST line write "
+    "'Answer: X' where X is A, B, C, or D."
+)
 REASON_THEN_ANSWER = (
-    "Reason briefly, then on the LAST line write 'Answer: X' where X is A, B, C, or D."
+    "In at most 30 words, say why the best option is best, then on the LAST line "
+    "write 'Answer: X' where X is A, B, C, or D."
 )
 
 

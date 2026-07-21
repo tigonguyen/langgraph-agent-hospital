@@ -12,8 +12,8 @@ from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import (ANALYSE_ONLY, LETTER_ONLY, REASON_THEN_ANSWER,
-                                   format_mcq, parse_choice)
+from agent_hospital.qa.mcq import (ANALYSE_ONLY, DELIBERATE, LETTER_ONLY,
+                                   REASON_THEN_ANSWER, format_mcq, parse_choice)
 from agent_hospital.qa.reasoning import build_reasoning_agent
 
 Node = Callable[[dict], dict]
@@ -85,19 +85,13 @@ def make_clinical_reason_node(cfg: RunConfig) -> Node:
 def make_answer_node(cfg: RunConfig) -> Node:
     agent = Agent(cfg.answer_role, roles.ROLE_PROMPTS[cfg.answer_role], model=cfg.model_for(cfg.answer_role))
 
-    # The decider is handed an analysis already, so it just commits to a letter.
-    # Every other answer role explains itself (spec §3: answer + short explanation).
-    explains = cfg.answer_role != "decider"
-    closing = REASON_THEN_ANSWER if explains else LETTER_ONLY
-
     def node(state: dict) -> dict:
+        # A prior analysis (V2's clinical reasoner) informs the choice; the short
+        # justification written here replaces it as the user-facing explanation.
         prior = state.get("rationale", "")
         extra = f"\n\nClinical analysis:\n{prior}" if prior else ""
-        reply = agent.say(_prompt(state, extra=extra, closing=closing))
-        out: dict = {"answer": parse_choice(reply)}
-        if explains:
-            out["rationale"] = reply.strip()
-        return out
+        reply = agent.say(_prompt(state, extra=extra, closing=REASON_THEN_ANSWER))
+        return {"answer": parse_choice(reply), "rationale": reply.strip()}
 
     return node
 
@@ -110,7 +104,7 @@ def make_panel_node(cfg: RunConfig) -> Node:
         agents.append(Agent(f"specialist-{i}", prompt, model=cfg.model_for("specialist")))
 
     def node(state: dict) -> dict:
-        base = _prompt(state, closing=REASON_THEN_ANSWER)
+        base = _prompt(state, closing=DELIBERATE)
         return {"opinions": [a.say(base) for a in agents]}
 
     return node
