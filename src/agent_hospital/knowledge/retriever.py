@@ -18,6 +18,7 @@ CHROMA_DIR = "data/chroma"
 KNOWLEDGE_COLLECTION = "knowledge"
 DEFAULT_K = 4
 DEFAULT_THRESHOLD = 0.5
+OVERFETCH = 3            # fetch k*OVERFETCH so dedupe can still fill k slots
 
 
 def open_store(
@@ -43,10 +44,29 @@ def retrieve(
     threshold: float = DEFAULT_THRESHOLD,
     store: Any | None = None,
 ) -> list[tuple[Document, float]]:
-    """Return (doc, relevance) pairs above the threshold; empty list = no-RAG fallback."""
+    """Return up to `k` distinct (doc, relevance) pairs above the threshold.
+
+    Over-fetches then drops repeats, because MedMCQA was scraped from open sources
+    and contains the same question many times — without this, ~45% of queries spend
+    two or more of their k slots on identical answers. Empty list = no-RAG fallback.
+    """
     store = store or open_store()
-    hits = store.similarity_search_with_relevance_scores(query, k=k)
-    return [(doc, score) for doc, score in hits if score >= threshold]
+    hits = store.similarity_search_with_relevance_scores(query, k=k * OVERFETCH)
+
+    kept: list[tuple[Document, float]] = []
+    seen: set[str] = set()
+    for doc, score in hits:
+        if score < threshold:
+            continue
+        # Dedupe on the answer for QA corpora, else on the passage text.
+        key = (doc.metadata.get("answer") or doc.page_content).strip().lower()
+        if key in seen:
+            continue
+        seen.add(key)
+        kept.append((doc, score))
+        if len(kept) >= k:
+            break
+    return kept
 
 
 def format_evidence(hits: list[tuple[Document, float]], max_chars: int = 500) -> str:
@@ -59,12 +79,14 @@ def format_evidence(hits: list[tuple[Document, float]], max_chars: int = 500) ->
         return ""
     if all(doc.metadata.get("source") == "medmcqa" for doc, _ in hits):
         lines = ["Related exam questions and their answers:"]
-        for doc, _score in hits:
+        for rank, (doc, _score) in enumerate(hits):
             md = doc.metadata
             line = f"- Q: {doc.page_content.strip()}\n  A: {md.get('answer', '').strip()}"
             exp = (md.get("explanation") or "").strip()
             if exp:
-                line += f"\n  Why: {exp[:max_chars]}"
+                # Taper: the best-matching hit earns the most room, later hits less.
+                budget = max_chars // 2 if rank == 0 else max_chars // 4
+                line += f"\n  Why: {exp[:budget]}"
             lines.append(line)
         return "\n".join(lines)
 
