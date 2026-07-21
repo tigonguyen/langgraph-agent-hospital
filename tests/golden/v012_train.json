@@ -1,62 +1,35 @@
 {
- "model": "qwen2.5:7b",
- "split": "train",
- "ids": [
-  "train-00000",
-  "train-00001",
-  "train-00002",
-  "train-00003",
-  "train-00004",
-  "train-00005",
-  "train-00006",
-  "train-00007",
-  "train-00008",
-  "train-00009",
-  "train-00010",
-  "train-00011"
- ],
- "answers": {
-  "V0": {
-   "train-00000": 3,
-   "train-00001": 0,
-   "train-00002": 1,
-   "train-00003": 0,
-   "train-00004": 3,
-   "train-00005": 0,
-   "train-00006": 3,
-   "train-00007": 0,
-   "train-00008": 0,
-   "train-00009": 3,
-   "train-00010": 3,
-   "train-00011": 2
+  "model": "qwen2.5:7b",
+  "split": "train",
+  "ids": [
+    "train-00000",
+    "train-00001",
+    "train-00002",
+    "train-00003",
+    "train-00004",
+    "train-00005",
+    "train-00006",
+    "train-00007",
+    "train-00008",
+    "train-00009",
+    "train-00010",
+    "train-00011"
+  ],
+  "answers": {
+    "V0": {
+      "train-00000": 3,
+      "train-00001": 0,
+      "train-00002": 1,
+      "train-00003": 0,
+      "train-00004": 3,
+      "train-00005": 0,
+      "train-00006": 3,
+      "train-00007": 0,
+      "train-00008": 0,
+      "train-00009": 3,
+      "train-00010": 3,
+      "train-00011": 2
+    }
   },
-  "V1": {
-   "train-00000": 3,
-   "train-00001": 0,
-   "train-00002": 1,
-   "train-00003": 2,
-   "train-00004": 3,
-   "train-00005": 2,
-   "train-00006": 3,
-   "train-00007": 0,
-   "train-00008": 0,
-   "train-00009": 3,
-   "train-00010": 2,
-   "train-00011": 2
-  },
-  "V2": {
-   "train-00000": 3,
-   "train-00001": 0,
-   "train-00002": 1,
-   "train-00003": 2,
-   "train-00004": 3,
-   "train-00005": 2,
-   "train-00006": 3,
-   "train-00007": 0,
-   "train-00008": 0,
-   "train-00009": 3,
-   "train-00010": 2,
-   "train-00011": 2
-  }
- }
+  "note": "V1/V2 were rebuilt after capture (MedMCQA corpus, clinical reasoner); only V0 is pinned."
 }

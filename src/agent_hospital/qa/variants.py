@@ -21,7 +21,7 @@ DEFAULT_MODEL = "qwen2.5:14b"
 VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only",
-    "V2": "Multi-agent (reasoner + specialist)",
+    "V2": "Multi-agent (distiller + clinical reasoner + decider)",
     "V3": "Full system (panel + attending + verifier)",
     "V4": "Full system without verifier",
 }
@@ -35,7 +35,10 @@ _PRESETS: dict[str, RunConfig] = {
     # corpus A/B isn't confounded by one gate firing more often than the other.
     "V1": RunConfig(answer_role="rag-answerer",
                     rag=RagConfig(collection="knowledge_medmcqa", threshold=0.65)),
-    "V2": RunConfig(answer_role="specialist", rag=RagConfig()),
+    # 3 agents: query distiller -> clinical reasoner (analysis, no letter) -> decider.
+    # Inherits V1's MedMCQA corpus, so V1->V2 differs only in the answering stage.
+    "V2": RunConfig(answer_role="decider", clinical_reason=True,
+                    rag=RagConfig(collection="knowledge_medmcqa", threshold=0.65)),
     "V3": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=True),
     "V4": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=False),
 }
