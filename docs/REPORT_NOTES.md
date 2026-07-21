@@ -1,7 +1,7 @@
 # Report Notes
 
 Working notes for the midterm report, organised against the required report structure.
-Sections are filled in as each variant is built. **Status: architecture + V0 complete.**
+Sections are filled in as each variant is built. **Status: architecture + V0 + V1 complete.**
 
 Companion docs: [ARCHITECTURE.md](ARCHITECTURE.md) (what is wired to what) ·
 [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md) (why, with evidence).
@@ -107,40 +107,101 @@ answer = parse_choice(reply)
 `START → reason → retrieve → answer → END`. V1 = V0 plus retrieval; the only new `QAState` fields are
 `query` and `evidence`, plus the answer role changes `baseline → rag-answerer`.
 
+```mermaid
+flowchart TB
+    S([START]) --> RZ["reason · LLM call 1<br/>distil vignette → ≤20-word query"]
+    RZ -->|query| RT["retrieve · no LLM, ~40 ms"]
+    subgraph TOOL["search_textbooks tool"]
+      direction LR
+      E["embed query<br/>MedCPT Query encoder"] --> OF["over-fetch k×3<br/>12 of 182,822"]
+      OF --> G["gate<br/>score ≥ 0.65"]
+      G --> D["dedupe on answer<br/>keep top 4 distinct"]
+    end
+    RT -.-> TOOL
+    D --> Q{any hits left?}
+    Q -->|"yes ~65%"| F["format evidence<br/>Q / A / Why, taper 250/125<br/>~927 chars"]
+    Q -->|"no ~35%"| NF["no-RAG fallback<br/>evidence = '' → prompt = V0's"]
+    F --> A["answer · LLM call 2<br/>6.6 s with evidence · 1.6 s without"]
+    NF --> A
+    A --> P["parse_choice → 0-3, or None"]
+    P --> END([END])
+```
+
 | node | what it does | cost |
 |---|---|---|
-| `reason` | reasoning agent distils the vignette into a ≤20-word search query | **LLM call 1** |
-| `retrieve` | invokes the `search_textbooks` tool: embed query → cosine top-4 → gate → format | **no LLM**, ~22 ms |
-| `answer` | evidence prepended to the MCQ prompt, letter parsed out | **LLM call 2** |
+| `reason` | reasoning agent distils the vignette into a ≤20-word search query | **LLM call 1**, 0.5–1.8 s |
+| `retrieve` | `search_textbooks` tool: embed → over-fetch → gate → dedupe → format | **no LLM**, 0.03–0.06 s |
+| `answer` | evidence prepended to the MCQ prompt, letter parsed out | **LLM call 2**, 0.5–10 s |
 
 ### Retrieval configuration
 | setting | value |
 |---|---|
-| corpus | MedRAG Textbooks, 125,847 snippets |
-| embedder | **MedCPT** (asymmetric bi-encoder: Article encoder for docs, Query encoder for queries) |
-| collection | `knowledge_medcpt` (Chroma, cosine/HNSW) |
-| top-k | 4 |
-| **gate threshold** | **0.60** |
+| corpus | **MedMCQA** — 182,822 solved exam questions (Pal et al., CHIL 2022) |
+| collection | `knowledge_medmcqa` (Chroma, cosine/HNSW) |
+| embedder | **MedCPT** (asymmetric: Article encoder for docs, Query encoder for queries) |
+| what is embedded | **the question only** — answer/explanation/subject are metadata |
+| top-k | 4 distinct (over-fetch 12, dedupe on answer text) |
+| **gate threshold** | **0.65** |
+| evidence format | `Q: … / A: … / Why: …`, explanation tapered 250 chars (rank 0) then 125 |
 | fallback | no hits above gate → `evidence=""` → prompt collapses to V0's shape |
+
+V2–V4 still retrieve **textbook prose** (`knowledge_medcpt`, gate 0.60). That is deliberate — it enables
+a corpus A/B — but it means `V2 − V1` currently confounds corpus with answerer role.
+
+### Why the corpus changed from textbooks to MedMCQA
+Textbook RAG measurably **hurt** (V1 0.625 vs V0 0.662), and the published literature reports the same:
+textbook-corpus retrieval gives no significant gain on USMLE because the items are reasoning-driven —
+the answer is *derived* from integrating findings, not stated in any one passage. MedMCQA retrieves
+*solved questions with their explanations* instead of expository prose — closer to Medprompt's exemplar
+retrieval, which reached 90.6% on MedQA. **Not yet measured on our system.**
 
 ### Why retrieval is a tool but not agent-driven
 `search_textbooks` is defined once as a `@tool`, then **invoked by the retrieve node** rather than chosen
-by the model. Measured both ways (see D19): agent-driven costs 3 LLM calls / 542 generated chars /
-3.78 s, graph-invoked costs 2 / 51 / 0.90 s. The tool remains bindable to an agent, so agentic RAG is a
-one-line change if wanted as a future arm.
+by the model. Measured both ways (D19): agent-driven costs 3 LLM calls / 542 generated chars / 3.78 s;
+graph-invoked costs 2 / 51 / 0.90 s. A model-chosen tool call needs a second invocation to consume the
+result, and a tool-using agent cannot be told "respond with ONLY the letter". The tool stays bindable to
+an agent, so agentic RAG remains a one-line change.
 
-### Why the gate is 0.60, not 0.9
-MedCPT's asymmetric scores top out ≈0.69 on real queries (measured: 0.567–0.686). A 0.9 gate would admit
-**nothing**, silently turning V1 into V0-plus-a-wasted-call. At 0.60, evidence is present on ~4/6 sampled
-items. **Thresholds do not transfer between embedders** — re-tune whenever the embedder changes.
+### Why the gate is 0.65
+Calibrated on 20 real distilled queries against this collection:
 
----
+| gate | hits kept | queries with ≥1 hit |
+|---|---|---|
+| 0.60 | 84% | 85% |
+| **0.65** | **65%** | **65%** ← chosen |
+| 0.70 | 16% | 25% |
+
+0.65 matches the textbook gate's selectivity (~65%), so the corpus A/B is not confounded by one gate
+firing more often than the other. Above ~0.70 V1 degenerates toward V0 (75%+ of items take the fallback).
+**Thresholds do not transfer between embedders or corpora** — MedCPT is asymmetric so scores top out
+≈0.74; a 0.9 gate would admit nothing at all.
+
+**Caveat:** the gate is a *speed* knob, not a proven *quality* knob. Scores cluster tightly (0.583–0.742),
+so the margin between a good and a mediocre hit is ~0.05, and cosine measures topical closeness rather
+than whether the passage resolves the question. A threshold sweep (0.60/0.65/0.70) is still unrun.
+
+### Latency profile — V1 is bimodal
+The gate splits V1 into two systems (qwen2.5:14b, 12 train items):
+
+| path | share | mean | why |
+|---|---|---|---|
+| evidence retrieved | ~65% | **6.56 s** | ~900 extra chars to prefill |
+| gate rejected all | ~35% | **1.62 s** | prompt identical to V0's |
+
+All variance is in the `answer` node; `retrieve` is ~0.6% of runtime. Expected cost ≈ 4.85 s/item.
+
+**Dedupe + taper** halved evidence (1,890 → 927 chars) but cut latency only 17% (7.90 → 6.56 s), and the
+per-item effect was erratic — one item with just 375 chars of evidence still took 7.9 s. So **crossing
+from no-evidence to any-evidence dominates, not evidence size** (likely prompt-cache behaviour). Dedupe
+is kept regardless: it is a pure information win (4 distinct hits instead of ~2 facts twice).
 
 ## 4. Experimental Setup
 
 | item | value |
 |---|---|
 | Dataset | `openlifescienceai/medqa` (Jin et al. 2020) — train 10,178 / validation 1,272 / **test 1,273** |
+| RAG corpus (V1) | `openlifescienceai/medmcqa` (Pal et al. 2022) — 182,822 items → `knowledge_medmcqa` |
+| RAG corpus (V2–V4) | MedRAG Textbooks — 125,847 snippets → `knowledge_medcpt` |
 | Dev split | `train` (debugging/tuning only) |
 | Official split | `test`, n=1273 — the §7 denominator; used **once** |
 | Default model | `qwen2.5:7b` (CLI default), `qwen2.5:14b` (library default) |
