@@ -71,9 +71,10 @@ def make_search_tool(cfg: RunConfig):
 
 
 def make_medmcqa_tool(cfg: RunConfig):
-    """A `search_medmcqa` tool the V1 agent calls: retrieve the top-k similar solved
-    board questions (MedMCQA), with their answers/explanations. No gate — the k nearest
-    are always returned (rag.threshold defaults to 0.0 for V1).
+    """Tool factory (NOT a graph node): returns a LangChain `@tool` (`search_medmcqa`)
+    to BIND to an agent so the *model* decides when to call it (agentic RAG). V1's answer
+    agent and V2's panel/clinical-reasoner hold it. It retrieves the top-k similar solved
+    board questions (MedMCQA) with answers/explanations — no gate (rag.threshold=0.0).
     """
     from langchain_core.tools import tool
 
@@ -139,11 +140,15 @@ def make_answer_node(cfg: RunConfig) -> Node:
 
 
 def make_panel_node(cfg: RunConfig) -> Node:
+    # Agentic RAG (rag.tool): each specialist holds search_medmcqa and searches on its own
+    # while forming an opinion (MedAgents-style experts). Otherwise the panel reads the
+    # graph-retrieved evidence prepended by _prompt (V3/V4).
+    tools = [make_medmcqa_tool(cfg)] if (cfg.rag and cfg.rag.tool) else ()
     agents = []
     for i in range(cfg.panel_size):
         persona = roles.PERSPECTIVES[i % len(roles.PERSPECTIVES)]
         prompt = f"{roles.ROLE_PROMPTS['specialist']}\nPerspective: {persona}"
-        agents.append(Agent(f"specialist-{i}", prompt, model=cfg.model_for("specialist")))
+        agents.append(Agent(f"specialist-{i}", prompt, model=cfg.model_for("specialist"), tools=tools))
 
     def node(state: dict) -> dict:
         base = _prompt(state, closing=DELIBERATE)

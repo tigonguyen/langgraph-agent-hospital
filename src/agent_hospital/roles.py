@@ -65,10 +65,12 @@ VERIFIER = (
     "line write 'Answer: X' where X is A, B, C, or D."
 )
 
-# Distinct framings so a temperature=0 panel produces diverse opinions.
+# Distinct framings so a temperature=0 panel produces diverse opinions (MedAgents-style
+# multi-expert collaboration). Cycled by index, so a panel of any size stays diverse.
 PERSPECTIVES = [
     "Favor the single most likely diagnosis/answer.",
     "Actively rule out dangerous or commonly-confused alternatives.",
+    "Reason from the underlying mechanism / pathophysiology to the answer.",
 ]
 
 ROLE_PROMPTS: dict[str, str] = {

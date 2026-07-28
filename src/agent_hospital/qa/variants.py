@@ -45,10 +45,15 @@ _PRESETS: dict[str, RunConfig] = {
     "V1": RunConfig(answer_role="rag-agent",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=True)),
-    # 3 agents: query distiller -> clinical reasoner (analysis, no letter) -> decider.
-    # Inherits V1's MedMCQA corpus, so V1->V2 differs only in the answering stage.
-    "V2": RunConfig(answer_role="decider", clinical_reason=True,
-                    rag=RagConfig(collection="knowledge_medmcqa", threshold=0.65)),
+    # V2: a MedAgents-style medical panel on the agentic RAG (5 agents). Three specialists
+    # with distinct lenses (most-likely / rule-out-dangerous / mechanism) each hold the
+    # search_medmcqa tool and give an opinion; an attending synthesises + reconciles; a
+    # verifier does one confirm/revise pass. Grounded in MedAgents (expert panel -> consensus),
+    # MDAgents (moderator + adaptive collaboration) and Medprompt (self-consistency is the
+    # optional accuracy dial). NOTE: overlaps V3/V4's panel machinery — re-slot the ladder.
+    "V2": RunConfig(panel_size=3, aggregate=True, verify=True,
+                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                                  k=5, threshold=0.0, tool=True)),
     "V3": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=True),
     "V4": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=False),
 }
