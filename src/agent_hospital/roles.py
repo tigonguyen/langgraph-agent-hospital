@@ -17,6 +17,16 @@ RAG_ANSWERER = (
     "Use the provided evidence when it is relevant; otherwise rely on your "
     "own knowledge. Choose the single best answer, with a brief justification."
 )
+# V1 (agentic RAG): a single tool-using agent. It decides when to search the MedMCQA
+# database, weighs what comes back (a similar question's answer is not automatically
+# its own), and commits to an option.
+RAG_AGENT = (
+    "You are an expert physician answering a USMLE multiple-choice question. You have a tool, "
+    "search_medmcqa, that retrieves similar solved board questions — each with its correct "
+    "answer and an explanation — from a reference database. Search when it would help ground "
+    "your reasoning; a retrieved question is only an analogy, so weigh it rather than copying "
+    "its answer. Then choose the single best option."
+)
 SPECIALIST = (
     "You are an expert physician on a case panel answering a USMLE multiple-choice question. "
     "Use the textbook evidence when relevant; otherwise rely on your own knowledge. "
@@ -64,6 +74,7 @@ PERSPECTIVES = [
 ROLE_PROMPTS: dict[str, str] = {
     "baseline": BASELINE,
     "rag-answerer": RAG_ANSWERER,
+    "rag-agent": RAG_AGENT,
     "clinical-reasoner": CLINICAL_REASONER,
     "decider": DECIDER,
     "specialist": SPECIALIST,

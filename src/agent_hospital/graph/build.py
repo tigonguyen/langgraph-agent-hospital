@@ -15,6 +15,14 @@ from agent_hospital.graph.state import QAState
 
 def build_graph(cfg: RunConfig):
     g = StateGraph(QAState)
+
+    # V1: a single tool-using agent that drives its own retrieval (agentic RAG).
+    if cfg.rag and cfg.rag.tool:
+        g.add_node("agent", nodes.make_agentic_rag_node(cfg))
+        g.add_edge(START, "agent")
+        g.add_edge("agent", END)
+        return g.compile()
+
     seq: list[str] = []
 
     if cfg.rag:

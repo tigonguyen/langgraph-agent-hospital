@@ -38,11 +38,13 @@ AnswerFn = Callable[[MCQItem], AnswerResult]
 
 _PRESETS: dict[str, RunConfig] = {
     "V0": RunConfig(answer_role="baseline", rag=None),
-    # V1 retrieves solved exam questions (MedMCQA); V2-V4 retrieve textbook prose.
-    # 0.65 matches the textbook gate's selectivity (~65% of items get evidence), so the
-    # corpus A/B isn't confounded by one gate firing more often than the other.
-    "V1": RunConfig(answer_role="rag-answerer",
-                    rag=RagConfig(collection="knowledge_medmcqa", threshold=0.65)),
+    # V1: a SINGLE agent that calls a `search_medmcqa` tool over the MedMCQA database of
+    # solved board questions (agentic RAG — the model drives retrieval). nomic embeddings
+    # (8192-token ctx) so a full vignette isn't truncated the way MedCPT's 64-token query
+    # encoder would; threshold=0.0 returns the top-k, no gate. V2-V4 keep textbook retrieval.
+    "V1": RunConfig(answer_role="rag-agent",
+                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                                  k=5, threshold=0.0, tool=True)),
     # 3 agents: query distiller -> clinical reasoner (analysis, no letter) -> decider.
     # Inherits V1's MedMCQA corpus, so V1->V2 differs only in the answering stage.
     "V2": RunConfig(answer_role="decider", clinical_reason=True,

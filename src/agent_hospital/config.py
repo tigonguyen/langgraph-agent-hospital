@@ -16,8 +16,9 @@ class RagConfig:
     collection: str = "knowledge_medcpt"   # or "knowledge" (nomic-embedded)
     embedder: str = "medcpt"               # or "nomic-embed-text"
     k: int = 4
-    threshold: float = 0.60                # MedCPT (asymmetric) tops out ~0.69, so 0.6 is strict
+    threshold: float = 0.60                # gate for graph-invoked retrieval (V2-V4); 0.0 = keep top-k
     distill_query: bool = True
+    tool: bool = False                     # bind retrieval as a tool the agent calls (agentic V1)
 
 
 @dataclass(frozen=True)

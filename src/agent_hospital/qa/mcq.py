@@ -20,6 +20,13 @@ REASON_THEN_ANSWER = (
     "In at most 30 words, say why the best option is best, then on the LAST line "
     "write 'Answer: X' where X is A, B, C, or D."
 )
+# V1 agentic RAG: must permit a tool call (so NOT "respond with ONLY the letter",
+# which forbids any non-letter output and suppresses the tool call).
+AGENTIC_ANSWER = (
+    "First, if it would help, call search_medmcqa with a focused query to retrieve "
+    "similar solved questions. Then reason briefly and on the LAST line write "
+    "'Answer: X' where X is A, B, C, or D."
+)
 
 
 def format_mcq(item: MCQItem, closing: str = LETTER_ONLY) -> str:

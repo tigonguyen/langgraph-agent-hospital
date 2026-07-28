@@ -12,7 +12,7 @@ from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import (ANALYSE_ONLY, DELIBERATE, LETTER_ONLY,
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, ANALYSE_ONLY, DELIBERATE, LETTER_ONLY,
                                    REASON_THEN_ANSWER, format_mcq, parse_choice)
 from agent_hospital.qa.reasoning import build_reasoning_agent
 
@@ -68,6 +68,48 @@ def make_search_tool(cfg: RunConfig):
         return format_evidence(hits)          # "" = nothing cleared the gate (no-RAG fallback)
 
     return search_textbooks
+
+
+def make_medmcqa_tool(cfg: RunConfig):
+    """A `search_medmcqa` tool the V1 agent calls: retrieve the top-k similar solved
+    board questions (MedMCQA), with their answers/explanations. No gate — the k nearest
+    are always returned (rag.threshold defaults to 0.0 for V1).
+    """
+    from langchain_core.tools import tool
+
+    rag = cfg.rag
+    holder: dict[str, Any] = {}
+
+    @tool
+    def search_medmcqa(query: str) -> str:
+        """Search a database of solved medical board questions (MedMCQA) for entries
+        similar to the query. Returns the top matches with their correct answer and a
+        brief explanation. Use a focused clinical query (the key findings and what is asked)."""
+        if "store" not in holder:
+            holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
+        hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"])
+        return format_evidence(hits) or "No similar questions found."
+
+    return search_medmcqa
+
+
+def make_agentic_rag_node(cfg: RunConfig) -> Node:
+    """V1 as a single tool-using agent (agentic RAG).
+
+    One agent, one tool: it decides whether/what to search in the MedMCQA database,
+    the `create_agent` loop runs the tool and feeds the results back, and the agent
+    answers. The model — not the graph — drives retrieval (contrast V2-V4, where the
+    retrieve node invokes the tool directly).
+    """
+    search = make_medmcqa_tool(cfg)
+    agent = Agent("rag-agent", roles.ROLE_PROMPTS[cfg.answer_role],
+                  model=cfg.model_for(cfg.answer_role), tools=[search])
+
+    def node(state: dict) -> dict:
+        reply = agent.say(format_mcq(state["item"], AGENTIC_ANSWER))
+        return {"answer": parse_choice(reply), "rationale": reply.strip()}
+
+    return node
 
 
 def make_clinical_reason_node(cfg: RunConfig) -> Node:
