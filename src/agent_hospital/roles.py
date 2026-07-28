@@ -64,6 +64,13 @@ VERIFIER = (
     "If the proposed answer is correct, keep it; otherwise choose the better option. On the LAST "
     "line write 'Answer: X' where X is A, B, C, or D."
 )
+# V3 short-term memory: a scribe condenses the panel discussion into shared working notes
+# that the attending and verifier then reason over (not the raw opinions).
+SCRIBE = (
+    "You are the case scribe. You are given the question and the panel's opinions. Maintain the "
+    "team's short working memory: a compact set of notes the attending will rely on. Do NOT choose "
+    "an answer."
+)
 
 # Distinct framings so a temperature=0 panel produces diverse opinions (MedAgents-style
 # multi-expert collaboration). Cycled by index, so a panel of any size stays diverse.
@@ -82,4 +89,5 @@ ROLE_PROMPTS: dict[str, str] = {
     "specialist": SPECIALIST,
     "attending": ATTENDING,
     "verifier": VERIFIER,
+    "scribe": SCRIBE,
 }

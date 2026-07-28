@@ -31,6 +31,7 @@ class RunConfig:
     panel_size: int = 1                    # >1 or aggregate → panel + attending (V3/V4)
     aggregate: bool = False
     verify: bool = False                   # verifier node (V3 on, V4 off)
+    memory: bool = False                   # short-term working memory: scribe writes it, attending/verifier read it (V3)
 
     def model_for(self, role: str) -> Any:
         return self.role_models.get(role, self.model)

@@ -13,4 +13,5 @@ class QAState(TypedDict, total=False):
     evidence: str          # formatted evidence block ("" = none)
     rationale: str         # clinical reasoner's analysis, no letter (V2)
     opinions: list[str]    # panel replies (V3/V4)
+    working_memory: str    # scribe's short-term working notes, shared within the episode (V3)
     answer: int | None     # final chosen option index

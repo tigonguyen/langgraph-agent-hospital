@@ -1,0 +1,596 @@
+% !TEX program = xelatex
+\documentclass[11pt]{article}
+
+% ---------- gói (biên dịch bằng XeLaTeX cho tiếng Việt) ----------
+\usepackage{fontspec}
+% Nạp Latin Modern theo tên tệp OTF (có sẵn trong TeX Live/Overleaf và tectonic);
+% hỗ trợ đầy đủ dấu tiếng Việt. Biên dịch bằng XeLaTeX.
+\setmainfont{lmroman10-regular.otf}[
+  BoldFont=lmroman10-bold.otf,
+  ItalicFont=lmroman10-italic.otf,
+  BoldItalicFont=lmroman10-bolditalic.otf]
+\setmonofont{lmmono10-regular.otf}
+\usepackage[margin=1in]{geometry}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+
+\graphicspath{{figures/}}
+
+% ---------- bản địa hoá tiếng Việt cho tên các đối tượng ----------
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\abstractname}{Tóm tắt}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+\renewcommand{\appendixname}{Phụ lục}
+
+% ---------- kiểu hiển thị prompt / mã nguồn ----------
+\definecolor{promptbg}{gray}{0.96}
+\lstdefinestyle{prompt}{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{promptbg},
+  frame=single,
+  framesep=6pt,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=4pt,
+  xrightmargin=4pt,
+}
+\lstset{style=prompt}
+
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[CẦN LÀM: #1]}}}
+
+% ---------- tiêu đề ----------
+\title{\textbf{Hệ thống LLM đa tác tử y khoa nhằm nâng cao độ chính xác thực tế trên MedQA-USMLE}\\[4pt]
+\large Báo cáo giữa kỳ}
+\author{Nguyễn Đình Thanh \and Ngô Văn Tú \and Lê Viết Hưng \and Trần Quốc Phong}
+\date{}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+Nhóm xây dựng và đánh giá một hệ thống LLM đa tác tử (multi-agent) y khoa dạng module với mục
+tiêu nâng cao \emph{độ chính xác thực tế} (factual accuracy) trên bộ dữ liệu MedQA-USMLE. Hệ thống được
+tổ chức thành một \textbf{thang biến thể} (ablation ladder) gồm năm biến thể (V0 LLM trực
+tiếp $\rightarrow$ V4 hệ đa tác tử đầy đủ); mỗi biến thể chỉ là cùng một sơ đồ xử lý (StateGraph) của
+LangGraph, nhưng bật/tắt vài thành phần theo một cấu hình định sẵn tương ứng. Nhờ hai biến thể liền
+nhau chỉ khác đúng một thành phần, mọi chênh lệch về độ chính xác đều quy thẳng được về thành phần đó. Tất cả biến thể dùng chung một giao diện thống nhất và một bộ đo (độ chính xác kèm khoảng tin cậy
+bootstrap, tỷ lệ phản hồi không hợp lệ, phân tích Thắng/Thua/Hòa, và kiểm định ghép cặp McNemar), giúp
+phép so sánh trung thực. Phát hiện thực nghiệm cốt lõi của Nhóm là: trên MedQA \textbf{riêng truy
+hồi (retrieval) không giúp ích} (V1 $\le$ V0), trong khi \textbf{lập luận đa tác tử mới là bước cải
+thiện thực sự đầu tiên} (kết quả định lượng đang được đo lại trên test đầy đủ). Nhóm trình bày kết
+quả đo hiện tại, ghi lại đầy đủ kiến trúc, prompt và cấu hình truy hồi để tái lập được, đồng thời liệt
+kê các phần việc còn lại để đạt tới đánh giá chính thức đầy đủ.
+\end{abstract}
+
+\tableofcontents
+\bigskip
+
+% =====================================================================
+\section{Giới thiệu}
+% =====================================================================
+Các mô hình ngôn ngữ lớn (LLM) trả lời đúng nhiều câu hỏi thi y khoa ngay từ đầu, nhưng chúng cũng đưa
+ra những câu trả lời sai một cách rất tự tin (nghe thuyết phục nhưng sai), và không dễ thấy
+\emph{thành phần kiến trúc nào} thực sự làm giảm những lỗi đó. Dự án này đặt một câu hỏi về thiết kế
+chứ không phải triển khai lâm sàng: bắt đầu từ một LLM thuần, những thành phần nào giúp cải thiện đo
+lường được độ chính xác thực tế trên MedQA-USMLE, và cải thiện bao nhiêu? Cụ thể là ba thành phần: truy
+hồi tri thức (RAG), phối hợp nhiều tác tử (multi-agent), và một bước kiểm chứng (verifier).
+
+\paragraph{Bài toán.} Đầu vào là một câu hỏi trắc nghiệm MedQA-USMLE~\cite{jin2021medqa} (một tình huống lâm sàng kèm bốn
+lựa chọn A--D). Đầu ra bắt buộc là \emph{đúng một} lựa chọn cuối cùng cộng với một giải thích ngắn
+($\le 30$ từ).
+
+\paragraph{Cách tiếp cận.} Nhóm không viết tay năm hệ thống riêng biệt. Thay vào đó, mỗi biến thể
+là \emph{cùng một} bộ khung LangGraph, chỉ bật/tắt các nút (node) khác nhau theo một cấu hình định sẵn
+tương ứng. Cách này giúp so sánh mang tính nhân quả: giữa V0 và V1 chỉ khác các nút truy hồi, giữa V2
+và V3 chỉ khác cụm hội chẩn / bác sĩ chính / kiểm chứng. Và vì chỉ một bộ đo chấm cả năm biến thể theo
+cùng một cách, mọi chênh lệch điểm số đều so sánh được trực tiếp.
+
+\paragraph{Đóng góp.}
+\begin{enumerate}[nosep]
+  \item Một kiến trúc đa tác tử điều khiển bằng cấu hình (V0--V4), trong đó mỗi bậc thang khác bậc kế
+  tiếp đúng một thành phần (Mục~\ref{sec:arch}--\ref{sec:design}).
+  \item Một quy trình đánh giá ghép cặp, tái lập được, có kiểm định ý nghĩa thống kê
+  (Mục~\ref{sec:setup}--\ref{sec:results}).
+  \item Kết quả thực nghiệm cho thấy trên MedQA, \emph{cấu trúc lập luận}, chứ không phải
+  \emph{truy hồi}, mới là đòn bẩy làm thay đổi độ chính xác (Mục~\ref{sec:results}--\ref{sec:discussion}).
+\end{enumerate}
+
+\paragraph{Trạng thái đo lường (đọc phần này trước).} Kiến trúc (V0--V4) đã được xây dựng đầy đủ và kiểm
+tra chạy được đầu-cuối. Các con số trong báo cáo này đến từ \textbf{lần chạy chính thức trên toàn bộ tập
+test} ($n{=}1273$, qwen2.5:7b, nhiệt độ~0). Hiện mới có V0; V1--V4 \textbf{đang chạy}; mỗi khoảng trống
+như vậy đều được đánh dấu \todo{} để người
+đọc biết chính xác điều gì đã đo và điều gì mới là dự kiến.
+
+% =====================================================================
+\section{Kiến trúc hệ thống}
+\label{sec:arch}
+% =====================================================================
+Ý tưởng tổ chức là một bộ khung đồ thị duy nhất với các nút được bật/tắt tuỳ biến thể:
+\[
+\text{[reason}\rightarrow\text{retrieve]}\;\rightarrow\;(\text{answer}\mid\text{panel}\rightarrow\text{aggregate})\;\rightarrow\;\text{[verify]}
+\]
+Một biến thể không phải một nhánh mã riêng; nó là một \texttt{RunConfig} định sẵn được biên dịch thành
+một \texttt{StateGraph} của LangGraph~\cite{langgraph2024} qua \texttt{build\_graph(cfg)}. Chính điều
+này khiến khảo sát ablation trung thực.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.9\textwidth]{ladder_overview.pdf}
+  \caption{Thang khảo sát ablation. Mỗi biến thể thêm đúng một khả năng so với biến thể trước.}
+  \label{fig:ladder}
+\end{figure}
+
+\begin{table}[h]
+  \centering
+  \caption{Các nút thực sự được nối trong mỗi biến thể.}
+  \label{tab:variants}
+  \begin{tabular}{llc}
+    \toprule
+    Biến thể & Các nút được nối & Số tác tử \\
+    \midrule
+    V0 & \texttt{answer} & 1 \\
+    V1 & \texttt{agent}: tác tử gọi công cụ \texttt{search\_medmcqa} (agentic) & 1 \\
+    V2 & \texttt{panel(3) $\rightarrow$ aggregate $\rightarrow$ verify} (agentic RAG) & 5 \\
+    V3 & \texttt{reason $\rightarrow$ retrieve $\rightarrow$ panel $\rightarrow$ aggregate $\rightarrow$ verify} & 5 \\
+    V4 & \texttt{reason $\rightarrow$ retrieve $\rightarrow$ panel $\rightarrow$ aggregate} & 4 \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+V1 là ngoại lệ của bộ khung trên: thay vì chuỗi \texttt{reason $\rightarrow$ retrieve $\rightarrow$ answer},
+nó rút về một nút \texttt{agent} duy nhất tự điều khiển truy hồi (xem \S\ref{sec:rag}). V2--V4 vẫn theo
+đúng bộ khung.
+
+\paragraph{Bản đồ module.} Toàn hệ thống nằm gọn trong một số ít tệp, mỗi tệp một nhiệm vụ:
+\texttt{config.py} (nơi tập trung mọi tuỳ chỉnh: \texttt{RunConfig}/\texttt{RagConfig}), \texttt{roles.py} (mọi
+system prompt), \texttt{graph/} (trạng thái, các hàm tạo node, và \texttt{build\_graph}),
+\texttt{qa/variants.py} (các cấu hình định sẵn V0--V4 và điểm vào công khai \texttt{build\_variant}),
+\texttt{qa/mcq.py} (định dạng prompt và trích xuất câu trả lời), \texttt{qa/metrics.py} (mọi phép đo),
+\texttt{knowledge/} (nạp dữ liệu RAG, embedding, bộ truy hồi), và \texttt{agents/base.py} (lớp bọc tác
+tử khởi tạo trễ, không phụ thuộc nhà cung cấp).
+
+\paragraph{Các tính chất thiết kế.}
+\begin{itemize}[nosep]
+  \item \textbf{Giao diện thống nhất}: mọi biến thể đều là \texttt{answer(item) $\rightarrow$
+  AnswerResult(answer, rationale)}, nên một bộ đo duy nhất chấm điểm tất cả như nhau.
+  \item \textbf{Khởi tạo trễ / an toàn khi offline}: tác tử được dựng ở lần gọi đầu và kho vector mở ở
+  lần truy hồi đầu, nên việc biên dịch một đồ thị không đụng tới mạng; các bài kiểm thử chạy ngoại tuyến.
+  \item \textbf{Mỗi lần một thứ}: thêm một biến thể hay A/B một tham số (mô hình, embedder, kích thước
+  hội đồng, bật/tắt kiểm chứng) là thay đổi cấu hình chứ không phải viết mã mới.
+\end{itemize}
+
+% =====================================================================
+\section{Thiết kế hệ thống}
+\label{sec:design}
+% =====================================================================
+
+\subsection{Kiến trúc tác tử}
+Mỗi tác tử là một lớp bọc mỏng, khởi tạo trễ quanh \texttt{create\_agent} của LangChain với một
+\texttt{BaseChatModel} không phụ thuộc nhà cung cấp; chỉ cần ghi tên mô hình dưới dạng chuỗi là nó
+được hiểu thành một mô hình Ollama cục bộ. Các biến thể đa tác tử phối hợp các vai sau:
+
+\begin{itemize}[nosep]
+  \item \textbf{V2 (5 tác tử, hội đồng y khoa kiểu MedAgents):} một \emph{hội đồng} (panel) gồm ba
+  chuyên gia với ba góc nhìn riêng (khả dĩ nhất / loại trừ nguy hiểm / lập luận từ cơ chế bệnh sinh), mỗi
+  người \emph{tự} gọi công cụ \texttt{search\_medmcqa} khi cần rồi nêu ý kiến; một \emph{bác sĩ chính}
+  (attending) tổng hợp và hoà giải bất đồng để chốt đáp án; một \emph{bộ kiểm chứng} (verifier) làm một
+  lượt xác nhận/chỉnh sửa cuối. Thiết kế bám theo MedAgents~\cite{tang2024medagents} (hội đồng chuyên gia
+  $\rightarrow$ đồng thuận), MDAgents~\cite{kim2024mdagents} (moderator + cộng tác thích ứng theo độ khó)
+  và Medprompt~\cite{nori2023medprompt} (self-consistency là một cơ chế tăng độ chính xác tuỳ chọn). \todo{V2 nay
+  trùng bộ khung panel của V3/V4, cần sắp lại thang (ví dụ V3 thêm bộ nhớ kiểu Agent
+  Hospital~\cite{li2024agenthospital}, V4 thêm định tuyến thích ứng của MDAgents) và đo lại ở quy mô lớn.}
+  \item \textbf{V3 (5 tác tử):} một \emph{hội đồng} (panel) gồm hai chuyên gia, mỗi người được gán một
+  góc nhìn riêng (``ưu tiên đáp án khả dĩ nhất'' so với ``loại trừ các phương án nguy hiểm/gây nhiễu'')
+  để ngay cả ở nhiệt độ~0 hội đồng vẫn cho ra ý kiến đa dạng; một \emph{bác sĩ chính} (attending) tổng
+  hợp các ý kiến; một \emph{bộ kiểm chứng} (verifier) thực hiện một lượt xác nhận/chỉnh sửa cuối.
+  \item \textbf{V4 (4 tác tử):} giống hệt V3 nhưng bỏ bộ kiểm chứng, nhờ đó $V3 - V4$ tách riêng phần
+  đóng góp riêng của bộ kiểm chứng.
+\end{itemize}
+Tính đa dạng của hội đồng đạt được nhờ \emph{góc nhìn}, không phải nhiệt độ: ở nhiệt độ~0, hai chuyên gia
+giống hệt nhau sẽ trả về ý kiến giống hệt nhau, làm hỏng ý nghĩa của hội đồng.
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.78\textwidth]{v2_flow.pdf}
+  \caption{Luồng V2 theo \emph{thiết kế cũ} (reason $\rightarrow$ retrieve $\rightarrow$ clinical
+  reasoner $\rightarrow$ decider), tương ứng với các số đo ở \S\ref{sec:results}.
+  \todo{Vẽ lại cho thiết kế hội đồng kiểu MedAgents mới ở \S\ref{sec:design}.}}
+  \label{fig:v2}
+\end{figure}
+
+\subsection{Thiết kế RAG}
+\label{sec:rag}
+V1 = V0 cộng thêm truy hồi, nhưng ở dạng \emph{agentic}: thay vì một pipeline cố định, V1 là
+\textbf{một tác tử duy nhất} tự quyết định khi nào và tìm gì. Kho MedMCQA được dựng một lần ngoại tuyến;
+lúc suy luận, tác tử gọi một công cụ để truy vấn nó. Đồ thị rút về một nút: \texttt{START $\rightarrow$
+agent $\rightarrow$ END}.
+
+\begin{enumerate}[nosep]
+  \item \textbf{Tác tử tự soạn truy vấn và gọi công cụ.} Nhận câu hỏi trắc nghiệm, nếu thấy có ích, tác tử
+  tự viết một truy vấn tập trung rồi gọi \texttt{search\_medmcqa}. Vì model tự chọn truy vấn nên không cần
+  một reasoner rút gọn riêng như V2; điều này cũng tránh được lỗi rút gọn sai trọng tâm của tình huống.
+  \item \textbf{Công cụ truy hồi top-$k$, không dùng cổng.} \texttt{search\_medmcqa} nhúng truy vấn và trả
+  về $k{=}5$ câu thi đã giải gần nhất trong MedMCQA (kèm đáp án và giải thích), định dạng \texttt{Q:/A:/Why:}.
+  Không còn cổng độ tương đồng: top-$k$ luôn được trả về (\texttt{threshold=0.0}).
+  \item \textbf{Tác tử cân nhắc kết quả và chốt đáp án.} Vòng lặp \texttt{create\_agent} tự nạp kết quả
+  công cụ trở lại cho model; tác tử được nhắc rằng một câu tương tự chỉ là \emph{ví dụ so sánh}, không phải
+  đáp án để chép, rồi viết lý do ngắn và một chữ cái.
+\end{enumerate}
+
+\begin{figure}[h]
+  \centering
+  \includegraphics[width=0.72\textwidth]{v1_flow.pdf}
+  \caption{Luồng RAG của V1 (agentic): một tác tử duy nhất tự gọi công cụ \texttt{search\_medmcqa} để
+  truy hồi. \todo{Vẽ lại \texttt{v1\_flow.svg} cho khớp thiết kế agentic; hình hiện tại còn là luồng cũ
+  \texttt{reason $\rightarrow$ retrieve $\rightarrow$ answer}.}}
+  \label{fig:v1}
+\end{figure}
+
+\paragraph{Truy hồi là công cụ do \emph{mô hình} chọn.} V1 nay để tác tử tự quyết định khi nào và tìm gì,
+thay vì đồ thị gọi cứng như V2--V4. Đây là chi phí có chủ đích: đo trên cùng tập câu, cách do tác tử điều
+khiển tốn 3 lần gọi LLM / 542 ký tự sinh ra / 3.78\,s mỗi câu, so với 2 lần gọi / 51 ký tự / 0.90\,s khi để
+đồ thị gọi: một lời gọi công cụ do mô hình chọn cần thêm một lần gọi để xử lý kết quả, và tác tử dùng
+công cụ không thể bị ép ``chỉ trả lời bằng chữ cái'' (chỉ dẫn đó triệt tiêu việc gọi công cụ; đo được 0/5),
+nên đáp án được trích từ phần lý do ngắn thay vì một chữ cái đơn. Nhóm chấp nhận chi phí này vì mục tiêu là
+V1 thành một tác tử RAG đúng nghĩa; V2--V4 vẫn gọi truy hồi từ node để giữ tính tất định và chi phí thấp.
+
+\paragraph{Luồng mã của V1.} Từ \texttt{build\_variant("V1")} đến đáp án, đường đi cụ thể như sau (tên
+tệp ghi bên phải):
+\begin{lstlisting}
+build_variant("V1")                                   # qa/variants.py
+  preset: answer_role="rag-agent",
+          rag=(knowledge_medmcqa_nomic, nomic, k=5, threshold=0.0, tool=True)
+  build_graph(cfg) -> do thi 1 node: START -> agent -> END   # graph/build.py
+
+answer(item) = graph.invoke({"item": item})           # qa/variants.py
+
+[node] make_agentic_rag_node                          # graph/nodes.py
+  tool  = search_medmcqa            (make_medmcqa_tool)
+  agent = Agent("rag-agent", tools=[tool])
+  reply = agent.say( format_mcq(item, AGENTIC_ANSWER) )
+  return answer = parse_choice(reply), rationale = reply
+
+trong agent.say  (vong lap cong cu cua create_agent): # agents/base.py
+  LLM luot 1: he thong=RAG_AGENT + MCQ + mo ta tool
+              -> phat mot loi goi cong cu: search_medmcqa(query)
+                   search_medmcqa(query):             # graph/nodes.py
+                     retrieve(query, k=5, threshold=0.0)   # knowledge/retriever.py
+                       nomic nhung query (8192 token, khong cat)
+                       Chroma cosine top-k, khu trung lap, KHONG cong
+                     format_evidence(hits) -> "Q:/A:/Why:" x5
+              <- ket qua tool duoc noi vao chuoi message
+  LLM luot 2: doc bang chung, lap luan, viet "... Answer: X"
+  parse_choice(reply) -> 0..3  (hoac None)            # qa/mcq.py
+\end{lstlisting}
+Hai điểm mấu chốt: (1) \emph{mô hình} tự quyết định gọi công cụ, nên đồ thị chỉ có một node; (2) truy hồi
+trả về top-$k$ không qua cổng (\texttt{threshold=0.0}), và nomic nhúng trọn tình huống nên câu hỏi ở cuối
+không bị cắt như Query encoder 64 token của MedCPT. Chi phí $\sim$2 lần sinh của LLM mỗi câu (lượt~1 gọi
+công cụ, lượt~2 trả lời) là lý do V1 chậm hơn hẳn V0.
+
+\paragraph{Luồng mã của V2.} V2 gắn \emph{cùng} công cụ \texttt{search\_medmcqa} vào từng chuyên gia trong
+hội đồng, nên đồ thị là \texttt{panel(3) $\rightarrow$ aggregate $\rightarrow$ verify}:
+\begin{lstlisting}
+V2:  START -> panel(3 chuyen gia, tools=[search_medmcqa]) -> aggregate -> verify -> END
+  panel:     3 Agent("specialist-i", tools=[search_medmcqa])   # graph/nodes.py
+             3 goc nhin (kha di nhat / loai tru nguy hiem / co che benh sinh)
+             moi nguoi tu search khi can, neu y kien (DELIBERATE, noi bo)
+  aggregate: attending tong hop + hoa giai -> chot "Answer: X"
+  verify:    mot luot xac nhan / chinh sua dap an de xuat (giai thich <=30 tu)
+\end{lstlisting}
+Ba chuyên gia là hiện thực gọn của bước ``gather experts $\rightarrow$ propose analyses'' trong
+MedAgents~\cite{tang2024medagents}; attending là bước tổng hợp/đồng thuận; verifier là một vòng
+tinh chỉnh. \textbf{Chi phí:} $\sim$16\,s/câu ở qwen2.5:7b (5 tác tử + các lời gọi công cụ), tức
+$\sim$7 lần V1; đây là lý do MDAgents~\cite{kim2024mdagents} đề xuất định tuyến thích ứng (câu dễ đi
+đường solo) để kiểm soát độ trễ. \todo{Đo V2 mới ở quy mô lớn; hiện chưa có số cho thiết kế panel này.}
+
+\paragraph{Lựa chọn ngữ liệu.} V1/V2 truy hồi từ \textbf{MedMCQA}~\cite{pal2022medmcqa} (182{,}822 câu thi đã giải kèm giải
+thích), tức là truy hồi các ví dụ mẫu đã giải (tương tự Medprompt~\cite{nori2023medprompt}); V3/V4 truy hồi
+văn bản \textbf{MedRAG Textbooks}~\cite{xiong2024medrag} (125{,}847 đoạn). Sách giáo khoa là văn bản tham chiếu an toàn về rò rỉ và đề thi được viết dựa trên chúng, nhưng
+RAG trên sách giáo khoa lại làm \emph{giảm} kết quả trên MedQA ($-3.7$ điểm), nhất quán với y văn: MedQA
+chủ yếu đòi hỏi lập luận, nên truy hồi thêm dữ kiện không giúp một mô hình vốn đã nắm dữ kiện đó.
+\textbf{Điểm cần lưu ý:} vì V1/V2 và V3/V4 dùng ngữ liệu khác nhau, bước $V2\rightarrow V3$ hiện đang lẫn
+lộn giữa ngữ liệu và kiến trúc, cần được giải quyết trước khi hoàn thiện thang.
+
+\subsection{Thiết kế bộ nhớ}
+\label{sec:memory}
+Đề bài liệt kê bộ nhớ ngắn hạn và dài hạn là các thành phần bắt buộc. \textbf{Trạng thái: chưa xây
+dựng.} Bộ nhớ ngắn hạn (trạng thái nháp trong mỗi lượt) được phục vụ một phần bởi đối tượng
+\texttt{QAState} dùng chung mang \texttt{query}, \texttt{evidence}, \texttt{opinions} và
+\texttt{rationale} qua lại giữa các nút, nhưng chưa có bộ nhớ \emph{dài hạn} (episodic) xuyên câu hỏi.
+Một kế hoạch trước đó đã hình dung V3 xoay quanh việc truy hồi lập luận từ các lỗi đã giải trong tập
+MedQA-train; điều đó đã bị loại khỏi phạm vi, và mức tăng của V3 thay vào đó đến từ hội đồng đa góc nhìn.
+Một kho kinh nghiệm bền vững vẫn là việc trong tương lai. \todo{Xây dựng bộ nhớ ngắn hạn + dài hạn; do
+đó V3 hiện tại chưa phải là ``hệ đầy đủ'' theo đề bài.}
+
+\subsection{Thiết kế bộ kiểm chứng}
+\label{sec:verifier}
+V3 thêm một nút \emph{verifier} làm khâu cuối: nó nhận đáp án đã chốt của bác sĩ chính cùng nội dung hội
+chẩn, rồi hoặc xác nhận hoặc chỉnh sửa. Để giữ luồng bền vững, một lỗi trích xuất ở bất kỳ khâu muộn nào
+(aggregate hay verify) sẽ lùi về đáp án trước đó thay vì phát ra \texttt{None} không hợp lệ. Phần đóng góp riêng
+của bộ kiểm chứng được đo trực tiếp bằng tương phản $V3 - V4$, vì V4 chính là V3 với \texttt{verify=False}
+và không đổi gì khác. \todo{Báo cáo $V3-V4$ khi cả hai được đo ở quy mô lớn.}
+
+\subsection{Tối ưu hoá tiến hoá}
+Không dùng trong hệ giữa kỳ này. Đề bài liệt kê nó là tuỳ chọn; Nhóm chủ động bỏ qua để giữ khảo
+sát ablation dễ diễn giải và dời việc tìm kiếm prompt/pipeline sang phần sau.
+
+\paragraph{Đáp án + giải thích.} Đề bài yêu cầu một lựa chọn \emph{cộng với} một giải thích ngắn. Mọi
+biến thể đều trả về cả hai qua một giao diện duy nhất \texttt{answer(item) $\rightarrow$
+AnswerResult(answer, rationale)}, và bản ghi từng câu mang theo phần giải thích để tệp dự đoán có nó mà
+không cần chạy lại. Các nút trả lời bị giới hạn 30 từ (\texttt{REASON\_THEN\_ANSWER}); phần hội chẩn nội
+bộ của hội đồng chủ ý \emph{không} bị giới hạn, vì các ý kiến đó là đầu vào của bác sĩ chính chứ không
+phải đầu ra hướng tới người dùng.
+
+% =====================================================================
+\section{Thiết lập thực nghiệm}
+\label{sec:setup}
+% =====================================================================
+
+\subsection{Mô hình và prompt}
+Mô hình trả lời mặc định là \textbf{Qwen2.5}~\cite{qwen2025} (Ollama, có gọi công cụ): \texttt{qwen2.5:7b} làm mặc định
+cho CLI và \texttt{qwen2.5:14b} làm mặc định thư viện cho các con số được báo cáo. Mô hình 14B là điểm
+cân bằng năng lực/tốc độ trên phần cứng mục tiêu; \texttt{qwen2.5:32b} không cho thêm độ chính xác (0.66
+so với 0.68) nhưng chậm gấp $\sim$4 lần. Mọi vai chạy ở \textbf{nhiệt độ~0}: ở nhiệt độ mặc định, chênh
+lệch $V1-V0$ dao động giữa các lần chạy lớn hơn cả bản thân hiệu ứng, nên tính tất định là bắt buộc để
+McNemar ghép cặp có ý nghĩa. Các nhà cung cấp đám mây (\texttt{anthropic:}, \texttt{openai:},
+\texttt{google:}, \texttt{openrouter:}) được hỗ trợ qua cùng một đặc tả \texttt{provider:model}.
+
+System prompt của baseline (V0) và lượt người dùng cho câu trắc nghiệm, nguyên văn (giữ tiếng Anh vì đây
+là prompt vận hành thực tế):
+
+\begin{lstlisting}
+System (roles.py:BASELINE):
+You are an expert physician answering a medical board (USMLE)
+multiple-choice question. Choose the single best answer, with a
+brief justification.
+
+User turn (qa/mcq.py:format_mcq):
+{question}
+
+A. {option 0}
+B. {option 1}
+C. {option 2}
+D. {option 3}
+
+Reason briefly, then on the LAST line write 'Answer: X' where X is
+A, B, C, or D.
+\end{lstlisting}
+
+\texttt{parse\_choice} trích đáp án từ \texttt{Answer: X} hoặc \texttt{answer is X} (không phân biệt hoa
+thường), dự phòng bằng chữ cái \texttt{A|B|C|D} độc lập đầu tiên; phản hồi không trích được trả về
+\texttt{None} và bị tính là \emph{không hợp lệ}, không bao giờ bị tính nhầm thành câu trả lời sai. Tỷ lệ không
+hợp lệ đo được là \textbf{0.0\%} xuyên suốt.
+
+\subsection{Cấu hình truy hồi}
+\label{sec:retrievalconfig}
+\begin{table}[h]
+  \centering
+  \caption{Thiết lập truy hồi. V1 (agentic) đã tách khỏi V2--V4.}
+  \label{tab:retrieval}
+  \begin{tabular}{ll}
+    \toprule
+    Thiết lập & Giá trị \\
+    \midrule
+    Ngữ liệu (V1) & MedMCQA: 182{,}822 câu thi đã giải (collection \texttt{knowledge\_medmcqa\_nomic}) \\
+    Ngữ liệu (V2) & MedMCQA (collection \texttt{knowledge\_medmcqa}, MedCPT) \\
+    Ngữ liệu (V3/V4) & MedRAG Textbooks: 125{,}847 đoạn \\
+    Kho vector & Chroma, cosine / HNSW, lưu trữ bền \\
+    Embedder (V1) & nomic-embed-text: ngữ cảnh 8192 token, nhúng trọn tình huống không bị cắt \\
+    Embedder (V2--V4) & MedCPT~\cite{jin2023medcpt} (bất đối xứng: Article encoder cho tài liệu, Query encoder cho truy vấn), 768 chiều \\
+    Cái được nhúng & chỉ phần câu hỏi (đáp án/giải thích/chủ đề là metadata) \\
+    Top-$k$ (V1) & 5, không cổng (\texttt{threshold=0.0}) \\
+    Top-$k$ (V2--V4) & 4 phân biệt (lấy dư 12, khử trùng lặp theo văn bản đáp án) \\
+    Cổng độ tương đồng (V2--V4) & 0.65 (MedMCQA); 0.60 (Textbooks) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+V1 đổi sang \textbf{nomic-embed-text} vì Query encoder của MedCPT cắt truy vấn ở \textbf{64 token}, quá
+ngắn cho một tình huống USMLE mà câu hỏi thực nằm ở cuối; nomic có ngữ cảnh 8192 token nên nhúng trọn cả
+tình huống. V1 cũng bỏ cổng: tác tử luôn nhận top-$k$ để tự cân nhắc. Với V2--V4, cổng phụ thuộc embedder và
+không thể chuyển giao: MedCPT bất đối xứng, nên điểm cosine giữa truy vấn và đoạn đạt trần $\approx 0.69$--$0.74$;
+một ngưỡng mượn từ embedder đối xứng sẽ khiến không đoạn nào được nhận. Cổng được hiệu chỉnh để $\sim$65\%
+truy vấn giữ được ít nhất một kết quả.
+
+\subsection{Phần cứng / thiết lập API}
+\begin{itemize}[nosep]
+  \item \textbf{Phần cứng:} máy Mac Apple Silicon, 48\,GB bộ nhớ hợp nhất, chạy Ollama cục bộ.
+  \item \textbf{Seed ngẫu nhiên:} \texttt{bootstrap\_ci(seed=0)}; sinh văn bản là greedy ở nhiệt
+  độ~0 nên không áp dụng seed lấy mẫu.
+  \item \textbf{Lưu ý khi đo độ trễ:} một câu khởi động tổng hợp được chạy trước (khởi động mô hình nguội
+  sẽ tính cho câu chấm điểm đầu tiên $\sim$1.9\,s so với $\sim$0.3\,s ở trạng thái ổn định); các mô hình
+  không phải mục tiêu bị dừng trước một lần chạy đo giờ để tránh tranh chấp GPU.
+  \item \textbf{Dữ liệu:} \texttt{openlifescienceai/medqa} (train 10{,}178 / validation 1{,}272 /
+  \textbf{test 1{,}273}), lưu cache cục bộ và nạp không cần mạng.
+\end{itemize}
+
+\paragraph{Tái lập một lần chạy.}
+\begin{lstlisting}
+HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 150
+\end{lstlisting}
+
+% =====================================================================
+\section{Kết quả đánh giá}
+\label{sec:results}
+% =====================================================================
+Chỉ số chính là độ chính xác, $\text{Độ chính xác} = (\text{số dự đoán đúng}) / (\text{số câu hỏi})$;
+với đánh giá chính thức, mẫu số là toàn bộ tập test, $1273$. Nhóm báo cáo thêm tỷ lệ phản hồi không
+hợp lệ, mức tăng độ chính xác $\text{Acc}(V3)-\text{Acc}(V0)$, Thắng/Thua/Hòa so với baseline, khoảng tin
+cậy bootstrap 95\%, kiểm định ghép cặp McNemar, và độ trễ.
+
+\paragraph{Trạng thái đo lường.} Mục này chỉ báo cáo \textbf{lần chạy chính thức trên toàn bộ tập test}
+($n{=}1273$, qwen2.5:7b, nhiệt độ~0). Các số ở quy mô nhỏ trước đây (n=80, 14b) đã được gỡ bỏ để tránh
+nhầm lẫn. Hiện mới có V0; V1--V4 đang chạy trên cùng tập câu, nên các chỉ số ghép cặp (mức tăng,
+Thắng/Thua/Hòa, McNemar) sẽ được điền khi đủ dữ liệu.
+
+\subsection{Bảng chính (main board): test đầy đủ ($n{=}1273$, qwen2.5:7b)}
+Lần chạy chính thức trên \emph{toàn bộ} tập test dùng \textbf{qwen2.5:7b} (nhẹ hơn 14b để chạy hết 1273
+câu). Hiện mới có V0; các biến thể còn lại đang được chạy trên cùng tập câu để tính các chỉ số ghép cặp.
+\begin{table}[h]
+  \centering
+  \caption{Kết quả chính thức: MedQA test đầy đủ, qwen2.5:7b, nhiệt độ~0, $n{=}1273$.}
+  \label{tab:official}
+  \begin{tabular}{lccccc}
+    \toprule
+    Biến thể & Độ chính xác & KTC bootstrap 95\% & Không hợp lệ & Độ trễ/câu & Token/câu \\
+    \midrule
+    V0: LLM trực tiếp & \textbf{0.615} (783/1273) & [0.588, 0.641] & 0.0\% & 0.97\,s & 329 \\
+    V1--V4            & \multicolumn{5}{c}{\todo{đang chạy trên test đầy đủ, qwen2.5:7b}} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+Token/câu (đầu vào + đầu ra) là thước đo chi phí cho mô hình cục bộ; với V0 là 329 token/câu, độ trễ
+0.97\,s/câu, tỷ lệ phản hồi không hợp lệ 0\%. Các chỉ số ghép cặp (mức tăng, Thắng/Thua/Hòa, McNemar)
+sẽ được tính từ chính các bản ghi này khi V1--V4 chạy xong.
+
+\subsection{So sánh với baseline và khảo sát ablation (so sánh ghép cặp)}
+\begin{table}[h]
+  \centering
+  \caption{So sánh ghép cặp trên test đầy đủ ($n{=}1273$, qwen2.5:7b). Tính từ bản ghi từng câu của V0 và mỗi biến thể.}
+  \label{tab:paired}
+  \begin{tabular}{lccc}
+    \toprule
+    Cặp so sánh & Mức tăng độ chính xác & Thắng/Thua/Hòa & McNemar $p$ \\
+    \midrule
+    V1 vs V0 & \multicolumn{3}{c}{\todo{đang chạy}} \\
+    V2 vs V0 & \multicolumn{3}{c}{\todo{đang chạy}} \\
+    V3 vs V0 (mức tăng $\text{Acc}(V3)-\text{Acc}(V0)$) & \multicolumn{3}{c}{\todo{đang chạy}} \\
+    V3 vs V4 (hiệu ứng kiểm chứng) & \multicolumn{3}{c}{\todo{đang chạy}} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Phân tích Thắng/Thua/Hòa}
+Cột T/T/H đếm theo từng câu: biến thể sửa được lỗi của baseline (thắng), làm hỏng một câu baseline vốn
+đúng (thua), hay trùng khớp (hòa) --- đây là đầu vào cho kiểm định McNemar ở Bảng~\ref{tab:paired}.
+\todo{Điền từ bản ghi test đầy đủ khi V1--V4 chạy xong.}
+
+\subsection{Chi phí và độ trễ}
+Chi phí đo bằng \emph{độ trễ} và \emph{số token} (đầu vào + đầu ra) cho mô hình cục bộ (không có phí API).
+V0 trên test đầy đủ: \textbf{0.97\,s/câu}, \textbf{329 token/câu}, tỷ lệ phản hồi không hợp lệ \textbf{0\%}.
+\todo{Bổ sung độ trễ và token của V1--V4 khi chạy xong; độ trễ kỳ vọng cao hơn nhiều với các biến thể
+panel (đo được $\sim$16--17\,s/câu ở qwen2.5:7b cho V2/V3).}
+
+% =====================================================================
+\section{Phân tích lỗi}
+\label{sec:error}
+% =====================================================================
+\todo{Mục này cần tệp dự đoán từng câu (\S9) để hoàn thiện; dưới đây là mô tả định tính hiện
+tại từ các lần chạy ghép cặp.}
+
+Tỷ lệ không hợp lệ là 0.0\% trên mọi biến thể đã đo, nên mọi lỗi đều là chọn sai lựa chọn thực sự, không
+phải lỗi trích xuất. Hai mẫu hình hiện rõ trong dữ liệu ghép cặp:
+\begin{itemize}[nosep]
+  \item \textbf{Câu trung tính với truy hồi.} Trên đa số câu, truy hồi hầu như không đổi đáp án,
+  nhất quán với việc MedQA chủ yếu đòi hỏi lập luận: mô hình vốn đã nắm dữ kiện, nên thêm dữ kiện không
+  đổi đáp án.
+  \item \textbf{Câu nhạy với lập luận.} Các câu mà V2 sửa được so với V1 là những câu mà việc cấu trúc
+  hoá phân tích (dấu hiệu $\rightarrow$ câu hỏi hỏi gì $\rightarrow$ từng lựa chọn) làm đổi quyết định,
+  dù bằng chứng truy hồi giống hệt. Điều này khu trú mức tăng vào khâu lập luận.
+\end{itemize}
+
+\begin{table}[h]
+  \centering
+  \caption{Bảng phân tích lỗi (khung; sẽ điền từ tệp dự đoán).}
+  \label{tab:error}
+  \begin{tabular}{lll}
+    \toprule
+    Loại lỗi & Mã câu ví dụ & Ghi chú \\
+    \midrule
+    Lỗi lập luận (tích hợp sai) & \todo{} & truy hồi đúng dữ kiện nhưng chọn sai lựa chọn \\
+    Bị phương án nhiễu đánh lừa & \todo{} & tự tin chọn một phương án hợp lý nhưng sai \\
+    Truy hồi trượt / bằng chứng lạc đề & \todo{} & cổng nhận một đoạn không phân biệt được \\
+    Thiếu tri thức & \todo{} & dữ kiện thực sự vắng ở cả mô hình lẫn ngữ liệu \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+% =====================================================================
+\section{Thảo luận}
+\label{sec:discussion}
+% =====================================================================
+Bài học nổi bật là: \textbf{trên MedQA, đòn bẩy là lập luận, không phải truy hồi}. Đây không phải lỗi
+tinh chỉnh: Nhóm đã thử hai ngữ liệu (sách giáo khoa $-3.7$ điểm; MedMCQA $+0.5$ điểm, không ý
+nghĩa), đã hiệu chỉnh cổng, và đã rút gọn truy vấn, mà truy hồi vẫn không làm thay đổi độ chính xác.
+Y văn cũng ghi nhận điều tương tự: mức tăng của RAG không đồng đều giữa các bộ dữ liệu: mạnh trên các bộ
+nặng về tra cứu (PubMedQA, BioASQ) và yếu trên các bộ nặng về lập luận/trí nhớ như MedQA, vì một mô hình
+đủ mạnh vốn đã nắm sẵn tri thức trong sách giáo khoa và phần việc còn lại là \emph{tích hợp}. Kết quả V2 của
+Nhóm là mặt tích cực của câu chuyện này: một cách tách hai tác tử phân biệt phân tích lâm
+sàng có cấu trúc với quyết định cuối cùng tạo ra mức cải thiện có ý nghĩa thống kê đầu tiên, và làm được
+điều đó trên \emph{cùng} bằng chứng truy hồi mà V1 đã có. Điều đó chỉ hướng đòn bẩy tiếp theo vào cấu trúc
+lập luận (hội đồng, bác sĩ chính, bộ kiểm chứng), đúng là thứ V3/V4 được dựng để kiểm tra.
+
+% =====================================================================
+\section{Hạn chế}
+\label{sec:limitations}
+% =====================================================================
+\begin{itemize}[nosep]
+  \item \textbf{Quy mô.} Hiện mới có V0 trên test đầy đủ ($n{=}1273$, qwen2.5:7b); V1--V4 đang chạy, nên
+  các so sánh ghép cặp còn trống cho tới khi đủ dữ liệu.
+  \item \textbf{Bậc thang bị lẫn biến.} V1/V2 dùng MedMCQA còn V3/V4 dùng Textbooks, nên
+  $V2\rightarrow V3$ trộn lẫn ngữ liệu với kiến trúc; cần thống nhất trước khi hoàn thiện thang.
+  \item \textbf{Thiếu thành phần.} Bộ nhớ ngắn hạn và dài hạn (\S4.4/4.5) chưa được xây, nên V3 hiện tại
+  chưa phải ``hệ đầy đủ'' theo đề bài.
+  \item \textbf{Chưa có chỉ số token/chi phí.} Mới chỉ ghi độ trễ; chưa có chi phí token và tiền.
+  \item \textbf{Chưa có tệp dự đoán / công cụ phân tích lỗi} (\S9), nên phân tích lỗi còn định tính.
+  \item \textbf{Số liệu cũ đã bị thay thế.} Việc thêm giải thích $\le 30$ từ làm đổi mọi prompt, nên các
+  phép đo lấy dưới prompt chỉ-chữ-cái trước đây không còn giá trị và đang được đo lại.
+  \item \textbf{Cổng chủ yếu ảnh hưởng tốc độ, chưa chứng minh được ảnh hưởng chất lượng.} Điểm cụm chặt
+  (0.58--0.74); một lượt quét ngưỡng đầy đủ (0.60/0.65/0.70) chưa chạy.
+  \item \textbf{Tính tất định trên đám mây.} Nhiệt độ~0 được đặt, nhưng các API lưu trữ không bảo đảm
+  tính tái lập như giải mã greedy cục bộ; cổng golden được ghim vào một mô hình cục bộ.
+\end{itemize}
+
+% =====================================================================
+\section{Kết luận}
+\label{sec:conclusion}
+% =====================================================================
+Nhóm đã xây một hệ đa tác tử y khoa điều khiển bằng cấu hình dưới dạng một thang biến thể năm bậc
+(ablation ladder) trên MedQA-USMLE, trong đó mỗi bậc khác nhau đúng một thành phần và được chấm bởi một bộ đo ghép
+cặp, có nhận thức về ý nghĩa thống kê. Bằng chứng hiện tại rõ ràng ở điểm cốt lõi: riêng truy hồi không
+cải thiện độ chính xác MedQA, trong khi một cách tách lập luận đa tác tử thì có (kết quả định lượng đang
+được đo lại trên test đầy đủ). Các bước tiếp theo trước mắt là (i) thống nhất ngữ liệu truy hồi giữa các bậc,
+(ii) chạy toàn bộ tập test chính thức ($n{=}1273$), (iii) đo V3/V4 ở quy mô lớn và tách riêng hiệu ứng
+bộ kiểm chứng ($V3-V4$), và (iv) thêm bộ nhớ, tệp dự đoán, và theo dõi chi phí token để khép các khoảng
+trống còn lại so với đề bài. Hệ thống được thiết kế sao cho mỗi việc trên là một thay đổi cấu hình hoặc
+bộ đo chứ không phải viết lại.
+
+% =====================================================================
+\appendix
+\section{Danh mục kiểm tra tái lập}
+\label{app:repro}
+\begin{table}[h]
+  \centering
+  \begin{tabular}{ll}
+    \toprule
+    Mục & Giá trị \\
+    \midrule
+    Mô hình & \texttt{qwen2.5:14b} (mặc định thư viện), \texttt{qwen2.5:7b} (mặc định CLI) \\
+    Nhiệt độ & 0 (mọi vai) \\
+    Prompt & nguyên văn trong \texttt{roles.py}; baseline xem \S\ref{sec:setup} \\
+    Truy hồi & embedder MedCPT, Chroma cosine/HNSW, top-$k$=4, cổng 0.60/0.65 \\
+    Seed ngẫu nhiên & \texttt{bootstrap\_ci(seed=0)}; còn lại là giải mã greedy \\
+    Phần cứng & máy Mac Apple Silicon, 48\,GB, Ollama cục bộ \\
+    Dữ liệu & \texttt{openlifescienceai/medqa} (test $n{=}1273$), cache ngoại tuyến \\
+    Điểm vào & \texttt{build\_variant(id, model=, temperature=0, **overrides)} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}

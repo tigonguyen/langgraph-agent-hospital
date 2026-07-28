@@ -13,7 +13,7 @@ from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
 from agent_hospital.qa.mcq import (AGENTIC_ANSWER, ANALYSE_ONLY, DELIBERATE, LETTER_ONLY,
-                                   REASON_THEN_ANSWER, format_mcq, parse_choice)
+                                   REASON_THEN_ANSWER, SCRIBE_NOTES, format_mcq, parse_choice)
 from agent_hospital.qa.reasoning import build_reasoning_agent
 
 Node = Callable[[dict], dict]
@@ -157,13 +157,36 @@ def make_panel_node(cfg: RunConfig) -> Node:
     return node
 
 
+def make_scribe_node(cfg: RunConfig) -> Node:
+    """Short-term memory (V3): distil the panel discussion into shared working notes that
+    the attending and verifier then reason over. The notes live in `state["working_memory"]`
+    for the rest of the episode (a per-question working memory, not cross-episode).
+    """
+    agent = Agent("scribe", roles.ROLE_PROMPTS["scribe"], model=cfg.model_for("scribe"))
+
+    def node(state: dict) -> dict:
+        ops = "\n\n".join(f"Panelist {i + 1}:\n{o}" for i, o in enumerate(state.get("opinions", [])))
+        notes = agent.say(_prompt(state, extra=f"\n\nPanel opinions:\n{ops}", closing=SCRIBE_NOTES))
+        return {"working_memory": notes.strip()}
+
+    return node
+
+
+def _panel_context(state: dict) -> str:
+    """Attending/verifier input: the scribe's working memory if present (V3), else the
+    raw panel opinions (V2/V4)."""
+    wm = state.get("working_memory", "")
+    if wm:
+        return f"\n\nWorking notes (team memory):\n{wm}"
+    ops = "\n\n".join(f"Panelist {i + 1}:\n{o}" for i, o in enumerate(state.get("opinions", [])))
+    return f"\n\nPanel opinions:\n{ops}"
+
+
 def make_aggregate_node(cfg: RunConfig) -> Node:
     agent = Agent("attending", roles.ROLE_PROMPTS["attending"], model=cfg.model_for("attending"))
 
     def node(state: dict) -> dict:
-        ops = "\n\n".join(f"Panelist {i + 1}:\n{o}" for i, o in enumerate(state.get("opinions", [])))
-        reply = agent.say(_prompt(state, extra=f"\n\nPanel opinions:\n{ops}",
-                                  closing=REASON_THEN_ANSWER))
+        reply = agent.say(_prompt(state, extra=_panel_context(state), closing=REASON_THEN_ANSWER))
         return {"answer": parse_choice(reply), "rationale": reply.strip()}
 
     return node
@@ -175,7 +198,8 @@ def make_verify_node(cfg: RunConfig) -> Node:
     def node(state: dict) -> dict:
         cur = state.get("answer")
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
-        reply = agent.say(_prompt(state, extra=f"\n\nProposed answer: {cur_letter}",
+        mem = f"\n\nWorking notes (team memory):\n{state['working_memory']}" if state.get("working_memory") else ""
+        reply = agent.say(_prompt(state, extra=f"{mem}\n\nProposed answer: {cur_letter}",
                                   closing=REASON_THEN_ANSWER))
         revised = parse_choice(reply)
         return {"answer": revised if revised is not None else cur, "rationale": reply.strip()}

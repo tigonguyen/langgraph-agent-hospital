@@ -54,7 +54,12 @@ _PRESETS: dict[str, RunConfig] = {
     "V2": RunConfig(panel_size=3, aggregate=True, verify=True,
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=True)),
-    "V3": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=True),
+    # V3 = the new V2 panel + short-term memory: a scribe distils the panel into shared
+    # working notes (state["working_memory"]) that the attending and verifier reason over.
+    # V2 -> V3 differs by exactly the memory. (Long-term / cross-episode memory is future work.)
+    "V3": RunConfig(panel_size=3, aggregate=True, verify=True, memory=True,
+                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                                  k=5, threshold=0.0, tool=True)),
     "V4": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=False),
 }
 

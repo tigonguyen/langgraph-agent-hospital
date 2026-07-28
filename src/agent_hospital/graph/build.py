@@ -39,8 +39,12 @@ def build_graph(cfg: RunConfig):
 
     if cfg.panel_size > 1 or cfg.aggregate:
         g.add_node("panel", nodes.make_panel_node(cfg))
+        seq.append("panel")
+        if cfg.memory:  # short-term memory: scribe distils the panel into working notes (V3)
+            g.add_node("scribe", nodes.make_scribe_node(cfg))
+            seq.append("scribe")
         g.add_node("aggregate", nodes.make_aggregate_node(cfg))
-        seq += ["panel", "aggregate"]
+        seq.append("aggregate")
     else:
         g.add_node("answer", nodes.make_answer_node(cfg))
         seq.append("answer")

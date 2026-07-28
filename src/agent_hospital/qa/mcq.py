@@ -16,6 +16,11 @@ DELIBERATE = (
     "Reason about the key findings and the options, then on the LAST line write "
     "'Answer: X' where X is A, B, C, or D."
 )
+# V3 scribe: distil the panel into shared working memory (no final answer).
+SCRIBE_NOTES = (
+    "Write compact working notes: (1) key findings; (2) for each option A-D, mark "
+    "supported / ruled-out / uncertain with a one-line reason. Do NOT pick a final answer."
+)
 REASON_THEN_ANSWER = (
     "In at most 30 words, say why the best option is best, then on the LAST line "
     "write 'Answer: X' where X is A, B, C, or D."
