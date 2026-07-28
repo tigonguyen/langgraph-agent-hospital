@@ -23,9 +23,9 @@ REASON_THEN_ANSWER = (
 # V1 agentic RAG: must permit a tool call (so NOT "respond with ONLY the letter",
 # which forbids any non-letter output and suppresses the tool call).
 AGENTIC_ANSWER = (
-    "First, if it would help, call search_medmcqa with a focused query to retrieve "
-    "similar solved questions. Then reason briefly and on the LAST line write "
-    "'Answer: X' where X is A, B, C, or D."
+    "First, if it would help, call search_medmcqa with a focused query to retrieve similar "
+    "solved questions. Then, in at most 30 words, say why the best option is best, and on the "
+    "LAST line write 'Answer: X' where X is A, B, C, or D."
 )
 
 
