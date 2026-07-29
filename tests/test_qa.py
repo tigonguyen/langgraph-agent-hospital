@@ -29,3 +29,9 @@ def test_parse_choice_variants():
     assert parse_choice("I think A is best") == 0
     assert parse_choice("no letter here") is None
     assert parse_choice("") is None
+
+
+def test_parse_choice_ignores_letter_inside_a_word():
+    # "answer as C" must not match the lowercase 'a' in "as" as option A.
+    assert parse_choice("Kept the answer as C for these reasons.\n\nAnswer: C") == 2
+    assert parse_choice("The answer as described above is D.\n\nAnswer: D") == 3

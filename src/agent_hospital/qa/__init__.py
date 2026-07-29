@@ -6,6 +6,7 @@ from agent_hospital.qa.metrics import (
     invalid_rate,
     mcnemar,
     mean_latency,
+    mean_tokens,
     run_variant,
     win_loss_tie,
 )
@@ -25,6 +26,7 @@ __all__ = [
     "accuracy",
     "invalid_rate",
     "mean_latency",
+    "mean_tokens",
     "bootstrap_ci",
     "win_loss_tie",
     "mcnemar",

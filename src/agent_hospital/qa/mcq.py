@@ -10,12 +10,17 @@ _LETTERS = "ABCD"
 
 
 LETTER_ONLY = "Respond with ONLY the letter (A, B, C, or D) of the best answer."
-# Panel opinions are internal — they feed the attending, so they stay unconstrained.
-DELIBERATE = (
-    "Reason about the key findings and the options, then on the LAST line write "
-    "'Answer: X' where X is A, B, C, or D."
+# V2 clinical reasoner: must NOT name an option (the decider commits from the report).
+ANALYSE_ONLY = "Write your analysis as instructed above. Do NOT state a final answer."
+# V2 clinical reasoner, agentic: same as ANALYSE_ONLY but must still permit a tool call.
+AGENTIC_ANALYSE = (
+    "First, if it would help, call search_medmcqa with a focused query to check your reasoning "
+    "against similar solved questions. Then write your analysis as instructed above. Do NOT state "
+    "a final answer or write 'Answer:'."
 )
-# V3 scribe: distil the panel into shared working memory (no final answer).
+# Layer 1, branch B: digest retrieved passages into a summary (no final answer).
+DIGEST_EVIDENCE_ONLY = "Write your digest as instructed above. Do NOT state a final answer."
+# V3/V4 scribe: distil the clinical report into shared working memory (no final answer).
 SCRIBE_NOTES = (
     "Write compact working notes: (1) key findings; (2) for each option A-D, mark "
     "supported / ruled-out / uncertain with a one-line reason. Do NOT pick a final answer."
@@ -24,12 +29,22 @@ REASON_THEN_ANSWER = (
     "In at most 30 words, say why the best option is best, then on the LAST line "
     "write 'Answer: X' where X is A, B, C, or D."
 )
-# V1 agentic RAG: must permit a tool call (so NOT "respond with ONLY the letter",
-# which forbids any non-letter output and suppresses the tool call).
+# V1 agentic RAG: must permit a tool call (so NOT "respond with ONLY the letter", which
+# forbids any non-letter output and suppresses the tool call). Unconditional — no "if it
+# would help" — so this doesn't silently contradict the system prompt's "always search"
+# instruction (a user-turn instruction can override the system prompt; keep them aligned).
 AGENTIC_ANSWER = (
-    "First, if it would help, call search_medmcqa with a focused query to retrieve similar "
-    "solved questions. Then, in at most 30 words, say why the best option is best, and on the "
-    "LAST line write 'Answer: X' where X is A, B, C, or D."
+    "First, call search_medmcqa with a focused query to retrieve similar solved questions. "
+    "Then, in at most 40 words, say why the best option is best and state your confidence "
+    "(High/Medium/Low) as instructed above, then on the LAST line write 'Answer: X' where X is "
+    "A, B, C, or D."
+)
+# V1a agentic RAG (same as AGENTIC_ANSWER, but over MedRAG Textbooks instead of MedMCQA).
+AGENTIC_ANSWER_TEXTBOOK = (
+    "First, call search_textbooks with a focused query to retrieve relevant textbook passages. "
+    "Then, in at most 40 words, say why the best option is best and state your confidence "
+    "(High/Medium/Low) as instructed above, then on the LAST line write 'Answer: X' where X is "
+    "A, B, C, or D."
 )
 # Verifier with textbook search (V2/V3): may check the proposed answer against reference
 # textbook passages before confirming/revising.
@@ -54,7 +69,17 @@ def parse_choice(text: str) -> int | None:
     """Extract the chosen option index (0-3) from a model reply, or None."""
     if not text:
         return None
-    m = re.search(r"answer\s*(?:is|:)?\s*\(?([ABCD])\)?", text, re.IGNORECASE)
+    # \b around the letter matters: without it, phrasing like "kept the answer AS C"
+    # matched the lowercase 'a' in "as" (case-insensitive) and silently returned A instead
+    # of the C stated two words later — a wrong answer, not a caught invalid response.
+    m = re.search(r"answer\s*(?:is|:)?\s*\(?\b([ABCD])\b\)?", text, re.IGNORECASE)
     if not m:
         m = re.search(r"\b([ABCD])\b", text)
     return _LETTERS.index(m.group(1).upper()) if m else None
+
+
+def summarize_rationale(rationale: str) -> str:
+    """The explanation without its trailing 'Answer: X' — the pred already shows the letter.
+    Also collapses it to one line, for compact per-item logging."""
+    text = re.sub(r"\n*\s*Answer\s*:\s*[ABCD]\s*\.?\s*$", "", rationale.strip(), flags=re.IGNORECASE)
+    return " ".join(text.split())

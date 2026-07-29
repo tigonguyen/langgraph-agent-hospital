@@ -23,7 +23,7 @@ def _ollama_has(model: str) -> bool:
 # --- offline: the switch (building is lazy — no network/store) --------------
 
 def test_registry_has_all_variants():
-    assert list(VARIANTS) == ["V0", "V1", "V2", "V3", "V4"]
+    assert list(VARIANTS) == ["V0", "V1", "V1A", "V2", "V3", "V4"]
 
 
 def test_all_variants_build():
@@ -59,7 +59,7 @@ def test_variants_answer_live():
     from agent_hospital.diseases import load_medqa_usmle
 
     items = load_medqa_usmle(split="test", limit=2)
-    for vid in ("V0", "V1", "V2"):
+    for vid in ("V0", "V1", "V1A", "V2"):
         answer = build_variant(vid, model=SMOKE_MODEL)
         for it in items:
             res = answer(it)

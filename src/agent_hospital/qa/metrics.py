@@ -23,6 +23,8 @@ class EpisodeRecord:
     gold: int
     latency_s: float
     rationale: str = ""      # the variant's explanation (spec §3)
+    tokens_in: int = 0       # summed prompt tokens across the episode's LLM calls
+    tokens_out: int = 0      # summed completion tokens — cost proxy for a local model (spec §7)
 
     @property
     def valid(self) -> bool:
@@ -49,7 +51,10 @@ def run_variant(
         # Accept a bare index too, so ad-hoc answer fns still work.
         pred = getattr(res, "answer", res)
         rationale = getattr(res, "rationale", "")
-        records.append(EpisodeRecord(it.id, pred, it.answer_idx, time.time() - t, rationale))
+        tokens_in = getattr(res, "tokens_in", 0)
+        tokens_out = getattr(res, "tokens_out", 0)
+        records.append(EpisodeRecord(it.id, pred, it.answer_idx, time.time() - t, rationale,
+                                     tokens_in, tokens_out))
         if progress:
             progress(len(records), len(items), records[-1])
     return records
@@ -67,6 +72,11 @@ def invalid_rate(records: list[EpisodeRecord]) -> float:
 
 def mean_latency(records: list[EpisodeRecord]) -> float:
     return sum(r.latency_s for r in records) / len(records) if records else 0.0
+
+
+def mean_tokens(records: list[EpisodeRecord]) -> float:
+    """Mean total tokens (in+out) per item — the cost proxy for a local model (no API $)."""
+    return sum(r.tokens_in + r.tokens_out for r in records) / len(records) if records else 0.0
 
 
 def bootstrap_ci(records: list[EpisodeRecord], n_boot: int = 2000, alpha: float = 0.05,

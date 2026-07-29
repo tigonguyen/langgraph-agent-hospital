@@ -115,6 +115,24 @@ PY
 `build_variant(id, model=…, temperature=0, **overrides)` is the single entry point; the metrics harness
 (`qa/metrics.py`) gives accuracy, bootstrap CI, invalid-rate, Win/Loss/Tie, McNemar, and latency.
 
+## 6. Official evaluation — predictions + metrics (spec §7-9)
+
+```bash
+# One prediction file per variant (resumable — safe to re-run after an interruption)
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V0 -s test -m qwen2.5:7b
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V1 -s test -m qwen2.5:7b
+# ... V2, V3, V4
+
+# Leaderboard + paired comparison (accuracy gain, Win/Loss/Tie, McNemar) vs a baseline
+PYTHONPATH=src .venv/bin/python -m agent_hospital.evaluate --baseline V0
+```
+`predict.py` writes `data/eval_runs/<variant>_<split>_<model>.jsonl` (one record per item:
+prediction, gold, correctness, latency, rationale) plus a `.meta.json` sidecar (model,
+temperature, item count, timing — spec §10 reproducibility). `evaluate.py` reads every
+`*.jsonl` there and reports the two required tables; `--out <path>` also writes them to a file.
+Not yet covered: the error-analysis table and token/cost tracking (latency is the only cost
+proxy today).
+
 ## MedCPT — the textbook embedder
 
 V1–V3 retrieve **solved MedMCQA questions** (`knowledge_medmcqa_nomic`, `nomic-embed-text`, no
@@ -145,14 +163,18 @@ src/agent_hospital/
   agents/base.py      # Agent — lazy create_agent wrapper (any provider/model)
   models.py           # resolve_model — 'provider:model' spec → chat model
   config.py           # RunConfig, RagConfig — the per-variant flexibility surface
-  roles.py            # ROLE_PROMPTS registry (baseline · rag-answerer · specialist · attending · verifier)
+  roles.py            # ROLE_PROMPTS registry (baseline · rag-agent · clinical-reasoner ·
+                      #   evidence-digest · decider · report-verifier · scribe)
   graph/              # state.py (QAState) · nodes.py (node factories) · build.py (build_graph)
   diseases/           # MedQA-USMLE loader
   knowledge/          # RAG: ingest · embeddings (nomic/medcpt) · retriever
   qa/                 # variants (V0–V4 presets) · mcq (format/parse) · reasoning · metrics
+  predict.py          # run a variant over a split, write per-item predictions (.jsonl + .meta.json)
+  evaluate.py         # leaderboard + paired-comparison tables from prediction files
 tests/                # offline + live (auto-skip) tests · golden/ (exact-match gate)
 docs/                 # ARCHITECTURE · TECHNICAL_DECISIONS · PLAN · REFACTOR_PLAN
 ```
 
-**Note:** `data/chroma/` and `data/medcpt/` are gitignored (large, regenerable) — each collaborator
-builds the knowledge base locally via step 3.
+**Note:** `data/chroma/`, `data/medcpt/`, and `data/eval_runs/` are gitignored (large/regenerable
+or run-specific) — each collaborator builds the knowledge base locally via step 3, and prediction
+runs live under `data/eval_runs/` by default.

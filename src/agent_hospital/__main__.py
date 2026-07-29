@@ -9,7 +9,6 @@
 from __future__ import annotations
 
 import argparse
-import re
 from textwrap import fill
 
 from agent_hospital.diseases import load_medqa_usmle
@@ -21,14 +20,10 @@ from agent_hospital.qa import (
     build_variant,
     invalid_rate,
     mean_latency,
+    mean_tokens,
     run_variant,
 )
-
-
-def _summarise(rationale: str) -> str:
-    """The explanation without its trailing 'Answer: X' — pred already shows the letter."""
-    text = re.sub(r"\n*\s*Answer\s*:\s*[ABCD]\s*\.?\s*$", "", rationale.strip(), flags=re.I)
-    return " ".join(text.split())
+from agent_hospital.qa.mcq import summarize_rationale
 
 
 def warm_up(answer_fn) -> None:
@@ -96,7 +91,7 @@ def main() -> None:
         verdict = f"{pred} {mark}" if r.correct else f"{pred} {mark} (gold {letters[r.gold]})"
         print(f"{done:>4}/{total}  {r.item_id:<14} {verdict:<22} "
               f"{r.latency_s:5.1f}s  acc {hits / done:.3f}", flush=True)
-        why = _summarise(r.rationale)
+        why = summarize_rationale(r.rationale)
         if why:
             print(fill(why, width=88, initial_indent=" " * 8, subsequent_indent=" " * 8), flush=True)
             print(flush=True)
@@ -114,6 +109,7 @@ def main() -> None:
           f"   95% CI [{lo:.3f}, {hi:.3f}]")
     print(f"  invalid rate  {invalid_rate(records):.3f}")
     print(f"  mean latency  {mean_latency(records):.2f}s / item")
+    print(f"  mean tokens   {mean_tokens(records):.0f} / item")
 
 
 if __name__ == "__main__":

@@ -30,10 +30,10 @@ class RunConfig:
     role_models: dict[str, Any] = field(default_factory=dict)
     answer_role: str = "baseline"          # role for the single-answer node (V0-V2)
     rag: RagConfig | None = None           # None = no retrieval (V0)
-    panel_size: int = 1                    # >1 or aggregate → panel + attending (V3/V4)
-    aggregate: bool = False
-    verify: bool = False                   # verifier node (V3 on, V4 off)
-    memory: bool = False                   # short-term working memory: scribe writes it, attending/verifier read it (V3)
+    clinical_reason: bool = False          # dedicated clinical-reasoning stage before the decider (V2-V4)
+    verify: bool = False                   # verifier node, reads the clinical report (V2/V3, off for V4)
+    memory: bool = False                   # short-term memory: scribe condenses the clinical report into
+                                            # working notes that the decider/verifier read instead (V3/V4)
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
 
     def model_for(self, role: str) -> Any:
