@@ -1,8 +1,11 @@
 # Refactor Plan — Config-driven LangGraph
 
-> **Status: ✅ COMPLETE.** All phases done — V0–V2 refactored behavior-preserving (golden exact-match
-> gate passes live), V3/V4 added as config toggles, docs updated. Deviations from the original plan below
-> are marked *(as built)*. This file is kept as the design record.
+> **Status: ✅ COMPLETE, and since superseded.** All phases below were completed as described — V0–V2
+> refactored behavior-preserving, V3/V4 added as config toggles. **V1 and V2 were then rebuilt again**
+> as agentic MedAgents-style panels (see `docs/ARCHITECTURE.md`), so the presets, roles, and prompts
+> described below no longer match the current code (e.g. the golden gate this phase produced now pins
+> nothing — its captured answers are for a design that no longer exists; see `tests/test_golden.py`).
+> This file is kept as the historical record of that first refactor, not as current documentation.
 
 Rebuild `qa/` so every variant is a **LangGraph `StateGraph`** assembled from an internal
 config, flexible on **agent roles, RAG, and model** — without changing V0–V2 behavior.

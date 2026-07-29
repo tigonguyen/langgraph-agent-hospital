@@ -4,6 +4,14 @@ Standalone SVGs for the midterm report and slides. Self-contained — no externa
 fonts or scripts — so they can be dropped straight into Word, LaTeX, Google Slides or a
 web page, and scale without pixelation.
 
+**Stale — depict the pre-rebuild design.** `v1_flow.svg`, `v2_flow.svg`, and `ladder_overview.svg`
+were hand-drawn against the design described in the old `REFACTOR_PLAN.md`/`REPORT_NOTES.md` §3b/§3c
+(graph-invoked textbook/MedMCQA retrieval, a `clinical_reason → decider` V2). V1 and V2 were since
+rebuilt as agentic MedAgents-style panels (`ARCHITECTURE.md`), so these three no longer match the
+current graph topology. They have not been redrawn as part of this cleanup pass — regenerate them
+(or draw new ones) from the current `build_graph(cfg).get_graph().draw_mermaid()` output before
+using them in the report or slides. `v0_flow.svg` is unaffected (V0 hasn't changed).
+
 | file | shows | report section |
 |---|---|---|
 | [ladder_overview.svg](ladder_overview.svg) | V0–V4 side by side, what each rung adds | §2 System Architecture |

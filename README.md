@@ -6,11 +6,11 @@ variants (V0–V4) and measured with paired significance. Stack: **LangChain v1 
 
 | id | variant | graph | status |
 |----|---------|-------|--------|
-| V0 | Direct LLM | `answer` | ✅ |
-| V1 | RAG-only (reasoning-distilled query) | `reason → retrieve → answer` | ✅ |
-| V2 | Multi-agent (reasoner + specialist) | `reason → retrieve → answer` | ✅ |
-| V3 | Full system (panel + attending + verifier) | `reason → retrieve → panel → aggregate → verify` | ✅ |
-| V4 | Full system without verifier | `reason → retrieve → panel → aggregate` | ✅ |
+| V0 | Direct LLM | `answer` | ✅ measured |
+| V1 | RAG-only — single agent, agentic tool call (`search_medmcqa`) | `agent` | ✅ measured |
+| V2 | Multi-agent (3-specialist panel + attending + verifier) | `panel(3) → aggregate → verify` | ✅ measured |
+| V3 | V2 + short-term memory (scribe writes shared working notes) | `panel(3) → scribe → aggregate → verify` | ⚠️ builds & runs, not yet measured |
+| V4 | Full system without verifier | `reason → retrieve → panel(2) → aggregate` | ⚠️ stale preset — predates the V1–V3 agentic rebuild; does **not** currently isolate the verifier (different corpus/embedder/panel size than V3) |
 
 Every variant is a **LangGraph `StateGraph`** assembled from an internal `RunConfig`; `build_variant(id)`
 is the single switch. Design details: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) · decisions:
@@ -69,17 +69,22 @@ PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 20 -m anthropic:claud
 ```
 Provider packages are imported lazily — only the one you actually use must be installed.
 
-## 3. Build the RAG knowledge base (needed for V1/V2)
+## 3. Build the RAG knowledge base (needed for V1–V4)
 
-Downloads the MedRAG **Textbooks** corpus (~125k snippets) and embeds it into a local Chroma store at
-`data/chroma/` (gitignored, ~2.3 GB). One-time, ~1 hour on Apple Silicon.
+Two separate collections, built from two separate corpora — V1–V3's panel retrieves solved
+MedMCQA questions; V2/V3's verifier and V4 retrieve MedRAG Textbook passages. V0 needs neither.
 
 ```bash
+# MedMCQA (V1-V3): ~182k solved board questions, nomic-embed-text, no gate
+PYTHONPATH=src .venv/bin/python -c "
+from agent_hospital.knowledge import open_store, ingest_medmcqa
+ingest_medmcqa(182_822, store=open_store('knowledge_medmcqa_nomic'), verbose=True)"
+
+# MedRAG Textbooks (V2/V3 verifier, V4): ~125k snippets, embeds into data/chroma/ (~2.3 GB)
 PYTHONPATH=src .venv/bin/python -m agent_hospital.knowledge.ingest 130000
 ```
 - Progress prints per batch (`embedded N`).
 - If the HuggingFace download throttles, authenticate first: `.venv/bin/hf auth login`.
-- V0 needs no knowledge base; V1/V2 do.
 
 ## 4. Run the tests
 
@@ -110,10 +115,13 @@ PY
 `build_variant(id, model=…, temperature=0, **overrides)` is the single entry point; the metrics harness
 (`qa/metrics.py`) gives accuracy, bootstrap CI, invalid-rate, Win/Loss/Tie, McNemar, and latency.
 
-## MedCPT — the default embedder
+## MedCPT — the textbook embedder
 
-V1–V4 retrieve with **MedCPT** (medical-domain asymmetric bi-encoder) from the `knowledge_medcpt`
-collection. Setup: install the extra deps, download the two encoders into `data/medcpt/`, and ingest:
+V1–V3 retrieve **solved MedMCQA questions** (`knowledge_medmcqa_nomic`, `nomic-embed-text`, no
+gate — the agent decides how to weigh a hit). **MedCPT** (medical-domain asymmetric bi-encoder)
+is used separately for **textbook** retrieval: V2/V3's verifier holds its own `search_textbooks`
+tool over `knowledge_medcpt`, and V4 retrieves textbooks from the same collection. Setup: install
+the extra deps, download the two encoders into `data/medcpt/`, and ingest:
 
 ```bash
 uv pip install --python .venv -r requirements-medcpt.txt

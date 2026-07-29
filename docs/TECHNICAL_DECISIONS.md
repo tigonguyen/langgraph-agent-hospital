@@ -4,6 +4,12 @@ A decision log — *why* we chose what we chose, with rejected alternatives and 
 evidence behind each call. Structure ("what is wired to what") lives in
 [ARCHITECTURE.md](ARCHITECTURE.md); this file is the rationale.
 
+**Append-only log, read historically.** Entries record the decision *at the time it was made*;
+later entries (and `ARCHITECTURE.md`) supersede earlier ones rather than editing them out. In
+particular, D6–D11/D19–D20 (textbook corpus, MedCPT, gate 0.60–0.65) describe the RAG design V1–V3
+used *before* their agentic MedAgents-style rebuild — that corpus/embedder combination now applies
+only to V2/V3's verifier and to V4 (see `ARCHITECTURE.md`'s current per-variant sections).
+
 ---
 
 ## Stack & models
@@ -146,12 +152,13 @@ prediction files without a second pass. `run_variant` still accepts a bare int, 
 functions keep working.
 
 **D22 — Explanations are capped at 30 words; internal deliberation is not.**
-Why: §3 asks for a *short* explanation and unconstrained replies ran ~200 words. Four closing
-instructions now exist because one cannot serve every role: `REASON_THEN_ANSWER` (≤30 words) for
-answering nodes, `ANALYSE_ONLY` for V2's clinical reasoner (must **not** name an option, or the
-decider would just copy it), `DELIBERATE` for V3/V4 panel opinions (internal input to the
-attending — capping them would degrade the deliberation V3 exists to test), and `LETTER_ONLY`
-retained as the default.
+Why: §3 asks for a *short* explanation and unconstrained replies ran ~200 words. Multiple closing
+instructions exist because one cannot serve every role: `REASON_THEN_ANSWER` (≤30 words) for
+answering nodes, `DELIBERATE` for panel opinions (internal input to the attending — capping them
+would degrade the deliberation the panel exists to test), `AGENTIC_ANSWER`/`AGENTIC_VERIFY` for
+tool-using agents (must permit a tool call, so not letter-only), and `LETTER_ONLY` retained as the
+default. (`ANALYSE_ONLY`, originally added for V2's since-removed clinical-reasoner/decider stage,
+was deleted along with that stage — see `ARCHITECTURE.md`'s current V2 design.)
 **Cost:** V0 rose 0.66 s → ~1.5 s/item. **Consequence:** every measurement taken under the
 letter-only prompts is superseded, and the golden file pins nothing until the ladder settles.
 

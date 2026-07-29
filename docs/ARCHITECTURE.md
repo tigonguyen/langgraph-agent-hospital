@@ -1,7 +1,9 @@
 # Architecture — System Variants (V0–V4)
 
-This document describes what is **built and measured today**: the five-variant ablation ladder
-(V0 Direct LLM → V4 full multi-agent system), every component it uses, and **why** each was chosen.
+This document describes the current five-variant ablation ladder (V0 Direct LLM → V4 full
+multi-agent system), every component it uses, and **why** each was chosen. The tail of this
+document (from "Component choices & rationale" on) is a historical record of an earlier design —
+see the callout there before citing anything from it as current.
 
 Every variant is a **LangGraph `StateGraph`**, assembled from an internal `RunConfig` by
 `graph/build.py:build_graph(cfg)`. All variants expose the same interface —
@@ -17,10 +19,10 @@ answer = build_variant("V3", model="qwen2.5:14b")   # V0..V4
 flowchart LR
     item["MCQItem<br/>vignette + 4 options"] --> sw{"build_variant(id, model)<br/>→ build_graph(RunConfig)"}
     sw -->|V0| v0["answer"]
-    sw -->|V1| v1["reason → retrieve → answer"]
-    sw -->|V2| v2["reason → retrieve → clinical_reason → answer"]
-    sw -->|V3| v3["reason → retrieve → panel → aggregate → verify"]
-    sw -->|V4| v4["reason → retrieve → panel → aggregate"]
+    sw -->|V1| v1["agent (search_medmcqa tool)"]
+    sw -->|V2| v2["panel(3) → aggregate → verify"]
+    sw -->|V3| v3["panel(3) → scribe → aggregate → verify"]
+    sw -->|V4| v4["reason → retrieve → panel(2) → aggregate"]
     v0 & v1 & v2 & v3 & v4 --> ans["AnswerResult<br/>option index + short explanation"]
     ans --> eval["Metrics harness<br/>accuracy, CI, invalid-rate, WLT, McNemar, latency"]
 ```
@@ -38,20 +40,26 @@ new code, and every variant is evaluated identically. `RunConfig` is internal;
 |---|---|---|
 | **Agent** | thin lazy wrapper over LangChain v1 `create_agent`; builds the graph on first use | `agents/base.py` |
 | **Model access** | any `BaseChatModel`; a bare string → local `ChatOllama` (provider-agnostic) | `agents/base.py` |
-| **Config** | `RunConfig` (answer role, rag, clinical_reason, panel_size, aggregate, verify, per-role models) + `RagConfig` | `config.py` |
-| **Roles** | `ROLE_PROMPTS` — baseline · rag-answerer · clinical-reasoner · decider · specialist · attending · verifier | `roles.py` |
-| **Graph** | `QAState` + node factories (reason/retrieve/clinical_reason/answer/panel/aggregate/verify) + `build_graph(cfg)` | `graph/` |
+| **Config** | `RunConfig` (answer role, rag, panel_size, aggregate, verify, memory, verify_rag, per-role models) + `RagConfig` | `config.py` |
+| **Roles** | `ROLE_PROMPTS` — baseline · rag-answerer · rag-agent · specialist · attending · verifier · scribe | `roles.py` |
+| **Graph** | `QAState` + node factories (reason/retrieve/answer/agent/panel/scribe/aggregate/verify) + `build_graph(cfg)` | `graph/` |
 | **Variant switch** | `_PRESETS` (V0–V4) + `build_variant(id, model, **overrides)` → uniform `answer` fn | `qa/variants.py` |
 | **Eval harness** | per-item records (pred, gold, latency, rationale) → accuracy+CI, invalid-rate, Win/Loss/Tie, McNemar | `qa/metrics.py` |
 | **Data** | `openlifescienceai/medqa` (4-option MCQ; train 10,178 / val 1,272 / test 1,273) | `diseases/medqa_usmle.py` |
 
 **Why this shape:** the goal is an **ablation ladder** — every variant differs by *exactly one thing*
 and is scored the same way, so accuracy differences are attributable. A single config-driven graph
-builder + one metrics harness guarantees that: V0→V1 adds RAG, V1→V2 adds the clinical reasoning stage,
-V2→V3 swaps it for the panel/attending/verifier, V3→V4 drops the verifier.
+builder + one metrics harness is meant to guarantee that; today it holds for V0→V1→V2→V3 (V1 adds
+agentic RAG, V2 adds the panel/attending/verifier, V3 adds short-term memory) but **not for V4** — see
+the caveat below.
 
-> **Open caveat:** V1/V2 retrieve from **MedMCQA** while V3/V4 retrieve **textbook prose**, so `V2 → V3`
-> currently confounds corpus with architecture. Resolve before the ladder goes in the report.
+> **Open caveat — V4 is not currently `V3` minus the verifier.** V4's preset predates the MedAgents-style
+> rebuild of V1–V3 (agentic tool-driven retrieval over MedMCQA) and was never updated: it still uses
+> graph-invoked textbook retrieval (`knowledge_medcpt`, MedCPT, gated) and a 2-specialist panel, vs. V3's
+> agentic MedMCQA retrieval and 3-specialist panel. So `V3 − V4` currently confounds the verifier with the
+> corpus, embedder, retrieval mode, and panel size — it does **not** isolate the verifier's contribution
+> as the report claims. Fix: redefine `V4 = replace(_PRESETS["V3"], verify=False)` before it is measured
+> or reported on.
 
 ### MedQA-USMLE row schema (`openlifescienceai/medqa`)
 
@@ -99,82 +107,101 @@ flowchart LR
 
 ---
 
-## V1 — RAG-only
+## V1 — RAG-only (single agentic-RAG agent)
 
-V1 = V0 **plus** retrieved textbook evidence: a knowledge base built once offline, then per-question
-retrieval at inference.
-
-```mermaid
-flowchart TB
-    subgraph KB["Knowledge base — built once (offline)"]
-      direction LR
-      corpus["MedRAG Textbooks<br/>18 USMLE books · 125,847 snippets"] --> e1["MedCPT Article encoder<br/>768-d (local)"]
-      e1 --> store[("Chroma · knowledge<br/>cosine / HNSW, persisted")]
-    end
-    subgraph INF["Inference — per question"]
-      direction TB
-      q["MCQItem"] --> d["1 · Query distillation<br/>LLM → focused query"]
-      d --> e2["2 · Embed query<br/>MedCPT Query encoder 768-d"]
-      e2 --> r["3 · Retrieve (search_textbooks tool)<br/>cosine · top-k=4 · gate >= 0.60"]
-      r --> g{"evidence above gate?"}
-      g -->|yes| p1["4 · evidence + MCQ prompt"]
-      g -->|"no — fallback"| p2["4 · MCQ prompt only"]
-      p1 --> l2["5 · LLM qwen2.5:14b → parse"]
-      p2 --> l2
-      l2 --> idx["option index"]
-    end
-    store -. read at inference .-> r
-```
-
-Files: `knowledge/ingest.py` (streamed incremental embedding), `knowledge/embeddings.py` (embedder
-seam), `knowledge/retriever.py` (`open_store`, gated `retrieve`), `qa/reasoning.py` (query distiller),
-`graph/nodes.py` (`make_reason_node`, `make_search_tool`, `make_retrieve_node`, `make_answer_node`).
-V1's answer role is `rag-answerer`. **V1 retrieves from MedMCQA** (`knowledge_medmcqa`, 182,822 solved
-exam questions, gate 0.65) rather than textbook prose — see D19/D20 and REPORT_NOTES §3b.
-
-**Retrieval is packaged as a `search_textbooks` tool** that the retrieve node invokes directly. Calling
-it from the graph costs **no LLM call** (only the ~22 ms MedCPT query embedding; the HNSW search itself is
-sub-millisecond). Binding the same tool to an agent instead — letting the model decide when to search —
-costs one extra model invocation per call, because the model must be re-invoked to consume the result.
-
----
-
-## V2–V4 — Multi-agent
-
-V2–V4 share the same front end as V1 (`reason → retrieve`) and differ in how the answer is produced.
-All roles/prompts live in `roles.py`; all nodes in `graph/nodes.py`; the wiring is `graph/build.py`.
+V1 = V0 **plus** one bound tool: a single agent, given `search_medmcqa`, decides for itself whether
+and what to search.
 
 ```mermaid
 flowchart LR
-    q["MCQItem"] --> rz["reason<br/>distill query"]
-    rz --> rt["retrieve<br/>gated top-k evidence"]
-    rt --> br{answer role?}
-    br -->|"V2 · clinical reasoner"| sp["clinical_reason → decider"]
-    br -->|"V3/V4 · panel"| pn["panel<br/>2 specialists,<br/>distinct perspectives"]
-    pn --> ag["aggregate<br/>attending weighs opinions"]
-    ag --> vf{"verify? (V3 only)"}
-    vf -->|V3| vr["verify<br/>verifier confirms/revises"]
-    vf -->|V4| out["option index"]
-    sp --> out
-    vr --> out
+    item["MCQItem"] --> agent["Agent(rag-agent)<br/>tools=[search_medmcqa]"]
+    agent -->|"tool call?"| tool["search_medmcqa<br/>MedMCQA · 182,822 solved Qs<br/>nomic-embed-text · top-k=5 · no gate"]
+    tool -->|"Q/A/explanation hits"| agent
+    agent --> parse["parse_choice"]
+    parse --> idx["option index"]
 ```
 
-- **V2 — clinical reasoner + decider:** a `clinical-reasoner` writes a structured analysis (findings →
-  what is asked → each option for/against) but **never names an option**; a `decider` then commits.
-  3 agents, meeting spec §4.6. Inherits V1's corpus and gate, so `V2 − V1` isolates the answering stage.
-- **V3 — full system:** a **panel** of `panel_size=2` specialists, each given a distinct perspective
-  (`roles.PERSPECTIVES`: "favor the single most likely answer" vs "rule out dangerous/confused
-  alternatives") so a temperature-0 panel still produces diverse opinions; an **attending** aggregates
-  them (`aggregate=True`); a **verifier** does a final confirm/revise pass (`verify=True`). Parse failure
-  at any late stage keeps the prior answer rather than emitting `None`.
-- **V4 — full system without verifier:** identical to V3 with `verify=False` — isolates the verifier's
-  contribution (V3 − V4 = the verifier's marginal effect).
-
-> **Note — experience/memory base not built.** Earlier plans framed V3 around retrieving rationales from
-> solved MedQA-train mistakes. That was descoped; the built V3 gets its gain from a diverse-perspective
-> panel + attending + verifier, with no episodic-memory retrieval. An experience base remains future work.
+- **One node, one agent.** `build_graph` takes a dedicated branch when `cfg.rag.tool=True` and there is
+  no panel/aggregate (`graph/build.py:20`): a single `agent` node, `make_agentic_rag_node`
+  (`graph/nodes.py:164`), wraps `Agent("rag-agent", tools=[search_medmcqa])` — no separate reason/retrieve
+  nodes, because retrieval is folded into the one agent as a tool call.
+- **Corpus = MedMCQA** (`knowledge_medmcqa_nomic`), not textbook prose — retrieves similar **solved exam
+  questions** with their answer + explanation (Medprompt-style exemplar retrieval), embedded with
+  `nomic-embed-text` (8192-token context, so the query encoder doesn't truncate the vignette the way
+  MedCPT's 64-token query encoder would). **No gate** (`threshold=0.0`) — the agent sees the top-5 and is
+  trusted to weigh an analogous question rather than copy its answer.
+- **Cost:** letting the model choose when to call a tool costs one extra round-trip vs. a graph-invoked
+  call, because the model must be re-invoked to consume the tool result (see D19 for the measured
+  agentic-vs-graph-invoked comparison; V1 itself has since moved to the agentic side of that trade-off).
+- **Measured (full test, n=1273, qwen2.5:7b):** **0.573** accuracy — below V0's 0.615 — and **3.85%
+  invalid**, the highest of any variant: the tool-call loop sometimes doesn't converge on a final letter.
+  See `report.tex` §5 for the full table.
 
 ---
+
+## V2 — Multi-agent panel (MedAgents-style)
+
+5 agents: 3 specialists (each with agentic RAG over `search_medmcqa`) → an attending that aggregates →
+a verifier that double-checks against a *separate* corpus.
+
+```mermaid
+flowchart LR
+    item["MCQItem"] --> p1["specialist 1<br/>(favor most likely)"]
+    item --> p2["specialist 2<br/>(rule out dangerous)"]
+    item --> p3["specialist 3<br/>(mechanism-first)"]
+    p1 & p2 & p3 -->|opinions| ag["attending<br/>aggregate"]
+    ag -->|proposed answer| vf["verifier<br/>own search_textbooks tool<br/>MedRAG Textbooks · knowledge_medcpt · MedCPT"]
+    vf --> idx["option index"]
+```
+
+- **Panel** (`make_panel_node`, `graph/nodes.py:193`): `panel_size=3` specialists, each a distinct
+  `roles.PERSPECTIVES` framing (favor-most-likely / rule-out-dangerous / mechanism-first) cycled by index
+  so a temperature-0 panel still disagrees; each specialist holds its own `search_medmcqa` tool call.
+- **Attending** (`make_aggregate_node`): reads all opinions, weighs them, commits to a letter.
+- **Verifier** (`make_verify_node`): holds an **independent** `search_textbooks` tool over MedRAG
+  Textbooks (`knowledge_medcpt`, MedCPT, `verify_rag=RagConfig(threshold=0.0)`) — a *different* corpus
+  from the panel's solved-exemplar MedMCQA, so the verifier checks the proposed answer against reference
+  textbook fact rather than re-consulting the same exam-question analogies the panel already saw.
+- **Measured (full test, n=1273):** **0.608** accuracy (~level with V0), **0% invalid** (the panel +
+  verifier structure eliminates V1's tool-convergence problem), but **~25× V0's latency and ~16× its
+  tokens** (`report.tex` §5) for no net accuracy gain over the direct baseline yet.
+
+---
+
+## V3 — V2 + short-term memory
+
+Identical to V2, plus a `scribe` node between the panel and the attending: it condenses the three
+specialists' opinions into shared **working notes** (`state["working_memory"]`), which the attending
+and verifier then read instead of the raw opinions (`_panel_context`, `graph/nodes.py:226`). `V3 − V2`
+isolates the effect of that shared working memory alone.
+
+**Status: builds and runs end-to-end (verified live), but not yet measured** — no accuracy numbers
+exist yet; `report.tex` marks this row `\todo`.
+
+> **No long-term/cross-episode memory exists anywhere in this codebase.** Spec §4.5 (long-term memory)
+> is not met by any variant — only V3's per-episode working memory (§4.4, short-term) is built. See
+> `docs/REPORT_NOTES.md` and `docs/TECHNICAL_DECISIONS.md` (D4) for the earlier plan (retrieving
+> rationales from solved MedQA-train mistakes) that was descoped and remains future work.
+
+---
+
+## V4 — full system without verifier (stale preset — see the ladder caveat above)
+
+Preset frozen from **before** V1–V3's agentic MedAgents-style rebuild: `reason → retrieve → panel(2) →
+aggregate`, using graph-invoked textbook retrieval (`knowledge_medcpt`, MedCPT, gate 0.60), no memory,
+no verifier. It builds and runs (verified live), but because its corpus, embedder, retrieval mode, and
+panel size all differ from V3's, **it does not currently isolate the verifier's marginal contribution**
+the way its name and the report imply — see the caveat at the top of this document for the fix.
+
+---
+
+> **Historical from here down.** Everything below (component choices, the MedRAG deep-dive, the
+> n=80 measured-results table, design principles) documents the design **before** V1–V3 were rebuilt as
+> agentic MedAgents-style panels over MedMCQA — i.e. the "V1 = graph-invoked textbook RAG" / "V2 =
+> clinical-reasoner + decider" era described in the old mermaid diagrams that used to sit above this
+> line. It stays as the evidence trail that motivated the rebuild (the RAG-barely-helps finding, the
+> query-distillation lift, the 32B-no-gain result). For the **current** V0–V4 design see the sections
+> above; for **current** full-test-set numbers see `report.tex` / `docs/REPORT_NOTES.md`.
 
 ## Component choices & rationale
 

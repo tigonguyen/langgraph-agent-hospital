@@ -3,6 +3,11 @@
 Working notes for the midterm report, organised against the required report structure.
 Sections are filled in as each variant is built. **Status: architecture + V0 + V1 + V2 complete.**
 
+> **§3b/§3c below describe the pre-rebuild V1/V2 design** (graph-invoked textbook/MedMCQA retrieval,
+> clinical-reasoner + decider) — V1 and V2 were since rebuilt as agentic MedAgents-style panels (see
+> `ARCHITECTURE.md`). `report.tex` is the up-to-date, authoritative write-up of the current design;
+> treat this file's variant-design sections as superseded working notes, not current documentation.
+
 Companion docs: [ARCHITECTURE.md](ARCHITECTURE.md) (what is wired to what) ·
 [TECHNICAL_DECISIONS.md](TECHNICAL_DECISIONS.md) (why, with evidence) ·
 [diagrams/](diagrams/) (report-ready SVGs).
