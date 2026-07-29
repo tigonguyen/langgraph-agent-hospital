@@ -22,7 +22,7 @@ VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only (MedMCQA)",
     "V1A": "RAG-only (MedRAG Textbooks)",
-    "V2": "Multi-agent (clinical reasoner + decider + verifier)",
+    "V2": "Multi-agent (case reasoner + decider)",
     "V3": "Full system (V2 + short-term memory)",
     "V4": "Full system without verifier",
 }
@@ -56,25 +56,22 @@ _PRESETS: dict[str, RunConfig] = {
     "V1A": RunConfig(answer_role="rag-agent-textbook",
                      rag=RagConfig(collection="knowledge_medcpt", embedder="medcpt",
                                    k=4, threshold=0.0, tool=True)),
-    # V2: a dedicated clinical-reasoning agent (spec §4.2) — findings, what's asked, reasoning,
-    # option-by-option, summary, never naming an option — hands its report to a separate decider
-    # who commits to a letter, then a lightweight verifier audits that choice against the
-    # report's own verdicts (and, if needed, a targeted textbook check) before confirming or
-    # revising it. 3 agents. `tool=False`: retrieval runs as its own reason->retrieve branch
-    # CONCURRENTLY with the reasoner (build_graph wires both straight off START) instead of
-    # being bound to the reasoner as a tool — the reasoner digests the case from its own
-    # knowledge while retrieval happens at the same time, and `answer` is where both join
-    # (`_prompt` auto-prepends `state["evidence"]`). Confirmed empirically: with Ollama's
-    # `-np` (parallel slots) > 1, concurrent local calls measured ~1.8x faster than serial.
-    # Same RAG corpus as V1, so V2 - V1 isolates exactly the effect of splitting one agent
-    # into reasoner + decider (+ verifier), not the RAG design.
-    "V2": RunConfig(clinical_reason=True, answer_role="decider", verify=True,
+    # V2: a dedicated case-reasoning agent (Node 1, spec §4.2) produces a shared case summary +
+    # search query; a search node and a reasoning node run CONCURRENTLY off it (retrieve+digest
+    # vs. own-knowledge clinical reasoning, each with its own confidence rating); a decider
+    # joins both and weighs them. 4 agents, no verifier. `tool=False`: retrieval is its own
+    # concurrent branch (build_graph wires it and reasoning both off Node 1) rather than bound
+    # to an agent as a tool. Same RAG corpus as V1, so V2 - V1 isolates exactly the effect of
+    # splitting one agent into case-reasoner + search + reasoning + decider, not the RAG design.
+    "V2": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
-                                  k=5, threshold=0.0, tool=False),
-                    verify_rag=RagConfig(threshold=0.0)),
-    # V3 = V2 + short-term memory: a scribe condenses the clinical reasoner's report into
-    # shared working notes (state["working_memory"]) that the decider and verifier read
-    # instead of the raw report. V3 - V2 isolates exactly the effect of that memory stage.
+                                  k=5, threshold=0.0, tool=False)),
+    # V3 = V2 + short-term memory + verifier: a scribe condenses the case reasoner's report
+    # into shared working notes (state["working_memory"]) that the decider and verifier read
+    # instead of the raw report; a verifier audits the decider's choice against those notes
+    # (and, if needed, a targeted textbook check) before confirming or revising it. Two deltas
+    # from V2 (memory AND verify), not one — V2 dropped its own verifier, so this relationship
+    # is no longer a clean single-variable step; noted here rather than left implicit.
     "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=False),

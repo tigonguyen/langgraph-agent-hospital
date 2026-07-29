@@ -9,6 +9,8 @@ from agent_hospital.diseases.medqa_usmle import MCQItem
 
 class QAState(TypedDict, total=False):
     item: MCQItem
+    case_understanding: str # Node 1's shared case summary + search-query rationale (V2-V4) —
+                            # read by Node 2 (search) and Node 3 (reasoning), which run concurrently
     query: str
     evidence: str          # formatted evidence block ("" = none)
     rationale: str         # most recent explanation text; overwritten by whichever node answers last

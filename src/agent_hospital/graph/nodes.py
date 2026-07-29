@@ -6,6 +6,7 @@ first retrieval, so compiling a graph touches no network / no vector store.
 
 from __future__ import annotations
 
+import re
 from dataclasses import replace
 from typing import Any, Callable
 
@@ -13,9 +14,10 @@ from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import (AGENTIC_ANALYSE, AGENTIC_ANSWER, AGENTIC_ANSWER_TEXTBOOK,
-                                   AGENTIC_VERIFY, ANALYSE_ONLY, DIGEST_EVIDENCE_ONLY, LETTER_ONLY,
-                                   REASON_THEN_ANSWER, SCRIBE_NOTES, format_mcq, parse_choice)
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_ANSWER_TEXTBOOK, AGENTIC_VERIFY,
+                                   ANALYSE_ONLY, DIGEST_EVIDENCE_ONLY, LETTER_ONLY,
+                                   REASON_THEN_ANSWER, SCRIBE_NOTES, UNDERSTAND_ONLY, format_mcq,
+                                   parse_choice)
 from agent_hospital.qa.reasoning import build_followup_agent, build_reasoning_agent, build_router
 
 Node = Callable[[dict], dict]
@@ -41,7 +43,7 @@ def make_reason_node(cfg: RunConfig) -> Node:
 
 def make_retrieve_node(cfg: RunConfig) -> Node:
     """Retrieval stage — invokes the `search_textbooks` tool directly (no LLM call)."""
-    search = make_search_tool(cfg)
+    search, _reset = make_search_tool(cfg)
 
     def node(state: dict) -> dict:
         return {"evidence": search.invoke({"query": state["query"]})}
@@ -69,27 +71,38 @@ def make_evidence_digest_node(cfg: RunConfig) -> Node:
     return node
 
 
-def make_evidence_branch_node(cfg: RunConfig) -> Node:
-    """Layer 1, branch B — reason -> retrieve -> digest, bundled into ONE graph node.
-
-    Bundling matters for real concurrency with `clinical_reason` (branch A): LangGraph's
-    synchronous execution advances in supersteps — all nodes in a superstep run
-    concurrently, but the NEXT superstep only starts once every node in the CURRENT one
-    has finished. Wired as three separate chained nodes, only the first step (~0.7s)
-    actually overlaps with clinical_reason's much longer call — retrieve/digest are
-    stranded in later supersteps, only starting once clinical_reason's superstep ends
-    (measured: 12.8s total). Bundled into one node, the whole ~3.5s branch overlaps
-    clinical_reason's slot entirely (measured: 10.9s total, same accuracy-relevant work).
+def make_search_branch_node(cfg: RunConfig) -> Node:
+    """Node 2 of the 4-node design (V2-V4): retrieve + digest, bundled into ONE graph node
+    so it shares a superstep with Node 3 (reasoning) for real concurrency — LangGraph's
+    synchronous execution advances in supersteps, and a multi-node chain racing a single
+    long call only has its FIRST step actually overlap; the rest gets stranded until the
+    long call's superstep ends. Uses the query `make_understand_node` already produced
+    (no separate query-distillation call needed here).
     """
-    reason = make_reason_node(cfg)
     retrieve = make_retrieve_node(cfg)
     digest = make_evidence_digest_node(cfg)
 
     def node(state: dict) -> dict:
-        s = {**state, **reason(state)}
-        s = {**s, **retrieve(s)}
+        s = {**state, **retrieve(state)}
         s = {**s, **digest(s)}
-        return {"evidence": s.get("evidence", ""), "query": s.get("query", "")}
+        return {"evidence": s.get("evidence", "")}
+
+    return node
+
+
+def make_understand_node(cfg: RunConfig) -> Node:
+    """Node 1 of the 4-node design (V2-V4): one shared case understanding (findings + what's
+    asked) and search query, read by BOTH the search branch (Node 2) and the reasoning branch
+    (Node 3) instead of each independently re-deriving its own — the shared first step of
+    what V1's single agent does internally, split into its own node here.
+    """
+    agent = Agent("case-reasoner", roles.ROLE_PROMPTS["case-reasoner"], model=cfg.model_for("case-reasoner"))
+
+    def node(state: dict) -> dict:
+        reply = agent.say(format_mcq(state["item"], UNDERSTAND_ONLY)).strip()
+        m = re.search(r"search query:\s*(.+)", reply, re.IGNORECASE | re.DOTALL)
+        query = m.group(1).strip().splitlines()[0] if m else state["item"].question
+        return {"case_understanding": reply, "query": query}
 
     return node
 
@@ -160,59 +173,98 @@ def make_adaptive_rag_node(cfg: RunConfig) -> Node:
     return node
 
 
-def make_search_tool(cfg: RunConfig):
+def _call_cap_guard(calls: dict, max_calls: int | None, tool_name: str) -> str | None:
+    """Shared hard-stop check for agentic tool use: a prompt-only "never call more than N
+    times" instruction is not reliable — measured, qwen2.5:7b ignored it and called a tool
+    4 times on one item. Returning a redirect message via the TOOL'S OWN OUTPUT (visible to
+    the model at the exact moment it's deciding whether to search again) works far better
+    than a rule stated once at the start of a long tool-calling conversation. Returns the
+    redirect message if the cap is hit, else None (and increments the counter).
+    """
+    if max_calls is None:
+        return None
+    if calls["n"] >= max_calls:
+        return (f"You have already called {tool_name} the maximum of {max_calls} times. Do "
+                "NOT call it again — answer the question now using your own reasoning and "
+                "whatever evidence you already have.")
+    calls["n"] += 1
+    return None
+
+
+def make_search_tool(cfg: RunConfig, max_calls: int | None = None):
     """A `search_textbooks` tool over the knowledge store (gated retrieval).
 
     The retrieve node invokes it directly, so it costs no LLM call. Binding it to an
     agent instead would let the model choose when to search, at the cost of one extra
     model invocation per call (the model must be re-invoked on the tool result).
+
+    `max_calls`, if set, hard-caps calls within one episode (see `_call_cap_guard`).
+    Returns `(tool, reset)` — call `reset()` once per item before invoking the agent,
+    since the tool closure is reused across items (uncapped callers can ignore `reset`).
     """
     from langchain_core.tools import tool
 
     rag = cfg.rag
     holder: dict[str, Any] = {}
+    calls = {"n": 0}
 
     @tool
     def search_textbooks(query: str) -> str:
         """Search medical textbooks for passages relevant to a clinical query."""
+        blocked = _call_cap_guard(calls, max_calls, "search_textbooks")
+        if blocked:
+            return blocked
         if "store" not in holder:
             holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
         hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"])
         return format_evidence(hits)          # "" = nothing cleared the gate (no-RAG fallback)
 
-    return search_textbooks
+    return search_textbooks, lambda: calls.__setitem__("n", 0)
 
 
-def make_medmcqa_tool(cfg: RunConfig):
+def make_medmcqa_tool(cfg: RunConfig, max_calls: int | None = None):
     """Tool factory (NOT a graph node): returns a LangChain `@tool` (`search_medmcqa`)
-    to BIND to an agent so the *model* decides when to call it (agentic RAG). V1's answer
-    agent and V2-V4's clinical reasoner hold it. It retrieves the top-k similar solved
-    board questions (MedMCQA) with answers/explanations — no gate (rag.threshold=0.0).
+    to BIND to an agent so the *model* decides when to call it (agentic RAG). Only V1's
+    answer agent holds it — V2-V4 retrieve the same corpus non-agentically instead, via
+    `make_retrieve_node`/`make_search_tool`. It retrieves the top-k similar solved board
+    questions (MedMCQA) with answers/explanations — no gate (rag.threshold=0.0).
+
+    `max_calls`/returns: see `make_search_tool`.
     """
     from langchain_core.tools import tool
 
     rag = cfg.rag
     holder: dict[str, Any] = {}
+    calls = {"n": 0}
 
     @tool
     def search_medmcqa(query: str) -> str:
         """Search a database of solved medical board questions (MedMCQA) for entries
         similar to the query. Returns the top matches with their correct answer and a
         brief explanation. Use a focused clinical query (the key findings and what is asked)."""
+        blocked = _call_cap_guard(calls, max_calls, "search_medmcqa")
+        if blocked:
+            return blocked
         if "store" not in holder:
             holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
         hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"])
         return format_evidence(hits) or "No similar questions found."
 
-    return search_medmcqa
+    return search_medmcqa, lambda: calls.__setitem__("n", 0)
 
+
+# Hard cap for agentic search (V1/V1a and the verifier's own search) — matches the "up to
+# twice" confidence-gated retry the prompts describe; see _call_cap_guard for why a prompt-
+# only cap isn't enough.
+_MAX_AGENTIC_SEARCHES = 2
 
 # role -> (tool factory, closing instruction) for the single-agent agentic-RAG node below.
 # V1 searches MedMCQA (solved exam questions); V1a searches MedRAG Textbooks instead —
 # same one-agent-does-everything architecture, different corpus.
 _AGENTIC_TOOL_BY_ROLE = {
-    "rag-agent": (lambda cfg: make_medmcqa_tool(cfg), AGENTIC_ANSWER),
-    "rag-agent-textbook": (lambda cfg: make_search_tool(cfg), AGENTIC_ANSWER_TEXTBOOK),
+    "rag-agent": (lambda cfg: make_medmcqa_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES), AGENTIC_ANSWER),
+    "rag-agent-textbook": (lambda cfg: make_search_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES),
+                           AGENTIC_ANSWER_TEXTBOOK),
 }
 
 
@@ -223,55 +275,37 @@ def make_agentic_rag_node(cfg: RunConfig) -> Node:
     `_AGENTIC_TOOL_BY_ROLE`): it decides whether/what to search, the `create_agent`
     loop runs the tool and feeds the results back, and the agent answers. The model —
     not the graph — drives retrieval (contrast V2-V4, where the retrieve node invokes
-    the tool directly).
+    the tool directly). The tool hard-caps itself at `_MAX_AGENTIC_SEARCHES` calls, reset
+    per item below.
     """
     make_tool, closing = _AGENTIC_TOOL_BY_ROLE[cfg.answer_role]
-    search = make_tool(cfg)
+    search, reset_calls = make_tool(cfg)
     agent = Agent(cfg.answer_role, roles.ROLE_PROMPTS[cfg.answer_role],
                   model=cfg.model_for(cfg.answer_role), tools=[search])
 
     def node(state: dict) -> dict:
+        reset_calls()
         reply = agent.say(format_mcq(state["item"], closing))
         return {"answer": parse_choice(reply), "rationale": reply.strip()}
 
     return node
 
 
-# V2-V4's clinical reasoner may hold the same search_medmcqa tool as V1's agent, so its
-# system prompt gets this appended only when a tool is actually bound (see make_clinical_reason_node).
-_CLINICAL_REASONER_TOOL_HINT = (
-    "\n\nYou have a tool, search_medmcqa, that retrieves similar solved board questions with "
-    "their correct answer and explanation — call it in step 3 if it would sharpen your reasoning. "
-    "Treat any hit as an analogy to weigh, not a guaranteed match."
-)
-
-
-def make_clinical_reason_node(cfg: RunConfig) -> Node:
-    """Dedicated clinical-reasoning stage (spec §4.2, V2-V4): works the case up like a physician —
-    findings, what's asked, reasoning, option-by-option, summary — and deliberately never names
-    a final answer. The `decider` (make_answer_node) reads this report next and commits to a
-    letter, so the reasoning stays inspectable on its own rather than an implicit side-effect of
-    answering.
+def make_reasoning_node(cfg: RunConfig) -> Node:
+    """Node 3 of the 4-node design (V2-V4): reasons from the shared case understanding
+    (`make_understand_node`'s output) using only its own medical knowledge — it never sees
+    retrieved evidence, since it runs concurrently with Node 2 (search) — and rates its own
+    confidence, mirroring V1's step 4. Deliberately never names a final answer; the `decider`
+    (make_answer_node) reads this report next and commits to a letter, so the reasoning stays
+    inspectable on its own rather than an implicit side-effect of answering.
     """
-    use_tool = bool(cfg.rag and cfg.rag.tool)
-    tools = [make_medmcqa_tool(cfg)] if use_tool else ()
-    prompt = roles.ROLE_PROMPTS["clinical-reasoner"] + (_CLINICAL_REASONER_TOOL_HINT if use_tool else "")
-    agent = Agent("clinical-reasoner", prompt, model=cfg.model_for("clinical-reasoner"), tools=tools)
-    closing = AGENTIC_ANALYSE if use_tool else ANALYSE_ONLY
-    # Fallback agent for the empty-completion retry below: same role, no tool bound. Built
-    # eagerly (not only on failure) so its `create_agent` graph is compiled up front like
-    # every other agent, keeping "compiling a graph touches no network" true for this node too.
-    fallback = Agent("clinical-reasoner", roles.ROLE_PROMPTS["clinical-reasoner"],
-                     model=cfg.model_for("clinical-reasoner")) if use_tool else None
+    agent = Agent("clinical-reasoner", roles.ROLE_PROMPTS["clinical-reasoner"],
+                  model=cfg.model_for("clinical-reasoner"))
 
     def node(state: dict) -> dict:
-        analysis = agent.say(_prompt(state, closing=closing)).strip()
-        if not analysis and fallback is not None:
-            # Rare, item-specific failure observed with qwen2.5:7b: a tool-bound agent
-            # occasionally returns an empty completion (0 chars, no tool call) for a
-            # particular case, reproducible at temperature=0. Retrying the same case
-            # without the tool binding reliably produces real analysis.
-            analysis = fallback.say(_prompt(state, closing=ANALYSE_ONLY)).strip()
+        understanding = state.get("case_understanding", "")
+        extra = f"\n\nCase summary:\n{understanding}" if understanding else ""
+        analysis = agent.say(_prompt(state, extra=extra, closing=ANALYSE_ONLY)).strip()
         # `clinical_report` persists untouched for the decider AND the verifier to read;
         # `rationale` is the current best user-facing explanation, which the decider (and
         # then the verifier, if present) will overwrite with its own short justification.
@@ -327,12 +361,18 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
     that context alone doesn't settle it. Falls back to the prior answer on parse
     failure, like every other late-stage node.
     """
-    tools = [make_search_tool(replace(cfg, rag=cfg.verify_rag))] if cfg.verify_rag else ()
+    if cfg.verify_rag:
+        search, reset_calls = make_search_tool(replace(cfg, rag=cfg.verify_rag),
+                                               max_calls=_MAX_AGENTIC_SEARCHES)
+        tools = [search]
+    else:
+        tools, reset_calls = (), lambda: None
     closing = AGENTIC_VERIFY if cfg.verify_rag else REASON_THEN_ANSWER
     agent = Agent("report-verifier", roles.ROLE_PROMPTS["report-verifier"],
                   model=cfg.model_for("verifier"), tools=tools)
 
     def node(state: dict) -> dict:
+        reset_calls()
         cur = state.get("answer")
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
         context = _clinical_context(state)

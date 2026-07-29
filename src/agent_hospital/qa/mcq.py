@@ -10,14 +10,13 @@ _LETTERS = "ABCD"
 
 
 LETTER_ONLY = "Respond with ONLY the letter (A, B, C, or D) of the best answer."
-# V2 clinical reasoner: must NOT name an option (the decider commits from the report).
-ANALYSE_ONLY = "Write your analysis as instructed above. Do NOT state a final answer."
-# V2 clinical reasoner, agentic: same as ANALYSE_ONLY but must still permit a tool call.
-AGENTIC_ANALYSE = (
-    "First, if it would help, call search_medmcqa with a focused query to check your reasoning "
-    "against similar solved questions. Then write your analysis as instructed above. Do NOT state "
-    "a final answer or write 'Answer:'."
+# Node 1 (understand): produces a shared case summary + search query, no answer.
+UNDERSTAND_ONLY = (
+    "Output ONLY the two labeled sections above. Do not discuss the options, do not reason "
+    "toward an answer, and do not name an answer — colleagues will do that next."
 )
+# Node 3 (reasoning): must NOT name an option (the decider commits from the report).
+ANALYSE_ONLY = "Write your analysis as instructed above. Do NOT state a final answer."
 # Layer 1, branch B: digest retrieved passages into a summary (no final answer).
 DIGEST_EVIDENCE_ONLY = "Write your digest as instructed above. Do NOT state a final answer."
 # V3/V4 scribe: distil the clinical report into shared working memory (no final answer).
@@ -29,22 +28,22 @@ REASON_THEN_ANSWER = (
     "In at most 30 words, say why the best option is best, then on the LAST line "
     "write 'Answer: X' where X is A, B, C, or D."
 )
-# V1 agentic RAG: must permit a tool call (so NOT "respond with ONLY the letter", which
-# forbids any non-letter output and suppresses the tool call). Unconditional — no "if it
-# would help" — so this doesn't silently contradict the system prompt's "always search"
-# instruction (a user-turn instruction can override the system prompt; keep them aligned).
+# V1 agentic RAG: must permit tool calls (so NOT "respond with ONLY the letter", which
+# forbids any non-letter output and suppresses them). Explicitly allows up to two — a user-
+# turn instruction can silently override the system prompt, so this must not contradict the
+# system prompt's confidence-gated one-retry loop by implying only one call is allowed.
 AGENTIC_ANSWER = (
-    "First, call search_medmcqa with a focused query to retrieve similar solved questions. "
-    "Then, in at most 40 words, say why the best option is best and state your confidence "
-    "(High/Medium/Low) as instructed above, then on the LAST line write 'Answer: X' where X is "
-    "A, B, C, or D."
+    "Call search_medmcqa (up to twice, per the confidence-gated retry rule above) to retrieve "
+    "similar solved questions. Then, in at most 40 words, say why the best option is best and "
+    "state your confidence (High/Medium/Low) as instructed above, then on the LAST line write "
+    "'Answer: X' where X is A, B, C, or D."
 )
 # V1a agentic RAG (same as AGENTIC_ANSWER, but over MedRAG Textbooks instead of MedMCQA).
 AGENTIC_ANSWER_TEXTBOOK = (
-    "First, call search_textbooks with a focused query to retrieve relevant textbook passages. "
-    "Then, in at most 40 words, say why the best option is best and state your confidence "
-    "(High/Medium/Low) as instructed above, then on the LAST line write 'Answer: X' where X is "
-    "A, B, C, or D."
+    "Call search_textbooks (up to twice, per the confidence-gated retry rule above) to retrieve "
+    "relevant textbook passages. Then, in at most 40 words, say why the best option is best and "
+    "state your confidence (High/Medium/Low) as instructed above, then on the LAST line write "
+    "'Answer: X' where X is A, B, C, or D."
 )
 # Verifier with textbook search (V2/V3): may check the proposed answer against reference
 # textbook passages before confirming/revising.
