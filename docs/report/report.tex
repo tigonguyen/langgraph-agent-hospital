@@ -447,13 +447,23 @@ câu). Hiện mới có V0; các biến thể còn lại đang được chạy t
     Biến thể & Độ chính xác & KTC bootstrap 95\% & Không hợp lệ & Độ trễ/câu & Token/câu \\
     \midrule
     V0: LLM trực tiếp & \textbf{0.615} (783/1273) & [0.588, 0.641] & 0.0\% & 0.97\,s & 329 \\
-    V1--V4            & \multicolumn{5}{c}{\todo{đang chạy trên test đầy đủ, qwen2.5:7b}} \\
+    V1: RAG-only (agentic) & 0.573 (730/1273) & [0.546, 0.602] & 3.85\% & 3.98\,s & 1668 \\
+    V2: Hội đồng + kiểm chứng (agentic) & 0.608 (774/1273) & [0.581, 0.634] & 0.0\% & 23.84\,s & 5304 \\
+    V3--V4            & \multicolumn{5}{c}{\todo{đang chạy trên test đầy đủ, qwen2.5:7b}} \\
     \bottomrule
   \end{tabular}
 \end{table}
-Token/câu (đầu vào + đầu ra) là thước đo chi phí cho mô hình cục bộ; với V0 là 329 token/câu, độ trễ
-0.97\,s/câu, tỷ lệ phản hồi không hợp lệ 0\%. Các chỉ số ghép cặp (mức tăng, Thắng/Thua/Hòa, McNemar)
-sẽ được tính từ chính các bản ghi này khi V1--V4 chạy xong.
+Token/câu (đầu vào + đầu ra) là thước đo chi phí cho mô hình cục bộ. V1 \textbf{thấp hơn V0}
+($-4.2$ điểm), tốn gấp $\sim 5$ lần token và $\sim 4$ lần độ trễ, và có tỷ lệ phản hồi không hợp lệ
+cao hơn hẳn (3.85\% so với 0\%) --- vòng lặp gọi công cụ đôi khi không hội tụ về một chữ cái. V2 \textbf{gần
+bằng V0} ($-0.7$ điểm, khoảng tin cậy chồng lấn phần lớn), tỷ lệ không hợp lệ trở về 0\% (hội đồng + bộ kiểm
+chứng loại bỏ được vấn đề không hội tụ của V1), nhưng chi phí rất cao: $\sim$25 lần độ trễ và $\sim$16 lần
+token so với V0. Kết quả này nhất quán với mọi lần đo trước đó trong dự án: retrieval không giúp ích trên
+MedQA ở mô hình này; cấu trúc đa tác tử (V2) phục hồi phần lớn khoảng cách của V1 nhưng chưa vượt qua V0.
+\todo{Bản ghi từng câu của V0 (dùng để chấm điểm) đã mất do dọn dẹp thư mục tạm giữa chừng; số của V0
+trên chỉ còn ở dạng tổng hợp (accuracy/KTC/độ trễ/token), nên Bảng~\ref{tab:paired} (so sánh ghép cặp,
+Thắng/Thua/Hòa, McNemar) cho V1/V2 vs V0 hiện chưa tính được --- cần chạy lại V0 để có bản ghi ghép cặp
+nếu muốn số liệu đó.}
 
 \subsection{So sánh với baseline và khảo sát ablation (so sánh ghép cặp)}
 \begin{table}[h]
@@ -464,8 +474,8 @@ sẽ được tính từ chính các bản ghi này khi V1--V4 chạy xong.
     \toprule
     Cặp so sánh & Mức tăng độ chính xác & Thắng/Thua/Hòa & McNemar $p$ \\
     \midrule
-    V1 vs V0 & \multicolumn{3}{c}{\todo{đang chạy}} \\
-    V2 vs V0 & \multicolumn{3}{c}{\todo{đang chạy}} \\
+    V1 vs V0 (chỉ độ chính xác) & $-4.2$ điểm & \multicolumn{2}{c}{\todo{cần bản ghi ghép cặp của V0 (xem trên)}} \\
+    V2 vs V0 (chỉ độ chính xác) & $-0.7$ điểm & \multicolumn{2}{c}{\todo{cần bản ghi ghép cặp của V0 (xem trên)}} \\
     V3 vs V0 (mức tăng $\text{Acc}(V3)-\text{Acc}(V0)$) & \multicolumn{3}{c}{\todo{đang chạy}} \\
     V3 vs V4 (hiệu ứng kiểm chứng) & \multicolumn{3}{c}{\todo{đang chạy}} \\
     \bottomrule
@@ -475,13 +485,20 @@ sẽ được tính từ chính các bản ghi này khi V1--V4 chạy xong.
 \subsection{Phân tích Thắng/Thua/Hòa}
 Cột T/T/H đếm theo từng câu: biến thể sửa được lỗi của baseline (thắng), làm hỏng một câu baseline vốn
 đúng (thua), hay trùng khớp (hòa) --- đây là đầu vào cho kiểm định McNemar ở Bảng~\ref{tab:paired}.
-\todo{Điền từ bản ghi test đầy đủ khi V1--V4 chạy xong.}
+\todo{V1/V2 vs V0 chưa tính được: bản ghi từng câu của V0 đã mất (xem ghi chú ở Bảng~\ref{tab:official}).
+Điền phần còn lại từ bản ghi test đầy đủ khi V3--V4 chạy xong.}
 
 \subsection{Chi phí và độ trễ}
 Chi phí đo bằng \emph{độ trễ} và \emph{số token} (đầu vào + đầu ra) cho mô hình cục bộ (không có phí API).
 V0 trên test đầy đủ: \textbf{0.97\,s/câu}, \textbf{329 token/câu}, tỷ lệ phản hồi không hợp lệ \textbf{0\%}.
-\todo{Bổ sung độ trễ và token của V1--V4 khi chạy xong; độ trễ kỳ vọng cao hơn nhiều với các biến thể
-panel (đo được $\sim$16--17\,s/câu ở qwen2.5:7b cho V2/V3).}
+V1 (agentic): \textbf{3.98\,s/câu} ($\sim$4$\times$ V0), \textbf{1668 token/câu} ($\sim$5$\times$ V0), không
+hợp lệ \textbf{3.85\%} --- vòng lặp gọi công cụ (tìm rồi trả lời) sinh nhiều token hơn hẳn một lượt trả
+lời trực tiếp, và thỉnh thoảng không hội tụ về một chữ cái. V2 (hội đồng 3 chuyên gia + bác sĩ chính + bộ
+kiểm chứng, agentic): \textbf{23.84\,s/câu} ($\sim$25$\times$ V0), \textbf{5304 token/câu} ($\sim$16$\times$
+V0), không hợp lệ \textbf{0\%} --- nhiều tác tử tuần tự (không chạy song song) mỗi tác tử có thể gọi công
+cụ, nên chi phí cộng dồn nhanh; xem \S\ref{sec:design} về khả năng chạy song song 3 chuyên gia để giảm độ
+trễ. \todo{Bổ sung độ trễ và token của V3--V4 khi chạy xong; V3 (giống V2 nhưng thêm bộ nhớ ngắn hạn) kỳ
+vọng cao hơn 23.84\,s/câu của V2; V4 dùng thiết kế truy hồi cũ (graph-invoked), chưa đo lại ở qwen2.5:7b.}
 
 % =====================================================================
 \section{Phân tích lỗi}
