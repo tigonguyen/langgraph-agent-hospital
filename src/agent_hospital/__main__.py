@@ -62,12 +62,27 @@ def main() -> None:
                         "openrouter:meta-llama/llama-3.3-70b-instruct (default: qwen2.5:7b)")
     p.add_argument("-q", "--quiet", action="store_true",
                    help="suppress the per-item log, print only the summary")
+    p.add_argument("--rag-iterative", type=int, default=0, metavar="N",
+                   help="i-MedRAG prototype: N rounds of follow-up-query retrieval over the "
+                        "MedCPT textbook collection (graph-invoked, replaces the variant's own "
+                        "RAG). 0 = off (default); typically used with -v V1.")
     args = p.parse_args()
+
+    overrides: dict = {}
+    if args.rag_iterative > 0:
+        from agent_hospital.config import RagConfig
+
+        overrides["rag"] = RagConfig(collection="knowledge_medcpt", embedder="medcpt", k=4,
+                                     threshold=0.60, tool=False, iterative_max=args.rag_iterative)
+        overrides["answer_role"] = "rag-answerer"
 
     limit = args.limit or None
     items = load_medqa_usmle(args.split, limit=limit)
     print(f"Running {args.variant} ({VARIANTS[args.variant]}) on {len(items)} "
           f"{args.split} items with {args.model} (temp=0)")
+    if args.rag_iterative > 0:
+        print(f"  i-MedRAG iterative retrieval: {args.rag_iterative} rounds "
+              f"(knowledge_medcpt, MedCPT)")
     print("warming up (one throwaway item; spin-up excluded from latency)...\n")
 
     letters = "ABCD"
@@ -86,7 +101,7 @@ def main() -> None:
             print(fill(why, width=88, initial_indent=" " * 8, subsequent_indent=" " * 8), flush=True)
             print(flush=True)
 
-    answer = build_variant(args.variant, model=args.model)
+    answer = build_variant(args.variant, model=args.model, **overrides)
     warm_up(answer)
     records = run_variant(items, answer, progress=None if args.quiet else log)
     if not args.quiet:

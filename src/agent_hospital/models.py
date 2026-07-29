@@ -57,4 +57,11 @@ def resolve_model(spec: str, temperature: float = 0.0) -> BaseChatModel:
 
     from langchain.chat_models import init_chat_model
 
+    if provider == "ollama":
+        # Cap generation length: observed a runaway agentic tool-call loop generate 38k+
+        # tokens on a single item (Ollama serves one request at a time, so this stalls
+        # everything behind it for tens of minutes). 1024 comfortably covers even the
+        # panel's unconstrained deliberation (~900 tokens observed) with headroom.
+        return init_chat_model(name, model_provider=provider, temperature=temperature, num_predict=1024)
+
     return init_chat_model(name, model_provider=provider, temperature=temperature)

@@ -19,3 +19,4 @@ data/chroma/
 data/ingest_full.log
 data/medcpt/
 /tmp/medcpt_*.log
+data/eval_runs/

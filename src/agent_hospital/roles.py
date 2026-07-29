@@ -1,13 +1,7 @@
-"""Role → system-prompt registry.
-
-The V0–V2 prompts are copied VERBATIM from the pre-refactor code so the graph
-reproduces the old behavior exactly. `attending`/`verifier` and the panel
-perspectives are new for V3/V4.
-"""
+"""Role → system-prompt registry."""
 
 from __future__ import annotations
 
-# --- V0-V2 (verbatim) ---
 BASELINE = (
     "You are an expert physician answering a medical board (USMLE) multiple-choice "
     "question. Choose the single best answer, with a brief justification."
@@ -34,26 +28,6 @@ SPECIALIST = (
     "'Answer: X' where X is A, B, C, or D."
 )
 
-# --- V2: clinical reasoning stage, then a separate decision ---
-# The reasoner must NOT name an option: if it did, the decider would just copy the
-# letter and the split into two agents would buy nothing.
-CLINICAL_REASONER = (
-    "You are an expert physician analysing a USMLE case. Do NOT choose an answer.\n"
-    "Write a brief analysis covering, in order:\n"
-    "1. Key findings — the salient demographics, symptoms, signs, labs and timeline.\n"
-    "2. What is actually being asked (diagnosis / next step / mechanism / contraindication).\n"
-    "3. Each option in turn — what supports it, and what rules it out.\n"
-    "Use the provided evidence when relevant; otherwise rely on your own knowledge. "
-    "Never state a final answer or write 'Answer:'."
-)
-DECIDER = (
-    "You are an expert physician answering a USMLE multiple-choice question. "
-    "You are given the question, any evidence, and a colleague's clinical analysis. "
-    "Weigh the analysis and choose the single best answer. "
-    "Respond with ONLY the letter (A, B, C, or D)."
-)
-
-# --- V3/V4 (new) ---
 ATTENDING = (
     "You are the attending physician. You are given the question, textbook evidence, and the "
     "panel's opinions. Weigh them and choose the single best option. Reason briefly, then on the "
@@ -84,8 +58,6 @@ ROLE_PROMPTS: dict[str, str] = {
     "baseline": BASELINE,
     "rag-answerer": RAG_ANSWERER,
     "rag-agent": RAG_AGENT,
-    "clinical-reasoner": CLINICAL_REASONER,
-    "decider": DECIDER,
     "specialist": SPECIALIST,
     "attending": ATTENDING,
     "verifier": VERIFIER,

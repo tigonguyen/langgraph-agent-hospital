@@ -38,6 +38,14 @@ def test_overrides_apply():
     assert callable(build_variant("V1", model="dummy", rag=RagConfig(collection="knowledge_medcpt")))
 
 
+def test_iterative_rag_config_builds():
+    # i-MedRAG prototype: graph-invoked iterative retrieval instead of agentic V1.
+    from agent_hospital.config import RagConfig
+
+    rag = RagConfig(collection="knowledge_medcpt", embedder="medcpt", tool=False, iterative_max=3)
+    assert callable(build_variant("V1", model="dummy", rag=rag))
+
+
 def test_unknown_variant_raises():
     with pytest.raises(ValueError):
         build_variant("V9", model="dummy")
@@ -57,3 +65,21 @@ def test_variants_answer_live():
             res = answer(it)
             assert res.answer in (None, 0, 1, 2, 3)
             assert isinstance(res.rationale, str)
+
+
+def test_iterative_rag_answers_live():
+    """i-MedRAG prototype end-to-end: graph-invoked reason/retrieve loop over the
+    already-built MedCPT textbook collection, 2 rounds of follow-up retrieval."""
+    if not _ollama_has(SMOKE_MODEL):
+        pytest.skip(f"{SMOKE_MODEL} unavailable")
+    from agent_hospital.config import RagConfig
+    from agent_hospital.diseases import load_medqa_usmle
+
+    items = load_medqa_usmle(split="test", limit=2)
+    rag = RagConfig(collection="knowledge_medcpt", embedder="medcpt", k=4, threshold=0.60,
+                    tool=False, iterative_max=2)
+    answer = build_variant("V1", model=SMOKE_MODEL, answer_role="rag-answerer", rag=rag)
+    for it in items:
+        res = answer(it)
+        assert res.answer in (None, 0, 1, 2, 3)
+        assert isinstance(res.rationale, str)

@@ -6,15 +6,16 @@ first retrieval, so compiling a graph touches no network / no vector store.
 
 from __future__ import annotations
 
+from dataclasses import replace
 from typing import Any, Callable
 
 from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import (AGENTIC_ANSWER, ANALYSE_ONLY, DELIBERATE, LETTER_ONLY,
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, DELIBERATE, LETTER_ONLY,
                                    REASON_THEN_ANSWER, SCRIBE_NOTES, format_mcq, parse_choice)
-from agent_hospital.qa.reasoning import build_reasoning_agent
+from agent_hospital.qa.reasoning import build_followup_agent, build_reasoning_agent, build_router
 
 Node = Callable[[dict], dict]
 _LETTERS = "ABCD"
@@ -47,6 +48,72 @@ def make_retrieve_node(cfg: RunConfig) -> Node:
     return node
 
 
+def make_iterative_retrieve_node(cfg: RunConfig) -> Node:
+    """i-MedRAG-style iterative retrieval (Xiong et al., 2024): distill an initial query,
+    retrieve, then repeatedly ask for ONE follow-up query grounded in the evidence gathered
+    so far, retrieving again, until the model signals it has enough or `rag.iterative_max`
+    rounds are used. Evidence accumulates (deduped) across rounds — unlike `make_retrieve_node`,
+    each follow-up round costs one LLM call (the price of chaining retrieval, not just gating it).
+    """
+    rag = cfg.rag
+    reasoner = build_reasoning_agent(cfg.model_for("reasoner"))
+    next_query = build_followup_agent(cfg.model_for("reasoner"))
+    holder: dict[str, Any] = {}
+
+    def node(state: dict) -> dict:
+        if "store" not in holder:
+            holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
+        item = state["item"]
+
+        query = reasoner(item)
+        queries = [query]
+        hits: list[tuple[Any, float]] = []
+        seen: set[str] = set()
+
+        for i in range(rag.iterative_max):
+            for doc, score in retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"]):
+                key = (doc.metadata.get("answer") or doc.page_content).strip().lower()
+                if key not in seen:
+                    seen.add(key)
+                    hits.append((doc, score))
+            if i == rag.iterative_max - 1:
+                break
+            query = next_query(item, format_evidence(hits))
+            if not query:
+                break
+            queries.append(query)
+
+        return {"evidence": format_evidence(hits), "query": " | ".join(queries)}
+
+    return node
+
+
+def make_adaptive_rag_node(cfg: RunConfig) -> Node:
+    """V1b — adaptive RAG-tier routing (RAGCare-QA / Self-RAG style): a cheap router
+    decides PER QUESTION whether a textbook lookup is likely to help (a fact-lookup
+    question) versus do nothing or hurt (a reasoning-heavy question, where plain V0 wins
+    per this project's own measurements). Skips retrieval entirely (empty evidence, same
+    as V0's prompt) when the router says the case is reasoning-heavy rather than fixing
+    retrieval on or off for every item.
+    """
+    rag = cfg.rag
+    router = build_router(cfg.model_for("reasoner"))
+    reasoner = build_reasoning_agent(cfg.model_for("reasoner"))
+    holder: dict[str, Any] = {}
+
+    def node(state: dict) -> dict:
+        item = state["item"]
+        if not router(item):
+            return {"evidence": "", "query": ""}
+        if "store" not in holder:
+            holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
+        query = reasoner(item)
+        hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"])
+        return {"evidence": format_evidence(hits), "query": query}
+
+    return node
+
+
 def make_search_tool(cfg: RunConfig):
     """A `search_textbooks` tool over the knowledge store (gated retrieval).
 
@@ -73,7 +140,7 @@ def make_search_tool(cfg: RunConfig):
 def make_medmcqa_tool(cfg: RunConfig):
     """Tool factory (NOT a graph node): returns a LangChain `@tool` (`search_medmcqa`)
     to BIND to an agent so the *model* decides when to call it (agentic RAG). V1's answer
-    agent and V2's panel/clinical-reasoner hold it. It retrieves the top-k similar solved
+    agent and V2/V3's panel hold it. It retrieves the top-k similar solved
     board questions (MedMCQA) with answers/explanations — no gate (rag.threshold=0.0).
     """
     from langchain_core.tools import tool
@@ -113,27 +180,11 @@ def make_agentic_rag_node(cfg: RunConfig) -> Node:
     return node
 
 
-def make_clinical_reason_node(cfg: RunConfig) -> Node:
-    """Clinical reasoning stage — emits an analysis, deliberately no answer letter."""
-    agent = Agent("clinical-reasoner", roles.ROLE_PROMPTS["clinical-reasoner"],
-                  model=cfg.model_for("clinical-reasoner"))
-
-    def node(state: dict) -> dict:
-        analysis = agent.say(_prompt(state, closing=ANALYSE_ONLY)).strip()
-        return {"rationale": analysis}
-
-    return node
-
-
 def make_answer_node(cfg: RunConfig) -> Node:
     agent = Agent(cfg.answer_role, roles.ROLE_PROMPTS[cfg.answer_role], model=cfg.model_for(cfg.answer_role))
 
     def node(state: dict) -> dict:
-        # A prior analysis (V2's clinical reasoner) informs the choice; the short
-        # justification written here replaces it as the user-facing explanation.
-        prior = state.get("rationale", "")
-        extra = f"\n\nClinical analysis:\n{prior}" if prior else ""
-        reply = agent.say(_prompt(state, extra=extra, closing=REASON_THEN_ANSWER))
+        reply = agent.say(_prompt(state, closing=REASON_THEN_ANSWER))
         return {"answer": parse_choice(reply), "rationale": reply.strip()}
 
     return node
@@ -193,14 +244,22 @@ def make_aggregate_node(cfg: RunConfig) -> Node:
 
 
 def make_verify_node(cfg: RunConfig) -> Node:
-    agent = Agent("verifier", roles.ROLE_PROMPTS["verifier"], model=cfg.model_for("verifier"))
+    """Verifier stage. If `cfg.verify_rag` is set, the verifier holds its OWN
+    `search_textbooks` tool (independent of the panel's RAG) to double-check the
+    proposed answer against reference textbook passages — separate corpus from the
+    panel's MedMCQA exemplars: specialists get analogous solved cases, the verifier
+    checks against expository textbook fact.
+    """
+    tools = [make_search_tool(replace(cfg, rag=cfg.verify_rag))] if cfg.verify_rag else ()
+    closing = AGENTIC_VERIFY if cfg.verify_rag else REASON_THEN_ANSWER
+    agent = Agent("verifier", roles.ROLE_PROMPTS["verifier"], model=cfg.model_for("verifier"), tools=tools)
 
     def node(state: dict) -> dict:
         cur = state.get("answer")
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
         mem = f"\n\nWorking notes (team memory):\n{state['working_memory']}" if state.get("working_memory") else ""
         reply = agent.say(_prompt(state, extra=f"{mem}\n\nProposed answer: {cur_letter}",
-                                  closing=REASON_THEN_ANSWER))
+                                  closing=closing))
         revised = parse_choice(reply)
         return {"answer": revised if revised is not None else cur, "rationale": reply.strip()}
 

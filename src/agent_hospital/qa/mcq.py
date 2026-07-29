@@ -10,7 +10,6 @@ _LETTERS = "ABCD"
 
 
 LETTER_ONLY = "Respond with ONLY the letter (A, B, C, or D) of the best answer."
-ANALYSE_ONLY = "Analyse the case and the options. Do NOT state a final answer."
 # Panel opinions are internal — they feed the attending, so they stay unconstrained.
 DELIBERATE = (
     "Reason about the key findings and the options, then on the LAST line write "
@@ -31,6 +30,13 @@ AGENTIC_ANSWER = (
     "First, if it would help, call search_medmcqa with a focused query to retrieve similar "
     "solved questions. Then, in at most 30 words, say why the best option is best, and on the "
     "LAST line write 'Answer: X' where X is A, B, C, or D."
+)
+# Verifier with textbook search (V2/V3): may check the proposed answer against reference
+# textbook passages before confirming/revising.
+AGENTIC_VERIFY = (
+    "First, if it would help, call search_textbooks with a focused query to check the proposed "
+    "answer against textbook evidence. Then, in at most 30 words, say why you keep or change the "
+    "answer, and on the LAST line write 'Answer: X' where X is A, B, C, or D."
 )
 
 

@@ -19,6 +19,9 @@ class RagConfig:
     threshold: float = 0.60                # gate for graph-invoked retrieval (V2-V4); 0.0 = keep top-k
     distill_query: bool = True
     tool: bool = False                     # bind retrieval as a tool the agent calls (agentic V1)
+    iterative_max: int = 0                 # i-MedRAG: >0 rounds of follow-up-query retrieval (prototype)
+    adaptive: bool = False                 # V1b: per-question router — skip retrieval when a
+                                            # question looks reasoning-heavy rather than fact-lookup
 
 
 @dataclass(frozen=True)
@@ -27,11 +30,11 @@ class RunConfig:
     role_models: dict[str, Any] = field(default_factory=dict)
     answer_role: str = "baseline"          # role for the single-answer node (V0-V2)
     rag: RagConfig | None = None           # None = no retrieval (V0)
-    clinical_reason: bool = False          # clinical reasoning stage before answering (V2)
     panel_size: int = 1                    # >1 or aggregate → panel + attending (V3/V4)
     aggregate: bool = False
     verify: bool = False                   # verifier node (V3 on, V4 off)
     memory: bool = False                   # short-term working memory: scribe writes it, attending/verifier read it (V3)
+    verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
 
     def model_for(self, role: str) -> Any:
         return self.role_models.get(role, self.model)

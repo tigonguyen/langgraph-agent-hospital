@@ -51,15 +51,21 @@ _PRESETS: dict[str, RunConfig] = {
     # verifier does one confirm/revise pass. Grounded in MedAgents (expert panel -> consensus),
     # MDAgents (moderator + adaptive collaboration) and Medprompt (self-consistency is the
     # optional accuracy dial). NOTE: overlaps V3/V4's panel machinery — re-slot the ladder.
+    # Verifier holds its OWN search_textbooks tool over the (already-built) MedRAG Textbooks
+    # corpus (knowledge_medcpt, MedCPT) — a separate corpus from the panel's MedMCQA exemplars:
+    # specialists get analogous solved cases, the verifier checks against textbook fact.
+    # threshold=0.0 (top-k, no gate) to match the agentic-RAG philosophy used elsewhere.
     "V2": RunConfig(panel_size=3, aggregate=True, verify=True,
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
-                                  k=5, threshold=0.0, tool=True)),
+                                  k=5, threshold=0.0, tool=True),
+                    verify_rag=RagConfig(threshold=0.0)),
     # V3 = the new V2 panel + short-term memory: a scribe distils the panel into shared
     # working notes (state["working_memory"]) that the attending and verifier reason over.
     # V2 -> V3 differs by exactly the memory. (Long-term / cross-episode memory is future work.)
     "V3": RunConfig(panel_size=3, aggregate=True, verify=True, memory=True,
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
-                                  k=5, threshold=0.0, tool=True)),
+                                  k=5, threshold=0.0, tool=True),
+                    verify_rag=RagConfig(threshold=0.0)),
     "V4": RunConfig(rag=RagConfig(), panel_size=2, aggregate=True, verify=False),
 }
 
