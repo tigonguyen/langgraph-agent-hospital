@@ -24,6 +24,7 @@ VARIANTS: dict[str, str] = {
     "V2": "Multi-agent (case reasoner + decider)",
     "V3": "Full system (V2 + short-term memory)",
     "V4": "Full system without verifier",
+    "V3L": "V3 + long-term memory (cross-episode lessons)",
 }
 
 @dataclass(frozen=True)
@@ -78,6 +79,19 @@ _PRESETS: dict[str, RunConfig] = {
     "V4": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
+    # V3L = V3 + long-term memory (spec §4.5): the verifier recalls lessons from similar
+    # EARLIER cases and writes one back, in a SqliteStore that outlives the process. Kept as
+    # its own preset rather than folded into V3 so `V3L - V3` isolates cross-episode memory
+    # (V3's `memory=True` is only the within-episode state read).
+    # PROTOCOL: lessons are RECALLED here but not written — `long_term_read_only=True` is the
+    # preset default so the safe path is the one you get by typing nothing. Writing while
+    # scoring leaks item N's lesson into item N+80 of the same graded split, which inflates
+    # accuracy for reasons unrelated to reasoning. Build the lesson bank deliberately, on the
+    # dev split only: `-v V3L -s train --remember` (see __main__.py). See graph/longterm.py.
+    "V3L": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
+                     long_term=True, long_term_read_only=True,
+                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
+                                   k=5, threshold=0.0, tool=False)),
 }
 
 

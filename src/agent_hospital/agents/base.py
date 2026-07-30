@@ -13,6 +13,25 @@ from langchain_core.language_models import BaseChatModel
 from langchain_core.messages import AnyMessage
 
 
+def _as_text(content: Any) -> str:
+    """Flatten a message's `.content` to plain text.
+
+    Most models return a string. Thinking-capable ones (e.g. a reasoning model behind an
+    Anthropic-compatible proxy) return a list of content blocks instead, which every
+    downstream consumer here would choke on — `parse_choice` runs `re.search` over it and
+    raises TypeError. Keep only `text` blocks: `thinking` is the model's private reasoning,
+    so letting it through would put chain-of-thought into user-facing rationales.
+    """
+    if isinstance(content, str):
+        return content
+    if isinstance(content, list):
+        return "\n".join(
+            block["text"] for block in content
+            if isinstance(block, dict) and block.get("type") == "text" and block.get("text")
+        )
+    return str(content)
+
+
 class Agent:
     """A lazily-constructed role agent backed by `create_agent`."""
 
@@ -72,7 +91,7 @@ class Agent:
     def say(self, text: str, **kwargs: Any) -> str:
         """Send a single user turn and return the agent's text reply."""
         result = self.act([{"role": "user", "content": text}], **kwargs)
-        return result["messages"][-1].content
+        return _as_text(result["messages"][-1].content)
 
     def __repr__(self) -> str:
         return f"Agent(name={self.name!r}, tools={len(self.tools)})"

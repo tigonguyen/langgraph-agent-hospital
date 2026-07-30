@@ -34,6 +34,22 @@ class RunConfig:
     memory: bool = False                   # short-term memory: lets the verifier also read the
                                             # shared case understanding, straight from state, no
                                             # separate agent; a no-op without verify=True too (V3)
+    long_term: bool = False                # long-term (cross-episode) memory: the verifier recalls
+                                            # lessons from similar earlier cases and writes one back
+                                            # (SqliteStore, survives the process) — spec §4.5
+    long_term_db: str = "data/longterm/lessons.sqlite"
+    long_term_split: str = "train"          # WHICH lesson bank to use (a store namespace), not
+                                            # the split being scored — reading train-built
+                                            # lessons while scoring test is the intended setup,
+                                            # so this stays independent of the -s flag.
+    long_term_read_only: bool = True        # recall but never write. Default ON: writing during
+                                            # a scored run leaks one graded item's lesson into
+                                            # later graded items. Building the bank must be an
+                                            # explicit act (`--remember`).
+    checkpoint: bool = False               # snapshot QAState after every node (resumability /
+                                            # human-in-the-loop). Off by default: nothing reads
+                                            # checkpoints back, and retaining them costs ~100 KB
+                                            # per item (~128 MB over the 1273-item test split).
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
 
     def model_for(self, role: str) -> Any:
