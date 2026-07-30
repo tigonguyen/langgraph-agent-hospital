@@ -38,7 +38,7 @@
 
   <rect x="320" y="150" width="220" height="56" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
   <text x="430" y="171" text-anchor="middle" font-size="11.5" font-weight="500" fill="#115E59">search_medmcqa (tool)</text>
-  <text x="430" y="187" text-anchor="middle" font-size="10" fill="#0F766E">nomic nhúng query (8192 token) →</text>
+  <text x="430" y="187" text-anchor="middle" font-size="10" fill="#0F766E">qwen3-embedding:4b nhúng query (32K token) →</text>
   <text x="430" y="200" text-anchor="middle" font-size="10" fill="#0F766E">Chroma cosine top-5, không cổng</text>
 
   <line x1="540" y1="178" x2="576" y2="178" stroke="#64748B" stroke-width="1.5" marker-end="url(#v1a)"/>

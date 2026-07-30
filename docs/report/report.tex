@@ -21,6 +21,7 @@
 \usepackage{xcolor}
 \usepackage{listings}
 \usepackage{enumitem}
+\usepackage{placeins}
 \usepackage[hidelinks]{hyperref}
 
 \graphicspath{{figures/}}
@@ -83,10 +84,10 @@
 \textbf{Nhóm thực hiện:} Nhóm 01\\[8pt]
 \textbf{Thành viên:}
 \begin{itemize}[nosep, leftmargin=2.4cm]
-  \item Nguyễn Đình Thanh --- \todo{MSSV}
-  \item Ngô Văn Tú --- \todo{MSSV}
-  \item Lê Viết Hưng --- \todo{MSSV}
-  \item Trần Quốc Phong --- \todo{MSSV}
+  \item Nguyễn Đình Thanh - 250202053
+  \item Ngô Văn Tú - 250202057
+  \item Lê Viết Hưng - 250202040
+  \item Trần Quốc Phong - 250202051
 \end{itemize}
 \end{minipage}
 
@@ -136,17 +137,20 @@ lựa chọn A--D). Đầu ra bắt buộc là \emph{đúng một} lựa chọn 
 
 \paragraph{Cách tiếp cận.} Nhóm không thực hiện tách rời năm hệ thống riêng biệt. Thay vào đó, mỗi biến thể
 là \emph{cùng một} bộ khung LangGraph~\cite{langgraph2024}, chỉ bật/tắt các nút (node) khác nhau theo
-một cấu hình định sẵn. Kiến trúc hội đồng của V2--V4 bám theo MedAgents -- các chuyên gia nêu phân tích
-độc lập, một bác sĩ chính tổng hợp và chốt đáp án -- nhưng ở đây mỗi bước chỉ bổ sung \emph{đúng một}
-thành phần so với bước trước: V0$\to$V1 thêm truy hồi agentic, V1$\to$V2 thêm hội đồng đa tác tử,
-V3$\leftrightarrow$V4 bật/tắt bộ kiểm chứng. Vì một bộ đo duy nhất chấm cả năm biến thể theo cùng một
-bộ đánh giá, mọi chênh lệch điểm số đều so sánh được trực tiếp.
+một cấu hình định sẵn, và mỗi bậc chỉ bổ sung \emph{đúng một} thành phần so với bậc trước: V0$\to$V1
+thêm truy hồi agentic (RAG), V1$\to$V2 tách một tác tử duy nhất thành bốn nút chuyên trách - hiểu ca
+bệnh, tìm kiếm, lập luận, quyết định (Mục~\ref{sec:variants}) - V2$\to$V3 thêm bộ kiểm chứng và bộ
+nhớ ngắn hạn, còn V3$\leftrightarrow$V4 bật/tắt đúng bộ kiểm chứng đó. Thiết kế bốn nút này khác hẳn
+hội đồng nhiều chuyên gia kiểu MedAgents mà Nhóm đã thử trước khi ổn định trên kiến trúc hiện tại
+(\S\ref{sec:variants}). Vì một bộ đo duy nhất chấm cả năm biến thể theo cùng một bộ đánh giá, mọi
+chênh lệch điểm số đều so sánh được trực tiếp.
 
 \paragraph{Đóng góp của nhóm nghiên cứu.}
 \begin{enumerate}[nosep]
-  \item Một kiến trúc đa tác tử điều khiển bằng cấu hình (V0--V4), lấy cảm hứng từ
-  MedAgents~\cite{tang2024medagents}, trong đó mỗi cải tiến khác phiên bản trước đó đúng một thành phần
-  (Mục~\ref{sec:arch}--\ref{sec:design}).
+  \item Một kiến trúc đa tác tử điều khiển bằng cấu hình (V0--V4) - việc khám phá ban đầu lấy cảm
+  hứng từ MedAgents~\cite{tang2024medagents}, nhưng kiến trúc hiện tại là một thiết kế bốn nút riêng
+  của Nhóm (Mục~\ref{sec:variants}) - trong đó mỗi cải tiến khác phiên bản trước đó đúng một thành
+  phần (Mục~\ref{sec:arch}--\ref{sec:design}).
   \item Một quy trình đánh giá ghép cặp, tái lập được, có kiểm định ý nghĩa thống kê
   (Mục~\ref{sec:setup}--\ref{sec:results}).
   \item Kết quả thực nghiệm cho thấy trên MedQA, \emph{cấu trúc lập luận đa tác tử}, chứ không phải
@@ -158,28 +162,28 @@ bộ đánh giá, mọi chênh lệch điểm số đều so sánh được tr�
 \paragraph{Trạng thái đo lường.} Kiến trúc (V0--V4) đã được xây dựng đầy đủ và kiểm
 tra chạy được đầu-cuối, nhưng đã trải qua một đợt tái thiết kế sau lần đo gần nhất: V2--V4 đổi từ thiết
 kế hội đồng nhiều chuyên gia sang thiết kế bốn nút hiện tại (\S\ref{sec:design}), và V1--V4 nay dùng
-chung một luật quyết định mới thêm vào --- \emph{tin cậy bất đối xứng}. Vì vậy các số đo V1/V2 ở
+chung một luật quyết định mới thêm vào - \emph{tin cậy bất đối xứng}. Vì vậy các số đo V1/V2 ở
 \S\ref{sec:results} mô tả thiết kế trước đó, không phải kiến trúc hiện tại, và cần đo lại; chỉ V0
 (không dùng truy hồi hay tác tử thứ hai, nên không bị đợt tái thiết kế này ảnh hưởng) còn giữ nguyên
 giá trị tham chiếu. Mỗi khoảng trống như vậy đều được đánh dấu \todo{} để người đọc biết chính xác điều
 gì đã đo và điều gì mới là dự kiến.
 
 % =====================================================================
+\FloatBarrier
 \section{Kiến trúc hệ thống}
 \label{sec:arch}
 % =====================================================================
-Ý tưởng tổ chức là một bộ khung đồ thị duy nhất với các nút được bật/tắt tuỳ biến thể:
+Ý tưởng là tạo một bộ khung ứng dụng duy nhất với các nút được bật/tắt tuỳ biến thể:
 \[
 \text{[understand]}\;\rightarrow\;(\text{search}\parallel\text{reasoning})\;\rightarrow\;\text{decide}\;\rightarrow\;\text{[verify]}
 \]
-Một biến thể không phải một nhánh mã riêng; nó là một \texttt{RunConfig} định sẵn được biên dịch thành
-một \texttt{StateGraph} của LangGraph~\cite{langgraph2024} qua \texttt{build\_graph(cfg)}. Chính điều
-này khiến khảo sát ablation trung thực.
+Một biến thể không được tạo bởi một nhánh mã riêng, mà nó phụ thuộc vào một \texttt{RunConfig} định sẵn, sau đó được biên dịch thành
+một \texttt{StateGraph} của LangGraph~\cite{langgraph2024} qua \texttt{build\_graph(cfg)}.
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{system_stack.pdf}
-  \caption{Toàn bộ stack công nghệ, từ dữ liệu thô đến đáp án được chấm điểm. Mỗi hộp khớp với một
+  \caption{Toàn bộ technologies stack, từ dữ liệu thô đến đáp án được chấm điểm. Mỗi hộp khớp với một
   thành phần thật trong mã nguồn (tên tệp/hàm ghi kèm).}
   \label{fig:stack}
 \end{figure}
@@ -187,20 +191,20 @@ này khiến khảo sát ablation trung thực.
 \paragraph{Vai trò từng thành phần trong stack (Hình~\ref{fig:stack}).}
 \begin{itemize}[nosep]
   \item \textbf{Dữ liệu (HuggingFace \texttt{datasets}):} \textbf{MedQA-USMLE}~\cite{jin2021medqa} là bộ
-  đề dùng để đánh giá, không bao giờ dùng để truy hồi; \textbf{MedMCQA}~\cite{pal2022medmcqa} là ngữ
-  liệu truy hồi duy nhất, dùng chung cho toàn bộ V1--V4 (kể cả bộ kiểm chứng của V3,
-  \S\ref{sec:verifier} --- không còn nguồn thứ hai).
-  \item \textbf{Embedding:} \textbf{nomic-embed-text} (chạy qua Ollama, ngữ cảnh 8192 token) nhúng
-  MedMCQA và mọi truy vấn, cho mọi biến thể.
-  \item \textbf{Lưu trữ vector --- ChromaDB:} kho vector bền (persistent), chỉ mục cosine/HNSW, một bộ
-  sưu tập duy nhất (\texttt{knowledge\_medmcqa\_nomic}).
-  \item \textbf{Điều phối đa tác tử --- LangGraph:} \texttt{StateGraph} biên dịch một \texttt{RunConfig}
+  đề dùng để đánh giá, không bao giờ dùng để truy hồi; \textbf{MedMCQA}~\cite{pal2022medmcqa} là dữ
+  liệu truy hồi duy nhất, dùng chung cho toàn bộ V1--V4.
+  \item \textbf{Embedding:} hai embedder qua Ollama, cả hai chạy trên cùng nội dung MedMCQA:
+  \textbf{qwen3-embedding:4b} (V1, ngữ cảnh 32K token) và \textbf{nomic-embed-text} (V2--V4, ngữ cảnh
+  8192 token) - xem \S\ref{sec:rag} về lý do V1 đổi embedder.
+  \item \textbf{Lưu trữ vector - ChromaDB:} vector persistent database, similarity by Cosine Estimation, hai bộ
+  sưu tập (\texttt{knowledge\_medmcqa\_qwen3} cho V1, \texttt{knowledge\_medmcqa\_nomic} cho V2--V4).
+  \item \textbf{Điều phối đa tác tử - LangGraph:} \texttt{StateGraph} biên dịch một \texttt{RunConfig}
   (\texttt{config.py}) thành đồ thị các nút (\texttt{graph/nodes.py}, \texttt{graph/build.py}); mọi nút
-  đọc/ghi qua \texttt{QAState} dùng chung (\texttt{graph/state.py}) --- đây chính là bộ nhớ ngắn hạn của
-  hệ thống (\S\ref{sec:memory}).
-  \item \textbf{Tác tử --- LangChain:} mỗi vai trong đồ thị (5 vai, xem Hình~\ref{fig:stack}) là một
-  \texttt{Agent} (\texttt{agents/base.py}), bọc \texttt{create\_agent} của LangChain --- khởi tạo trễ,
-  không phụ thuộc nhà cung cấp. Prompt của từng vai nằm trong \texttt{roles.py}.
+  đọc/ghi qua \texttt{QAState} dùng chung (\texttt{graph/state.py}) - đây chính là kênh giao tiếp chính của
+  các nodes trong hệ thống (\S\ref{sec:memory}).
+  \item \textbf{Tác tử - LangChain:} mỗi role trong đồ thị (5 roles, xem Hình~\ref{fig:stack}) là một
+  \texttt{Agent} (\texttt{agents/base.py}), bọc \texttt{create\_agent} của LangChain - khởi tạo
+  không phụ thuộc nhà cung cấp mô hình LLM. Prompt của từng role nằm trong \texttt{roles.py}.
   \item \textbf{Suy luận LLM:} \textbf{Ollama} cục bộ (\texttt{qwen2.5}, cỡ 7b/14b/32b) là mặc định;
   các nhà cung cấp đám mây (\texttt{anthropic:}, \texttt{openai:}, \texttt{google:},
   \texttt{openrouter:}) cắm vào cùng giao diện \texttt{BaseChatModel} qua một chuỗi
@@ -224,7 +228,7 @@ này khiến khảo sát ablation trung thực.
   \small
   \begin{tabular}{@{} c l c @{}}
     \toprule
-    Biến thể & Các nút được nối & Tác tử (lượt gọi LLM) \\
+    Biến thể & Các nút tác tử  & Số lượng tác tử \\
     \midrule
     V0 & \texttt{answer} & 1 \\[3pt]
     V1 & \texttt{agent}\; (agentic, gọi \texttt{search\_medmcqa}) & 1 \\[3pt]
@@ -260,6 +264,7 @@ tử khởi tạo trễ, không phụ thuộc nhà cung cấp).
   hội đồng, bật/tắt kiểm chứng) là thay đổi cấu hình chứ không phải viết mã mới.
 \end{itemize}
 
+\FloatBarrier
 % =====================================================================
 \section{Thiết kế hệ thống}
 \label{sec:design}
@@ -270,10 +275,10 @@ tử khởi tạo trễ, không phụ thuộc nhà cung cấp).
 Mỗi tác tử là một lớp bọc mỏng, khởi tạo trễ quanh \texttt{create\_agent} của LangChain với một
 \texttt{BaseChatModel} không phụ thuộc nhà cung cấp; chỉ cần ghi tên mô hình dưới dạng chuỗi là nó
 được hiểu thành một mô hình Ollama cục bộ. Mục này giới thiệu từng biến thể theo đúng thứ tự thang
-ablation --- luồng xử lý, các tác tử tham gia, và điều mỗi bậc thêm vào so với bậc trước; \S\ref{sec:rag}
+ablation - luồng xử lý, các tác tử tham gia, và điều mỗi bậc thêm vào so với bậc trước; \S\ref{sec:rag}
 đi sâu hơn vào các quyết định thiết kế truy hồi dùng chung cho V1--V4.
 
-\paragraph{V0 --- LLM trực tiếp (đối chứng).} Một lượt gọi LLM duy nhất, không truy hồi, không tác
+\paragraph{V0 - LLM trực tiếp (đối chứng).} Một lượt gọi LLM duy nhất, không truy hồi, không tác
 tử thứ hai: \texttt{format\_mcq} dựng prompt (tình huống + A--D), model trả lời, \texttt{parse\_choice}
 trích chữ cái. Đây là mốc mà mọi biến thể khác được so sánh vào: \text{Độ chính xác}(Vn) $-$
 \text{Độ chính xác}(V0).
@@ -281,36 +286,36 @@ trích chữ cái. Đây là mốc mà mọi biến thể khác được so sán
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.92\textwidth]{v0_flow.pdf}
-  \caption{V0 --- một node duy nhất, không truy hồi, không tác tử thứ hai.}
+  \caption{V0 - một node duy nhất, không truy hồi, không tác tử thứ hai.}
   \label{fig:v0}
 \end{figure}
 
-\paragraph{V1 --- một tác tử agentic RAG.} Đồ thị rút về một node: \texttt{START $\rightarrow$ agent
+\paragraph{V1 - một tác tử agentic RAG.} Đồ thị rút về một node: \texttt{START $\rightarrow$ agent
 $\rightarrow$ END}. Bên trong, \texttt{Agent(rag-agent)} tự quyết định có gọi \texttt{search\_medmcqa}
 hay không (tối đa hai lần), tự chấm độ tin cậy của bằng chứng lấy về (HIGH/MEDIUM/LOW), rồi áp luật
-\emph{tin cậy bất đối xứng} (\S\ref{sec:rag}) để chốt đáp án --- tất cả trong cùng một tác tử, không
+\emph{tin cậy bất đối xứng} (\S\ref{sec:rag}) để chốt đáp án - tất cả trong cùng một tác tử, không
 có node/tác tử riêng cho từng bước.
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v1_flow.pdf}
-  \caption{V1 --- một tác tử agentic tự gọi công cụ, tự chấm độ tin cậy, tự áp luật quyết định.}
+  \caption{V1 - một tác tử agentic tự gọi công cụ, tự chấm độ tin cậy, tự áp luật quyết định.}
   \label{fig:v1}
 \end{figure}
 
-\paragraph{V2 --- bốn nút: hiểu ca bệnh, tìm kiếm, lập luận, quyết định.} V2--V4 dùng chung một thiết
+\paragraph{V2 - bốn nút: hiểu ca bệnh, tìm kiếm, lập luận, quyết định.} V2--V4 dùng chung một thiết
 kế bốn nút, tách đúng bốn việc mà tác tử đơn của V1 làm nối tiếp bên trong nó thành bốn nút riêng,
 chạy qua LangGraph thay vì một vòng lặp công cụ:
 \begin{itemize}[nosep]
-  \item \textbf{Node~1 --- \texttt{case-reasoner} (\texttt{understand}):} đọc tình huống một lần, viết
+  \item \textbf{Node~1 - \texttt{case-reasoner} (\texttt{understand}):} đọc tình huống một lần, viết
   ra một bản tóm tắt ca bệnh và một truy vấn tìm kiếm, dùng chung cho hai nhánh sau; không nêu đáp án.
-  \item \textbf{Node~2 --- \texttt{search} (tìm kiếm + rút gọn):} gọi \texttt{search\_medmcqa} với
+  \item \textbf{Node~2 - \texttt{search} (tìm kiếm + rút gọn):} gọi \texttt{search\_medmcqa} với
   truy vấn của Node~1, rồi \texttt{evidence-digest} tóm bằng chứng thành một đoạn ngắn kèm mức tin cậy
   tự đánh giá.
-  \item \textbf{Node~3 --- \texttt{clinical-reasoner} (\texttt{reasoning}):} lập luận từ CÙNG bản tóm
+  \item \textbf{Node~3 - \texttt{clinical-reasoner} (\texttt{reasoning}):} lập luận từ CÙNG bản tóm
   tắt của Node~1, hoàn toàn không thấy bằng chứng của Node~2 (hai nhánh chạy đồng thời); tự chấm mức
   tin cậy của chính lập luận đó.
-  \item \textbf{Node~4 --- \texttt{decider} (\texttt{answer}):} nhận hai đầu vào độc lập kèm mức tin
+  \item \textbf{Node~4 - \texttt{decider} (\texttt{answer}):} nhận hai đầu vào độc lập kèm mức tin
   cậy riêng, áp luật tin cậy bất đối xứng để chốt đáp án.
 \end{itemize}
 4 tác tử, 4 lượt gọi LLM/câu, không có bộ kiểm chứng. Thiết kế này khác thiết kế hội đồng nhiều chuyên
@@ -321,25 +326,25 @@ một luật tường minh để quyết nhánh nào được tin.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v2_flow.pdf}
-  \caption{V2 --- Node 1 phân nhánh đồng thời sang Node 2/Node 3, hội tụ ở Node 4.}
+  \caption{V2 - Node 1 phân nhánh đồng thời sang Node 2/Node 3, hội tụ ở Node 4.}
   \label{fig:v2}
 \end{figure}
 
-\paragraph{V3 --- V2 + bộ kiểm chứng + bộ nhớ ngắn hạn.} V3 thêm \textbf{Node~5 ---
+\paragraph{V3 - V2 + bộ kiểm chứng + bộ nhớ ngắn hạn.} V3 thêm \textbf{Node~5 -
 \texttt{report-verifier}}: đọc lại báo cáo lập luận của Node~3, và, khi bật bộ nhớ ngắn hạn
-(\texttt{memory=True} --- lần đầu xuất hiện ở biến thể này, xem \S\ref{sec:memory}), cả bản tóm tắt
+(\texttt{memory=True} - lần đầu xuất hiện ở biến thể này, xem \S\ref{sec:memory}), cả bản tóm tắt
 ca bệnh của Node~1, thẳng từ trạng thái đồ thị dùng chung (không qua một tác tử/lượt gọi LLM riêng),
 rồi xác nhận hoặc chỉnh đáp án của Node~4 (\S\ref{sec:verifier}). 5 tác tử, 5 lượt gọi LLM/câu.
 
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v3_flow.pdf}
-  \caption{V3 --- Node 5 audit đáp án của Node 4, đọc thẳng Node 1/Node 3 từ QAState dùng chung.}
+  \caption{V3 - Node 5 audit đáp án của Node 4, đọc thẳng Node 1/Node 3 từ QAState dùng chung.}
   \label{fig:v3}
 \end{figure}
 
-\paragraph{V4 --- V2 không có bộ kiểm chứng.} V4 hiện là \emph{đúng cấu hình của V2}
-(\texttt{verify=False}, \texttt{memory=False}) chứ không phải một preset kiến trúc riêng --- nhờ vậy
+\paragraph{V4 - V2 không có bộ kiểm chứng.} V4 hiện là \emph{đúng cấu hình của V2}
+(\texttt{verify=False}, \texttt{memory=False}) chứ không phải một preset kiến trúc riêng - nhờ vậy
 $V3-V4$ chỉ khác đúng Node~5, không lẫn với ngữ liệu/embedder/số tác tử như hạn chế đã nêu trong bản
 báo cáo trước (\S\ref{sec:verifier}). \todo{Kế hoạch: bật \texttt{memory=True} cho V4 để V3/V4 chỉ
 khác đúng field \texttt{verify}, thay vì hai field cùng là no-op khi không có Node~5; \texttt{qa/variants.py}
@@ -348,32 +353,25 @@ chưa cập nhật.}
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v4_flow.pdf}
-  \caption{V4 --- cùng đồ thị với V2 (Hình~\ref{fig:v2}); không có Node 5.}
+  \caption{V4 - cùng đồ thị với V2 (Hình~\ref{fig:v2}); không có Node 5.}
   \label{fig:v4}
 \end{figure}
 
+\FloatBarrier
 \subsection{Thiết kế RAG}
 \label{sec:rag}
-V1--V4 nay dùng chung một nguồn truy hồi: \textbf{MedMCQA} (182.822 câu thi đã giải), nhúng bằng
-\texttt{nomic-embed-text} (ngữ cảnh 8192 token, nên không bị cắt như Query encoder 64 token của
-MedCPT). Đây là một thay đổi so với thiết kế trước, khi V1/V2 tra MedMCQA còn V3/V4 tra sách giáo
-khoa (MedRAG Textbooks) --- một biến gây nhiễu giữa ngữ liệu và kiến trúc mà bản báo cáo trước liệt kê
-là hạn chế; hợp nhất ngữ liệu như hiện tại giải quyết hạn chế đó (chênh lệch giữa các bậc nay chỉ còn
-do kiến trúc, không lẫn với việc đổi ngữ liệu giữa các bậc nữa).
+V1--V4 nay dùng chung một \emph{nguồn dữ liệu} truy hồi: \textbf{MedMCQA} (182.822 câu thi đã giải) -
+chênh lệch giữa các bậc nay chỉ còn do kiến trúc, không lẫn với việc đổi ngữ liệu giữa các bậc.
+\textbf{Embedder thì không còn dùng chung}:
+V1 mới chuyển sang \texttt{qwen3-embedding:4b} (collection \texttt{knowledge\_medmcqa\_qwen3}), còn
+V2--V4 vẫn dùng \texttt{nomic-embed-text} (collection \texttt{knowledge\_medmcqa\_nomic}, ngữ cảnh
+8192 token, nên không bị cắt như Query encoder 64 token của MedCPT) - xem cuối mục này về lý do đổi
+và bằng chứng hiện có. \todo{Chuyển V2--V4 sang \texttt{qwen3-embedding:4b} nếu A/B ở quy mô lớn xác
+nhận lợi thế của V1; hiện chưa làm.}
 
-\paragraph{Cách mỗi biến thể dùng ngữ liệu đó thì khác nhau.}
+Luồng xử lý của từng biến thể đã trình bày ở \S\ref{sec:variants}; hai điểm sau là cơ chế truy hồi
+\emph{dùng chung}, cắt ngang mọi biến thể chứ không riêng cho một bậc nào:
 \begin{enumerate}[nosep]
-  \item \textbf{V1 --- một tác tử tự quyết định khi nào và tìm gì.} Không có pipeline cố định: một
-  tác tử duy nhất tự viết truy vấn, tự gọi \texttt{search\_medmcqa} (tối đa hai lần --- được phép thử
-  lại một lần nếu kết quả đầu có vẻ không sát), đọc kết quả, tự chấm độ tin cậy của bằng chứng đó rồi
-  quyết định. Đồ thị rút về một nút: \texttt{START $\rightarrow$ agent $\rightarrow$ END}.
-  \item \textbf{V2--V4 --- tách tìm-kiếm khỏi lập-luận, chạy đồng thời.} Node~1 (\texttt{understand})
-  viết một bản tóm tắt ca bệnh và một truy vấn dùng chung; Node~2 (\texttt{search}) gọi
-  \texttt{search\_medmcqa} với truy vấn đó --- do \emph{đồ thị} gọi trực tiếp, không phải mô hình tự
-  chọn gọi hay không, nên xác định được (deterministic) và không tốn thêm lượt LLM chỉ để gọi công cụ
-  --- rồi một tác tử \texttt{evidence-digest} tóm bằng chứng lấy về thành một đoạn ngắn kèm mức tin
-  cậy tự chấm. Node~3 (\texttt{reasoning}) lập luận lâm sàng từ CÙNG bản tóm tắt của Node~1, không
-  thấy bằng chứng của Node~2 (hai nhánh chạy đồng thời), và cũng tự chấm độ tin cậy của lập luận đó.
   \item \textbf{Công cụ truy hồi top-$k$, không còn cổng số.} \texttt{search\_medmcqa} luôn trả về
   $k{=}5$ câu thi gần nhất kèm đáp án và giải thích (định dạng \texttt{Q:/A:/Why:}), cho mọi biến thể
   (\texttt{threshold=0.0}). Thiết kế trước dùng một \emph{cổng độ tương đồng} bằng số (ngưỡng cosine,
@@ -382,7 +380,7 @@ do kiến trúc, không lẫn với việc đổi ngữ liệu giữa các bậc
   không so một điểm cosine với một ngưỡng cố định.
   \item \textbf{Luật quyết định: tin cậy bất đối xứng.} Cùng một luật cho cả bước chốt đáp án của V1
   lẫn Node~4 (\texttt{decider}, V2--V4): nếu bằng chứng truy hồi được chấm HIGH và rõ ràng nghiêng về
-  một phương án, phương án đó là đáp án mặc định --- chỉ bị lật lại khi có một dấu hiệu \emph{cụ thể}
+  một phương án, phương án đó là đáp án mặc định - chỉ bị lật lại khi có một dấu hiệu \emph{cụ thể}
   trong tình huống mà bằng chứng đã bỏ sót hoặc hiểu sai, không phải một cảm giác chung chung là ``có
   lẽ khác''. Nếu bằng chứng chỉ MEDIUM/LOW hoặc không có, nó bị gạt sang một bên hoàn toàn và đáp án
   được chọn thuần từ lập luận lâm sàng, đúng như cách V0 quyết định. Luật bất đối xứng có chủ đích:
@@ -392,11 +390,19 @@ do kiến trúc, không lẫn với việc đổi ngữ liệu giữa các bậc
 
 \begin{figure}[tbp]
   \centering
-  \includegraphics[width=0.72\textwidth]{v1_flow.pdf}
-  \caption{Luồng RAG của V1 (agentic): một tác tử duy nhất tự gọi công cụ \texttt{search\_medmcqa},
-  tự chấm độ tin cậy của bằng chứng rồi áp luật tin cậy bất đối xứng. \todo{Vẽ lại
-  \texttt{v1\_flow.svg}: hình hiện tại chưa thể hiện bước tự chấm độ tin cậy / luật quyết định.}}
-  \label{fig:v1}
+  \includegraphics[width=0.85\textwidth]{rag_infra.pdf}
+  \caption{Hạ tầng truy hồi: từ ngữ liệu MedMCQA, qua embedding và ChromaDB, đến công cụ
+  \texttt{search\_medmcqa} và bằng chứng thô.}
+  \label{fig:rag-infra}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=\textwidth]{rag_design.pdf}
+  \caption{Từ bằng chứng thô (Hình~\ref{fig:rag-infra}), qua bước digest + tự chấm độ tin cậy, đến
+  luật tin cậy bất đối xứng - dùng chung cho bước tự quyết định của V1 và Node~4
+  (\texttt{decider}) của V2--V4.}
+  \label{fig:rag-design}
 \end{figure}
 
 \paragraph{Truy hồi là công cụ do \emph{mô hình} chọn, chỉ ở V1.} V1 để tác tử tự quyết định khi nào
@@ -408,106 +414,84 @@ gọi công cụ; đo được 0/5), nên đáp án được trích từ phần 
 nhận chi phí này vì mục tiêu là V1 thành một tác tử RAG đúng nghĩa; V2--V4 vẫn gọi truy hồi từ node để
 giữ tính tất định và chi phí thấp.
 
-\paragraph{Luồng mã của V1.} Từ \texttt{build\_variant("V1")} đến đáp án, đường đi cụ thể như sau (tên
-tệp ghi bên phải):
-\begin{lstlisting}
-build_variant("V1")                                   # qa/variants.py
-  preset: answer_role="rag-agent",
-          rag=(knowledge_medmcqa_nomic, nomic, k=5, threshold=0.0, tool=True)
-  build_graph(cfg) -> do thi 1 node: START -> agent -> END   # graph/build.py
+Trong \texttt{agent.say} (vòng lặp công cụ của \texttt{create\_agent}), \emph{mô hình} tự quyết định
+gọi công cụ, nên đồ thị chỉ có một node; truy hồi trả về top-$k$ không qua cổng số, và bước quyết định
+ở lượt~2 dùng nhãn tin cậy tự chấm thay cho một ngưỡng cosine. Chi phí $\sim$2 lần sinh của LLM mỗi câu
+(lượt~1 gọi công cụ, lượt~2 trả lời) là lý do V1 chậm hơn hẳn V0.
 
-answer(item) = graph.invoke({"item": item})           # qa/variants.py
+\paragraph{Vì sao V1 đổi sang qwen3-embedding:4b.} \texttt{nomic-embed-text} (ngữ cảnh 8192 token) vẫn
+là embedder mặc định của V2--V4, nhưng V1 đã chuyển sang \textbf{qwen3-embedding:4b} (ngữ cảnh 32K
+token, chạy qua Ollama, không cần \texttt{transformers}/\texttt{torch} như MedCPT) sau một phép so
+sánh nhỏ: $n{=}1273$ chưa chạy, nhưng trên $n{=}40$ câu test (qwen2.5:7b), qwen3-embedding:4b đạt
+\textbf{0.600} độ chính xác - bằng đúng V0 (0.600, tức truy hồi không kéo tụt) và cao hơn nomic (0.550)
+$5$ điểm, đồng thời nhanh hơn $\sim$20\% (7.80\,s so với 9.68\,s/câu). Ngữ liệu nhúng lại là 30.000
+câu MedMCQA đầu tiên (một tập con của 182.822 câu gốc) vào một collection riêng
+(\texttt{knowledge\_medmcqa\_qwen3}); phần còn lại đang được nhúng nốt để khớp quy mô ngữ liệu gốc.
+\todo{Đo lại V1 (qwen3-embedding:4b) ở $n{=}1273$ khi ngữ liệu nhúng lại xong toàn bộ 182.822 câu, và
+cân nhắc chuyển V2--V4 sang cùng embedder nếu lợi thế được xác nhận ở quy mô lớn.}
 
-[node] make_agentic_rag_node                          # graph/nodes.py
-  tool  = search_medmcqa            (make_medmcqa_tool, max_calls=2)
-  agent = Agent("rag-agent", tools=[tool])
-  reply = agent.say( format_mcq(item, AGENTIC_ANSWER) )
-  return answer = parse_choice(reply), rationale = reply
-
-trong agent.say  (vong lap cong cu cua create_agent): # agents/base.py
-  LLM luot 1: he thong=RAG_AGENT + MCQ + mo ta tool
-              -> phat mot loi goi cong cu: search_medmcqa(query)
-                   search_medmcqa(query):             # graph/nodes.py
-                     retrieve(query, k=5, threshold=0.0)   # knowledge/retriever.py
-                       nomic nhung query (8192 token, khong cat)
-                       Chroma cosine top-k, khu trung lap, KHONG cong
-                     format_evidence(hits) -> "Q:/A:/Why:" x5
-              <- ket qua tool duoc noi vao chuoi message
-  LLM luot 2: doc bang chung, tu cham HIGH/MEDIUM/LOW, ap luat tin cay bat doi xung,
-              viet "... Answer: X"
-  parse_choice(reply) -> 0..3  (hoac None)            # qa/mcq.py
-\end{lstlisting}
-Hai điểm mấu chốt: (1) \emph{mô hình} tự quyết định gọi công cụ, nên đồ thị chỉ có một node; (2) truy
-hồi trả về top-$k$ không qua cổng số, và bước quyết định ở lượt~2 dùng nhãn tin cậy tự chấm thay cho
-một ngưỡng cosine. Chi phí $\sim$2 lần sinh của LLM mỗi câu (lượt~1 gọi công cụ, lượt~2 trả lời) là lý
-do V1 chậm hơn hẳn V0.
-
-\paragraph{Luồng mã của V2.} V2 tách bốn việc mà tác tử đơn của V1 làm nối tiếp (hiểu ca bệnh, tìm
-kiếm, lập luận, quyết định) thành bốn nút, hai trong số đó (\texttt{search}, \texttt{reasoning}) chạy
-đồng thời:
-\begin{lstlisting}
-V2:  START -> understand -> {search, reasoning} -> answer -> END
-  understand: Agent("case-reasoner")   # graph/nodes.py:make_understand_node
-              -> case_understanding (tom tat ca benh) + query (dung chung)
-  search:     retrieve(query) -> Agent("evidence-digest")   # make_search_branch_node
-              -> evidence = tom bang chung + muc tin cay tu cham
-  reasoning:  Agent("clinical-reasoner"), doc case_understanding, KHONG thay evidence
-              -> clinical_report = lap luan tung phuong an + muc tin cay tu cham
-  answer:     Agent("decider"), doc evidence VA clinical_report      # make_answer_node
-              -> ap luat tin cay bat doi xung -> "... Answer: X"
-\end{lstlisting}
+V2 tách bốn việc mà tác tử đơn của V1 làm nối tiếp (hiểu ca bệnh, tìm kiếm, lập luận, quyết định)
+thành bốn nút, hai trong số đó (\texttt{search}, \texttt{reasoning}) chạy đồng thời.
 \texttt{search} và \texttt{reasoning} được nối trực tiếp từ \texttt{understand} (không nối tiếp nhau),
 nên LangGraph chạy chúng trong cùng một superstep; \texttt{answer} chờ CẢ HAI xong mới chạy (nối bằng
 \texttt{add\_edge([search, reasoning], answer)}, dạng danh sách, để \texttt{answer} chỉ chạy đúng một
 lần). \textbf{4 tác tử, 4 lượt gọi LLM/câu} (\texttt{understand}, \texttt{evidence-digest},
-\texttt{clinical-reasoner}, \texttt{decider}) --- không còn hội đồng nhiều chuyên gia tranh luận theo
+\texttt{clinical-reasoner}, \texttt{decider}) - không còn hội đồng nhiều chuyên gia tranh luận theo
 góc nhìn (thiết kế trước, kiểu MedAgents~\cite{tang2024medagents}); thay vào đó hai nhánh độc lập
 KHÔNG thấy đầu ra của nhau, và \texttt{decider} dùng một luật tường minh (chứ không phải một bước tổng
 hợp tự do) để quyết nhánh nào được tin. \todo{Đo V2 mới ở quy mô lớn; số cũ ở \S\ref{sec:results} đo
 trên thiết kế hội đồng trước đó, không áp dụng được cho thiết kế này.}
 
 \paragraph{Lựa chọn ngữ liệu.} MedMCQA (Pal et al.~\cite{pal2022medmcqa}, 182.822 câu thi đã giải kèm
-giải thích) là ngữ liệu truy hồi \emph{duy nhất} trong hệ thống hiện tại, dùng cho toàn bộ V1--V4 ---
+giải thích) là ngữ liệu truy hồi \emph{duy nhất} trong hệ thống hiện tại, dùng cho toàn bộ V1--V4 -
 tức truy hồi các ví dụ mẫu đã giải (tương tự Medprompt~\cite{nori2023medprompt}), không phải văn bản
-tham khảo. Bộ kiểm chứng của V3 (\S\ref{sec:verifier}) không còn công cụ tra cứu riêng: một bản thiết
-kế trước đó cho nó một nguồn thứ hai, độc lập (MedRAG Textbooks, nhúng bằng MedCPT) để đối chiếu đáp
-án đề xuất với văn bản tham chiếu; nguồn đó đã bị bỏ, và bộ kiểm chứng nay chỉ audit dựa trên báo cáo
-lập luận đã có trong trạng thái đồ thị dùng chung (\S\ref{sec:verifier}).
+tham khảo. Bộ kiểm chứng của V3 (\S\ref{sec:verifier}) không có công cụ tra cứu riêng: nó chỉ audit
+dựa trên báo cáo lập luận đã có trong trạng thái đồ thị dùng chung (\S\ref{sec:verifier}).
 
+\FloatBarrier
 \subsection{Thiết kế bộ nhớ}
 \label{sec:memory}
-Đề bài liệt kê bộ nhớ ngắn hạn và dài hạn là các thành phần bắt buộc. \textbf{Bộ nhớ ngắn hạn: đã xây,
-ở dạng hẹp.} Thay vì một tác tử/kho bộ nhớ riêng, bộ nhớ ngắn hạn tận dụng \texttt{QAState} --- trạng
-thái dùng chung mà LangGraph truyền qua các nút: \texttt{case\_understanding} (bản tóm tắt ca bệnh của
-Node~1), \texttt{evidence}, và \texttt{clinical\_report} (báo cáo của Node~3) đều đã nằm sẵn trong đó.
-Khi \texttt{memory=True} (V3), bộ kiểm chứng (Node~5) đọc thêm \texttt{case\_understanding} khi audit
+Đề bài liệt kê bộ nhớ ngắn hạn và dài hạn là các thành phần bắt buộc. Bộ nhớ ngắn hạn \textbf{xuất
+hiện lần đầu ở V3} (Hình~\ref{fig:v3}, \S\ref{sec:variants}) - không biến thể nào trước đó bật cờ
+này. \textbf{Trạng thái: đã xây, ở dạng hẹp.} Thay vì một tác tử/kho bộ nhớ riêng, bộ nhớ ngắn hạn tận
+dụng \texttt{QAState} - trạng thái dùng chung mà LangGraph truyền qua các nút: \texttt{case\_understanding}
+(bản tóm tắt ca bệnh của Node~1), \texttt{evidence}, và \texttt{clinical\_report} (báo cáo của Node~3)
+đều đã nằm sẵn trong đó. Khi \texttt{memory=True} (V3), bộ kiểm chứng (Node~5) đọc thêm \texttt{case\_understanding} khi audit
 đáp án, thay vì chỉ đọc báo cáo lập luận như V2/V4; không nút nào khác cần bật cờ này, vì các nút khác
-vốn đã đọc thẳng những gì nút trước ghi ra --- \texttt{memory} chỉ mở rộng đúng MỘT điểm đọc thêm cho
-bộ kiểm chứng, không thêm tác tử hay lượt gọi LLM nào. \textbf{Bộ nhớ dài hạn (episodic, xuyên câu
+vốn đã đọc thẳng những gì nút trước ghi ra - \texttt{memory} chỉ mở rộng đúng MỘT điểm đọc thêm cho
+bộ kiểm chứng, không thêm tác tử hay lượt gọi LLM nào.
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.95\textwidth]{memory_design.pdf}
+  \caption{Bộ nhớ ngắn hạn là \texttt{QAState} dùng chung: mỗi trường được một nút ghi và một hoặc
+  nhiều nút khác đọc lại; hàng tô vàng là ô duy nhất \texttt{memory=True} mở thêm.}
+  \label{fig:memory-design}
+\end{figure}
+
+\textbf{Bộ nhớ dài hạn (episodic, xuyên câu
 hỏi): chưa xây}, và không nằm trong bất kỳ biến thể nào hiện có. Một kế hoạch trước đó đã hình dung
 việc truy hồi lập luận từ các lỗi đã giải trong tập MedQA-train; điều đó vẫn nằm ngoài phạm vi và là
 việc trong tương lai. \todo{Xây bộ nhớ dài hạn xuyên câu hỏi; do đó hệ thống hiện tại vẫn chưa phải
 ``hệ đầy đủ'' theo đúng nghĩa đề bài đòi bộ nhớ dài hạn.}
 
+\FloatBarrier
 \subsection{Thiết kế bộ kiểm chứng}
 \label{sec:verifier}
 V3 thêm Node~5 (\texttt{report-verifier}) làm khâu cuối: nó đọc thẳng báo cáo lập luận của Node~3
 (\texttt{state["clinical\_report"]}), đáp án và giải thích ngắn mà Node~4 vừa chốt, và, khi bật bộ nhớ
-(\S\ref{sec:memory}), cả bản tóm tắt ca bệnh của Node~1 --- không cần một tác tử/lượt gọi LLM riêng để
+(\S\ref{sec:memory}), cả bản tóm tắt ca bệnh của Node~1 - không cần một tác tử/lượt gọi LLM riêng để
 ``nhớ lại'' những thứ đó, vì chúng đã nằm sẵn trong trạng thái đồ thị dùng chung. Nó chỉ kiểm nhất
 quán: nếu đáp án được chọn bị chính báo cáo lập luận đánh giá RULED OUT (hoặc một phương án khác được
 đánh giá rõ SUPPORTED), đó là dấu hiệu đáng ngờ và nó chỉnh lại đáp án cho khớp với những gì báo cáo đã
-kết luận. \textbf{Không còn công cụ tra cứu riêng:} một bản thiết kế trước đó cho Node~5 một
-\texttt{search\_textbooks} độc lập trên MedRAG Textbooks (nhúng bằng MedCPT) để đối chiếu với văn bản
-tham chiếu khi báo cáo không đủ để quyết; nguồn thứ hai đó đã bị bỏ --- bộ kiểm chứng nay chỉ audit
-dựa trên bằng chứng và lập luận Node~2/Node~3 đã tạo ra, không tự truy hồi thêm gì. Để giữ luồng bền
-vững, một lỗi trích xuất ở Node~5 sẽ lùi về đáp án của Node~4 thay vì phát ra \texttt{None} không hợp
-lệ.
+kết luận. \textbf{Không có công cụ tra cứu riêng:} bộ kiểm chứng chỉ audit dựa trên bằng chứng và lập
+luận Node~2/Node~3 đã tạo ra, không tự truy hồi thêm gì. Để giữ luồng bền vững, một lỗi trích xuất ở
+Node~5 sẽ lùi về đáp án của Node~4 thay vì phát ra \texttt{None} không hợp lệ.
 
 Phần đóng góp riêng của bộ kiểm chứng được đo trực tiếp bằng tương phản $V3 - V4$: vì \texttt{V4} nay
 là \emph{đúng cấu hình của V2} (không có Node~5, không bật bộ nhớ) chứ không còn là một preset kiến
-trúc cũ như bản báo cáo trước, tương phản này thực sự chỉ khác đúng một thứ --- Node~5 (kèm quyền đọc
-bộ nhớ) --- không còn lẫn với ngữ liệu, embedder, hay số tác tử của panel như hạn chế đã nêu trong bản
+trúc cũ như bản báo cáo trước, tương phản này thực sự chỉ khác đúng một thứ - Node~5 (kèm quyền đọc
+bộ nhớ) - không còn lẫn với ngữ liệu, embedder, hay số tác tử của panel như hạn chế đã nêu trong bản
 báo cáo trước; hạn chế đó nay coi như đã được giải quyết. \todo{Báo cáo $V3-V4$ khi cả hai được đo ở
 quy mô lớn.}
 
@@ -521,10 +505,11 @@ AnswerResult(answer, rationale)}, và bản ghi từng câu mang theo phần gi�
 không cần chạy lại. Chỉ nút \emph{cuối cùng} ghi đáp án hướng tới người dùng mới bị giới hạn 30 từ
 (\texttt{REASON\_THEN\_ANSWER}, dùng cho Node~4 và Node~5): Node~1 (tóm tắt ca bệnh), Node~2 (tóm bằng
 chứng) và Node~3 (báo cáo lập luận) chủ ý \emph{không} bị giới hạn độ dài, vì đó là đầu vào nội bộ cho
-Node~4/5 đọc, không phải đầu ra hướng tới người dùng --- giới hạn từ ở đó sẽ chỉ làm cùn lập luận mà
+Node~4/5 đọc, không phải đầu ra hướng tới người dùng - giới hạn từ ở đó sẽ chỉ làm cùn lập luận mà
 các nút này tồn tại để tạo ra.
 
 % =====================================================================
+\FloatBarrier
 \section{Thiết lập thực nghiệm}
 \label{sec:setup}
 % =====================================================================
@@ -568,32 +553,33 @@ hợp lệ đo được là \textbf{0.0\%} xuyên suốt.
 \label{sec:retrievalconfig}
 \begin{table}[h]
   \centering
-  \caption{Thiết lập truy hồi --- một cấu hình duy nhất, dùng chung cho V1--V4 (kể cả bộ kiểm chứng
-  của V3, vốn không còn nguồn truy hồi riêng).}
+  \caption{Thiết lập truy hồi. Cùng ngữ liệu MedMCQA cho V1--V4, nhưng V1 dùng embedder khác V2--V4
+  kể từ đợt A/B gần nhất (\S\ref{sec:rag}).}
   \label{tab:retrieval}
-  \begin{tabular}{@{}p{0.34\textwidth}p{0.58\textwidth}@{}}
+  \begin{tabular}{@{}p{0.30\textwidth}p{0.31\textwidth}p{0.31\textwidth}@{}}
     \toprule
-    Thiết lập & Giá trị \\
+    Thiết lập & V1 & V2--V4 \\
     \midrule
-    Ngữ liệu & MedMCQA: 182{,}822 câu thi đã giải (collection \texttt{knowledge\_medmcqa\_nomic}) \\
-    Kho vector & Chroma, cosine / HNSW, lưu trữ bền \\
-    Embedder & nomic-embed-text: ngữ cảnh 8192 token, nhúng trọn tình huống không bị cắt \\
-    Cái được nhúng & chỉ phần câu hỏi (đáp án/giải thích/chủ đề là metadata) \\
-    Top-$k$ & 5, không cổng (\texttt{threshold=0.0}) \\
-    Cổng độ tương đồng (ngưỡng cosine) & không dùng ở bất kỳ đâu trong hệ thống hiện tại \\
+    Ngữ liệu & \multicolumn{2}{l}{MedMCQA: 182{,}822 câu thi đã giải} \\
+    Collection & \texttt{knowledge\_medmcqa\_qwen3} & \texttt{knowledge\_medmcqa\_nomic} \\
+    Kho vector & \multicolumn{2}{l}{Chroma, cosine / HNSW, lưu trữ bền} \\
+    Embedder & qwen3-embedding:4b (32K token) & nomic-embed-text (8192 token) \\
+    Cái được nhúng & \multicolumn{2}{l}{chỉ phần câu hỏi (đáp án/giải thích/chủ đề là metadata)} \\
+    Top-$k$ & \multicolumn{2}{l}{5, không cổng (\texttt{threshold=0.0})} \\
+    Cổng độ tương đồng & \multicolumn{2}{l}{không dùng ở bất kỳ đâu trong hệ thống hiện tại} \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-V1--V4 đều dùng \textbf{nomic-embed-text} vì Query encoder của các embedder bất đối xứng thường gặp
+Cả hai embedder được chọn vì có ngữ cảnh dài: Query encoder của các embedder bất đối xứng thường gặp
 (vd.\ MedCPT) cắt truy vấn ở khoảng \textbf{64 token}, quá ngắn cho một tình huống USMLE mà câu hỏi
-thực nằm ở cuối; nomic có ngữ cảnh 8192 token nên nhúng trọn cả tình huống. Thiết kế trước dùng một
-cổng độ tương đồng bằng số, hiệu chỉnh riêng theo embedder; cổng số đó nay không còn ở bất kỳ đường
-truy hồi nào trong hệ thống: việc quyết định có tin bằng chứng hay không chuyển hẳn sang bước chốt đáp
-án, dựa trên nhãn tin cậy HIGH/MEDIUM/LOW mà chính mô hình tự chấm (\S\ref{sec:rag}) --- một cổng số
-học phía trên nhãn tự chấm đó là dư thừa. Bộ kiểm chứng của V3 từng có một ngữ liệu/embedder thứ hai
-riêng (MedRAG Textbooks, MedCPT) cho một công cụ tra cứu độc lập; ngữ liệu đó đã bị bỏ
-(\S\ref{sec:verifier}), nên bảng trên là cấu hình truy hồi duy nhất còn lại trong hệ thống.
+thực nằm ở cuối, trong khi nomic (8192 token) và qwen3-embedding (32K token) đều nhúng trọn cả tình
+huống. Thiết kế trước dùng một cổng độ tương đồng bằng số, hiệu chỉnh riêng theo embedder; cổng số đó
+nay không còn ở bất kỳ đường truy hồi nào trong hệ thống: việc quyết định có tin bằng chứng hay không
+chuyển hẳn sang bước chốt đáp án, dựa trên nhãn tin cậy HIGH/MEDIUM/LOW mà chính mô hình tự chấm
+(\S\ref{sec:rag}) - một cổng số học phía trên nhãn tự chấm đó là dư thừa. Bộ kiểm chứng của V3 không
+có công cụ tra cứu riêng (\S\ref{sec:verifier}), nên bảng trên là toàn bộ cấu hình truy hồi trong hệ
+thống.
 
 \subsection{Phần cứng / thiết lập API}
 \begin{itemize}[nosep]
@@ -613,6 +599,7 @@ HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 150
 \end{lstlisting}
 
 % =====================================================================
+\FloatBarrier
 \section{Kết quả đánh giá}
 \label{sec:results}
 % =====================================================================
@@ -646,14 +633,14 @@ câu). Hiện mới có V0; các biến thể còn lại đang được chạy t
 \end{table}
 Token/câu (đầu vào + đầu ra) là thước đo chi phí cho mô hình cục bộ. V1 \textbf{thấp hơn V0}
 ($-4.2$ điểm), tốn gấp $\sim 5$ lần token và $\sim 4$ lần độ trễ, và có tỷ lệ phản hồi không hợp lệ
-cao hơn hẳn (3.85\% so với 0\%) --- vòng lặp gọi công cụ đôi khi không hội tụ về một chữ cái. V2 \textbf{gần
+cao hơn hẳn (3.85\% so với 0\%) - vòng lặp gọi công cụ đôi khi không hội tụ về một chữ cái. V2 \textbf{gần
 bằng V0} ($-0.7$ điểm, khoảng tin cậy chồng lấn phần lớn), tỷ lệ không hợp lệ trở về 0\% (hội đồng + bộ kiểm
 chứng loại bỏ được vấn đề không hội tụ của V1), nhưng chi phí rất cao: $\sim$25 lần độ trễ và $\sim$16 lần
 token so với V0. Kết quả này nhất quán với mọi lần đo trước đó trong dự án: retrieval không giúp ích trên
 MedQA ở mô hình này; cấu trúc đa tác tử (V2) phục hồi phần lớn khoảng cách của V1 nhưng chưa vượt qua V0.
 \todo{Bản ghi từng câu của V0 (dùng để chấm điểm) đã mất do dọn dẹp thư mục tạm giữa chừng; số của V0
 trên chỉ còn ở dạng tổng hợp (accuracy/KTC/độ trễ/token), nên Bảng~\ref{tab:paired} (so sánh ghép cặp,
-Thắng/Thua/Hòa, McNemar) cho V1/V2 vs V0 hiện chưa tính được --- cần chạy lại V0 để có bản ghi ghép cặp
+Thắng/Thua/Hòa, McNemar) cho V1/V2 vs V0 hiện chưa tính được - cần chạy lại V0 để có bản ghi ghép cặp
 nếu muốn số liệu đó.}
 
 \subsection{So sánh với baseline và khảo sát ablation (so sánh ghép cặp)}
@@ -675,7 +662,7 @@ nếu muốn số liệu đó.}
 
 \subsection{Phân tích Thắng/Thua/Hòa}
 Cột T/T/H đếm theo từng câu: biến thể sửa được lỗi của baseline (thắng), làm hỏng một câu baseline vốn
-đúng (thua), hay trùng khớp (hòa) --- đây là đầu vào cho kiểm định McNemar ở Bảng~\ref{tab:paired}.
+đúng (thua), hay trùng khớp (hòa) - đây là đầu vào cho kiểm định McNemar ở Bảng~\ref{tab:paired}.
 \todo{V1/V2 vs V0 chưa tính được: bản ghi từng câu của V0 đã mất (xem ghi chú ở Bảng~\ref{tab:official}).
 Điền phần còn lại từ bản ghi test đầy đủ khi V3--V4 chạy xong.}
 
@@ -683,15 +670,16 @@ Cột T/T/H đếm theo từng câu: biến thể sửa được lỗi của bas
 Chi phí đo bằng \emph{độ trễ} và \emph{số token} (đầu vào + đầu ra) cho mô hình cục bộ (không có phí API).
 V0 trên test đầy đủ: \textbf{0.97\,s/câu}, \textbf{329 token/câu}, tỷ lệ phản hồi không hợp lệ \textbf{0\%}.
 V1 (agentic): \textbf{3.98\,s/câu} ($\sim$4$\times$ V0), \textbf{1668 token/câu} ($\sim$5$\times$ V0), không
-hợp lệ \textbf{3.85\%} --- vòng lặp gọi công cụ (tìm rồi trả lời) sinh nhiều token hơn hẳn một lượt trả
+hợp lệ \textbf{3.85\%} - vòng lặp gọi công cụ (tìm rồi trả lời) sinh nhiều token hơn hẳn một lượt trả
 lời trực tiếp, và thỉnh thoảng không hội tụ về một chữ cái. V2 (hội đồng 3 chuyên gia + bác sĩ chính + bộ
 kiểm chứng, agentic): \textbf{23.84\,s/câu} ($\sim$25$\times$ V0), \textbf{5304 token/câu} ($\sim$16$\times$
-V0), không hợp lệ \textbf{0\%} --- nhiều tác tử tuần tự (không chạy song song) mỗi tác tử có thể gọi công
+V0), không hợp lệ \textbf{0\%} - nhiều tác tử tuần tự (không chạy song song) mỗi tác tử có thể gọi công
 cụ, nên chi phí cộng dồn nhanh; xem \S\ref{sec:design} về khả năng chạy song song 3 chuyên gia để giảm độ
 trễ. \todo{Bổ sung độ trễ và token của V3--V4 khi chạy xong; V3 (giống V2 nhưng thêm bộ nhớ ngắn hạn) kỳ
 vọng cao hơn 23.84\,s/câu của V2; V4 dùng thiết kế truy hồi cũ (graph-invoked), chưa đo lại ở qwen2.5:7b.}
 
 % =====================================================================
+\FloatBarrier
 \section{Phân tích lỗi}
 \label{sec:error}
 % =====================================================================
@@ -726,6 +714,7 @@ phải lỗi trích xuất. Hai mẫu hình hiện rõ trong dữ liệu ghép c
 \end{table}
 
 % =====================================================================
+\FloatBarrier
 \section{Thảo luận}
 \label{sec:discussion}
 % =====================================================================
@@ -741,6 +730,7 @@ sàng có cấu trúc với quyết định cuối cùng tạo ra mức cải th
 lập luận (hội đồng, bác sĩ chính, bộ kiểm chứng), đúng là thứ V3/V4 được dựng để kiểm tra.
 
 % =====================================================================
+\FloatBarrier
 \section{Hạn chế}
 \label{sec:limitations}
 % =====================================================================
@@ -763,6 +753,7 @@ lập luận (hội đồng, bác sĩ chính, bộ kiểm chứng), đúng là t
 \end{itemize}
 
 % =====================================================================
+\FloatBarrier
 \section{Kết luận}
 \label{sec:conclusion}
 % =====================================================================
@@ -778,6 +769,7 @@ bộ đo chứ không phải viết lại.
 
 % =====================================================================
 \appendix
+\FloatBarrier
 \section{Danh mục kiểm tra tái lập}
 \label{app:repro}
 \begin{table}[h]
@@ -789,7 +781,7 @@ bộ đo chứ không phải viết lại.
     Mô hình & \texttt{qwen2.5:14b} (mặc định thư viện), \texttt{qwen2.5:7b} (mặc định CLI) \\
     Nhiệt độ & 0 (mọi vai) \\
     Prompt & nguyên văn trong \texttt{roles.py}; baseline xem \S\ref{sec:setup} \\
-    Truy hồi & embedder nomic-embed-text, Chroma cosine/HNSW, top-$k$=5, không cổng \\
+    Truy hồi & embedder qwen3-embedding:4b (V1) / nomic-embed-text (V2--V4), Chroma cosine/HNSW, top-$k$=5, không cổng \\
     Seed ngẫu nhiên & \texttt{bootstrap\_ci(seed=0)}; còn lại là giải mã greedy \\
     Phần cứng & máy Mac Apple Silicon, 48\,GB, Ollama cục bộ \\
     Dữ liệu & \texttt{openlifescienceai/medqa} (test $n{=}1273$), cache ngoại tuyến \\

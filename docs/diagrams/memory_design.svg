@@ -1,0 +1,67 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="780" height="380" viewBox="0 0 780 380" font-family="Helvetica, Arial, sans-serif">
+  <title>Bộ nhớ ngắn hạn — QAState dùng chung</title>
+  <text x="390" y="24" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">Bộ nhớ ngắn hạn — mọi nút đọc/ghi qua một QAState dùng chung</text>
+  <text x="390" y="42" text-anchor="middle" font-size="11" fill="#64748B">Không tác tử/kho bộ nhớ riêng — memory=True chỉ mở thêm một quyền đọc cho Node 5</text>
+
+  <!-- table -->
+  <rect x="30" y="64" width="220" height="34" fill="#E2E8F0"/>
+  <rect x="250" y="64" width="180" height="34" fill="#E2E8F0"/>
+  <rect x="430" y="64" width="320" height="34" fill="#E2E8F0"/>
+  <text x="40" y="86" font-size="11.5" font-weight="500" fill="#334155">Trường trong QAState</text>
+  <text x="260" y="86" font-size="11.5" font-weight="500" fill="#334155">Ghi bởi</text>
+  <text x="440" y="86" font-size="11.5" font-weight="500" fill="#334155">Đọc bởi</text>
+
+  <!-- row: item -->
+  <rect x="30" y="98" width="220" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="250" y="98" width="180" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="430" y="98" width="320" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="40" y="121" font-size="11" fill="#334155">item</text>
+  <text x="260" y="121" font-size="11" fill="#475569">(đầu vào)</text>
+  <text x="440" y="121" font-size="11" fill="#475569">mọi nút</text>
+
+  <!-- row: query -->
+  <rect x="30" y="134" width="220" height="36" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="250" y="134" width="180" height="36" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="430" y="134" width="320" height="36" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="40" y="157" font-size="11" font-family="monospace" fill="#334155">query</text>
+  <text x="260" y="157" font-size="11" fill="#475569">Node 1 (understand)</text>
+  <text x="440" y="157" font-size="11" fill="#475569">Node 2 (search)</text>
+
+  <!-- row: evidence -->
+  <rect x="30" y="170" width="220" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="250" y="170" width="180" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="430" y="170" width="320" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="40" y="193" font-size="11" font-family="monospace" fill="#334155">evidence</text>
+  <text x="260" y="193" font-size="11" fill="#475569">Node 2 (search)</text>
+  <text x="440" y="193" font-size="11" fill="#475569">Node 4 (decider)</text>
+
+  <!-- row: clinical_report -->
+  <rect x="30" y="206" width="220" height="36" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="250" y="206" width="180" height="36" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <rect x="430" y="206" width="320" height="36" fill="#FFFFFF" stroke="#E2E8F0"/>
+  <text x="40" y="229" font-size="11" font-family="monospace" fill="#334155">clinical_report</text>
+  <text x="260" y="229" font-size="11" fill="#475569">Node 3 (reasoning)</text>
+  <text x="440" y="229" font-size="11" fill="#475569">Node 4 (decider), Node 5 (verifier)</text>
+
+  <!-- row: case_understanding — the memory row, highlighted -->
+  <rect x="30" y="242" width="220" height="42" fill="#FFFBEB" stroke="#D97706" stroke-width="1.3"/>
+  <rect x="250" y="242" width="180" height="42" fill="#FFFBEB" stroke="#D97706" stroke-width="1.3"/>
+  <rect x="430" y="242" width="320" height="42" fill="#FFFBEB" stroke="#D97706" stroke-width="1.3"/>
+  <text x="40" y="268" font-size="11" font-family="monospace" fill="#92400E">case_understanding</text>
+  <text x="260" y="268" font-size="11" fill="#92400E">Node 1 (understand)</text>
+  <text x="440" y="262" font-size="11" fill="#92400E">Node 3 (reasoning);</text>
+  <text x="440" y="276" font-size="11" font-weight="500" fill="#92400E">Node 5 (verifier) CHỈ khi memory=True (V3)</text>
+
+  <!-- row: answer/rationale -->
+  <rect x="30" y="284" width="220" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="250" y="284" width="180" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <rect x="430" y="284" width="320" height="36" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <text x="40" y="307" font-size="11" font-family="monospace" fill="#334155">answer, rationale</text>
+  <text x="260" y="307" font-size="11" fill="#475569">Node 4 (decider)</text>
+  <text x="440" y="307" font-size="11" fill="#475569">ghi đè bởi Node 5, nếu có (V3)</text>
+
+  <rect x="30" y="64" width="720" height="256" fill="none" stroke="#94A3B8" stroke-width="1"/>
+
+  <text x="390" y="344" text-anchor="middle" font-size="10.5" fill="#64748B">memory=True mở đúng MỘT ô được tô (Node 5 đọc case_understanding) — không thêm tác tử, không thêm lượt gọi LLM.</text>
+  <text x="390" y="362" text-anchor="middle" font-size="10.5" fill="#64748B">Không có bộ nhớ dài hạn (episodic) xuyên câu hỏi trong bảng này — mỗi hàng chỉ tồn tại trong một lượt (một câu hỏi).</text>
+</svg>

@@ -26,9 +26,9 @@
   <!-- Layer B: embedding -->
   <text x="40" y="250" font-size="10.5" font-weight="500" fill="#94A3B8">EMBEDDING (mô hình nhúng)</text>
   <rect x="220" y="256" width="320" height="66" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
-  <text x="380" y="279" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">nomic-embed-text</text>
-  <text x="380" y="295" text-anchor="middle" font-size="10" fill="#0F766E">qua Ollama · ngữ cảnh 8192 token</text>
-  <text x="380" y="309" text-anchor="middle" font-size="10" fill="#0F766E">nhúng MedMCQA + mọi truy vấn</text>
+  <text x="380" y="277" text-anchor="middle" font-size="12" font-weight="500" fill="#115E59">qwen3-embedding:4b (V1, 32K)</text>
+  <text x="380" y="293" text-anchor="middle" font-size="12" font-weight="500" fill="#115E59">nomic-embed-text (V2--V4, 8192)</text>
+  <text x="380" y="309" text-anchor="middle" font-size="10" fill="#0F766E">cả hai qua Ollama · nhúng MedMCQA + mọi truy vấn</text>
 
   <line x1="380" y1="322" x2="380" y2="356" stroke="#64748B" stroke-width="1.5" marker-end="url(#ss)"/>
 
@@ -36,12 +36,14 @@
   <text x="40" y="350" font-size="10.5" font-weight="500" fill="#94A3B8">LƯU TRỮ VECTOR</text>
   <rect x="180" y="356" width="400" height="54" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
   <text x="380" y="378" text-anchor="middle" font-size="13" font-weight="500" fill="#115E59">ChromaDB — kho vector bền (persistent), cosine / HNSW</text>
-  <rect x="255" y="386" width="250" height="20" rx="5" fill="#F0FDFA" stroke="#5EEAD4"/>
-  <text x="380" y="400" text-anchor="middle" font-size="10" fill="#0F766E">knowledge_medmcqa_nomic (bộ sưu tập duy nhất)</text>
+  <rect x="190" y="386" width="190" height="20" rx="5" fill="#F0FDFA" stroke="#5EEAD4"/>
+  <text x="285" y="400" text-anchor="middle" font-size="9.5" fill="#0F766E">knowledge_medmcqa_qwen3 (V1)</text>
+  <rect x="390" y="386" width="190" height="20" rx="5" fill="#F0FDFA" stroke="#5EEAD4"/>
+  <text x="485" y="400" text-anchor="middle" font-size="9.5" fill="#0F766E">knowledge_medmcqa_nomic (V2--V4)</text>
 
-  <!-- connector: orchestration queries the vector store — aligned above the "search" node below -->
-  <line x1="321" y1="460" x2="321" y2="410" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ss)"/>
-  <text x="333" y="440" font-size="10" fill="#475569">search_medmcqa (tool)</text>
+  <!-- connector: orchestration queries the vector store — same vertical line (x=380) as every other connector -->
+  <line x1="380" y1="460" x2="380" y2="410" stroke="#94A3B8" stroke-width="1.5" stroke-dasharray="4 4" marker-end="url(#ss)"/>
+  <text x="392" y="440" font-size="10" fill="#475569">search_medmcqa (tool)</text>
 
   <!-- Layer D: orchestration -->
   <text x="40" y="454" font-size="10.5" font-weight="500" fill="#94A3B8">ĐIỀU PHỐI ĐA TÁC TỬ</text>
