@@ -1,12 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" width="820" height="405" viewBox="0 0 820 405" font-family="Helvetica, Arial, sans-serif">
-  <title>V2 — 4-node design</title>
+  <title>V4 — same graph as V2</title>
   <defs>
-    <marker id="v2a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+    <marker id="v4a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
     </marker>
   </defs>
-  <text x="410" y="22" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">V2 — understand → (search ‖ reasoning) → answer</text>
-  <text x="410" y="40" text-anchor="middle" font-size="11" fill="#64748B">4 tác tử, 4 lượt gọi LLM/câu · không có bộ kiểm chứng</text>
+  <text x="410" y="22" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">V4 — understand → (search ‖ reasoning) → answer</text>
+  <text x="410" y="40" text-anchor="middle" font-size="11" fill="#64748B">4 tác tử, 4 lượt gọi LLM/câu · đúng cấu hình V2 (không có Node 5)</text>
 
   <rect x="30" y="119" width="70" height="40" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
   <text x="65" y="144" text-anchor="middle" font-size="12" font-weight="500" fill="#334155">START</text>
@@ -16,13 +16,13 @@
   <text x="230" y="144" text-anchor="middle" font-size="10" fill="#6D28D9">Agent(case-reasoner) · LLM call 1</text>
   <text x="230" y="159" text-anchor="middle" font-size="10" fill="#6D28D9">→ case_understanding + query (dùng chung)</text>
 
-  <line x1="100" y1="139" x2="134" y2="139" stroke="#64748B" stroke-width="1.5" marker-end="url(#v2a)"/>
+  <line x1="100" y1="139" x2="134" y2="139" stroke="#64748B" stroke-width="1.5" marker-end="url(#v4a)"/>
 
   <text x="480" y="63" text-anchor="middle" font-size="10.5" font-weight="500" fill="#334155">search (Node 2, bundled thành một node)</text>
   <rect x="370" y="69" width="220" height="30" rx="7" fill="#CCFBF1" stroke="#0D9488"/>
   <text x="480" y="85" text-anchor="middle" font-size="11" font-weight="500" fill="#115E59">retrieve — search_medmcqa</text>
   <text x="480" y="96" text-anchor="middle" font-size="9" fill="#0F766E">tool do đồ thị gọi · không LLM · ~40 ms</text>
-  <line x1="480" y1="99" x2="480" y2="109" stroke="#94A3B8" stroke-width="1.3" marker-end="url(#v2a)"/>
+  <line x1="480" y1="99" x2="480" y2="109" stroke="#94A3B8" stroke-width="1.3" marker-end="url(#v4a)"/>
   <rect x="370" y="111" width="220" height="40" rx="7" fill="#EDE9FE" stroke="#7C3AED"/>
   <text x="480" y="128" text-anchor="middle" font-size="10.5" font-weight="500" fill="#5B21B6">evidence-digest — LLM call 2</text>
   <text x="480" y="142" text-anchor="middle" font-size="9" fill="#6D28D9">tóm bằng chứng, tự chấm HIGH/MEDIUM/LOW</text>
@@ -32,24 +32,24 @@
   <text x="480" y="223" text-anchor="middle" font-size="9" fill="#6D28D9">option-by-option, tự chấm tin cậy</text>
   <text x="480" y="235" text-anchor="middle" font-size="9" fill="#6D28D9">KHÔNG thấy bằng chứng (chạy đồng thời Node 2)</text>
 
-  <line x1="320" y1="125" x2="360" y2="90" stroke="#64748B" stroke-width="1.3" marker-end="url(#v2a)"/>
-  <line x1="320" y1="153" x2="360" y2="213" stroke="#64748B" stroke-width="1.3" marker-end="url(#v2a)"/>
+  <line x1="320" y1="125" x2="360" y2="90" stroke="#64748B" stroke-width="1.3" marker-end="url(#v4a)"/>
+  <line x1="320" y1="153" x2="360" y2="213" stroke="#64748B" stroke-width="1.3" marker-end="url(#v4a)"/>
   <text x="325" y="171" font-size="9" fill="#94A3B8" font-style="italic">chạy đồng thời — cùng một superstep LangGraph</text>
 
   <rect x="640" y="125" width="150" height="72" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
   <text x="715" y="147" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">decider — Node 4</text>
   <text x="715" y="162" text-anchor="middle" font-size="10" fill="#6D28D9">LLM call 4</text>
   <text x="715" y="176" text-anchor="middle" font-size="9" fill="#6D28D9">luật tin cậy bất đối xứng</text>
-  <text x="715" y="189" text-anchor="middle" font-size="9" fill="#6D28D9">→ "Answer: X"</text>
+  <text x="715" y="189" text-anchor="middle" font-size="9" fill="#6D28D9">→ "Answer: X" (+ memory† dự kiến)</text>
 
-  <line x1="590" y1="111" x2="636" y2="149" stroke="#64748B" stroke-width="1.3" marker-end="url(#v2a)"/>
-  <line x1="590" y1="215" x2="636" y2="173" stroke="#64748B" stroke-width="1.3" marker-end="url(#v2a)"/>
+  <line x1="590" y1="111" x2="636" y2="149" stroke="#64748B" stroke-width="1.3" marker-end="url(#v4a)"/>
+  <line x1="590" y1="215" x2="636" y2="173" stroke="#64748B" stroke-width="1.3" marker-end="url(#v4a)"/>
 
   <rect x="670" y="253" width="90" height="36" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
   <text x="715" y="276" text-anchor="middle" font-size="12" fill="#334155">END</text>
-  <line x1="715" y1="197" x2="715" y2="249" stroke="#64748B" stroke-width="1.5" marker-end="url(#v2a)"/>
+  <line x1="715" y1="197" x2="715" y2="249" stroke="#64748B" stroke-width="1.5" marker-end="url(#v4a)"/>
 
-  <text x="410" y="321" text-anchor="middle" font-size="11" fill="#64748B">Node 2 và Node 3 không thấy đầu ra của nhau; Node 4 dùng một luật tường minh, không phải tổng hợp tự do.</text>
-  <text x="410" y="339" text-anchor="middle" font-size="11" fill="#64748B">Khác thiết kế hội đồng nhiều chuyên gia (MedAgents) mà Nhóm đã thử trước đó — đây là 4 bước của MỘT quy trình, không phải nhiều ý kiến tranh luận.</text>
-  <text x="410" y="367" text-anchor="middle" font-size="10.5" fill="#64748B">purple = lượt gọi LLM · teal = truy hồi (không LLM, do đồ thị gọi trực tiếp — xác định được)</text>
+  <text x="410" y="321" text-anchor="middle" font-size="11" fill="#64748B">Không có Node 5, nên không đọc case_understanding/clinical_report ngoài Node 4 tự đọc để trả lời.</text>
+  <text x="410" y="339" text-anchor="middle" font-size="11" fill="#64748B">V4 hiện là đúng RunConfig của V2 (verify=False, memory=False) — không lẫn với ngữ liệu/embedder/số tác tử của bản thiết kế trước.</text>
+  <text x="410" y="367" text-anchor="middle" font-size="10" fill="#B45309">† kế hoạch: bật memory=True cho V4 để V3/V4 chỉ khác đúng field verify; qa/variants.py chưa cập nhật (xem báo cáo, mục 3.4).</text>
 </svg>
