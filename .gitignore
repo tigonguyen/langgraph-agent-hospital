@@ -10,6 +10,8 @@ venv/
 
 # Env / secrets
 .env
+.env.*
+!.env.example
 
 # OS
 .DS_Store
@@ -20,3 +22,4 @@ data/ingest_full.log
 data/medcpt/
 /tmp/medcpt_*.log
 data/eval_runs/
+data/longterm/

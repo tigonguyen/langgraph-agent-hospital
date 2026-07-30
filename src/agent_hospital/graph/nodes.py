@@ -13,10 +13,12 @@ from typing import Any, Callable
 from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
+from agent_hospital.graph import longterm
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
 from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, ANALYSE_ONLY,
-                                   DIGEST_EVIDENCE_ONLY, LETTER_ONLY, REASON_THEN_ANSWER,
-                                   UNDERSTAND_ONLY, format_mcq, parse_choice)
+                                   DIGEST_EVIDENCE_ONLY, LESSON_SUFFIX, LETTER_ONLY,
+                                   REASON_THEN_ANSWER, UNDERSTAND_ONLY, format_mcq,
+                                   parse_choice)
 from agent_hospital.qa.reasoning import build_reasoning_agent, build_router
 
 Node = Callable[[dict], dict]
@@ -304,8 +306,24 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
     else:
         tools, reset_calls = (), lambda: None
     closing = AGENTIC_VERIFY if cfg.verify_rag else REASON_THEN_ANSWER
+    if cfg.long_term:
+        closing = f"{closing}\n\n{LESSON_SUFFIX}"
     agent = Agent("report-verifier", roles.ROLE_PROMPTS["report-verifier"],
                   model=cfg.model_for("verifier"), tools=tools)
+
+    # Long-term store: opened once per graph (not per item) so the sqlite connection is
+    # reused across the whole run. Lazily, so building a graph still touches no disk.
+    lt: dict[str, Any] = {}
+
+    def _store():
+        if not cfg.long_term:
+            return None
+        if "store" not in lt:
+            try:
+                lt["store"], lt["close"] = longterm.open_store(cfg.long_term_db)
+            except Exception:
+                lt["store"] = None        # unavailable -> behave like plain V3
+        return lt["store"]
 
     def node(state: dict) -> dict:
         reset_calls()
@@ -313,12 +331,27 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
         report = state.get("clinical_report", "")
         understanding = state.get("case_understanding", "") if cfg.memory else ""
-        extra = ((f"\n\nCase summary:\n{understanding}" if understanding else "")
+        item = state["item"]
+
+        # Long-term memory (spec §4.5): lessons from similar cases in EARLIER episodes.
+        lessons = longterm.recall(_store(), cfg.long_term_split, item.question) if cfg.long_term else ""
+
+        extra = ((f"\n\n{lessons}" if lessons else "")
+                 + (f"\n\nCase summary:\n{understanding}" if understanding else "")
                  + f"\n\nClinical-reasoning report (option-by-option verdicts):\n{report}"
                  + f"\n\nChosen answer: {cur_letter}"
                  + f"\n\nColleague's explanation: {state.get('rationale', '')}")
         reply = agent.say(_prompt(state, extra=extra, closing=closing))
         revised = parse_choice(reply)
-        return {"answer": revised if revised is not None else cur, "rationale": reply.strip()}
+        final = revised if revised is not None else cur
+
+        if cfg.long_term:
+            longterm.remember(
+                _store(), cfg.long_term_split, item.id, item.question,
+                longterm.extract_lesson(reply),
+                chosen=_LETTERS[final] if final is not None else "",
+                read_only=cfg.long_term_read_only,
+            )
+        return {"answer": final, "rationale": reply.strip()}
 
     return node
