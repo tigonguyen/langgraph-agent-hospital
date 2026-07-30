@@ -25,6 +25,7 @@ from textwrap import fill
 
 from agent_hospital.diseases import load_medqa_usmle
 from agent_hospital.diseases.medqa_usmle import MCQItem
+from agent_hospital.models import default_model
 from agent_hospital.qa import VARIANTS, build_variant
 from agent_hospital.qa.mcq import summarize_rationale
 
@@ -67,13 +68,14 @@ def _warm_up(answer_fn) -> None:
 def run(
     variant: str,
     split: str = "test",
-    model: str = "qwen2.5:7b",
+    model: str | None = None,
     limit: int = 0,
     out_dir: str = DEFAULT_OUT_DIR,
     overwrite: bool = False,
     quiet: bool = False,
 ) -> str:
     """Run `variant` over `split` and append predictions to the output `.jsonl`. Returns its path."""
+    model = model or default_model()   # None = take $AGENT_HOSPITAL_MODEL / the fallback
     os.makedirs(out_dir, exist_ok=True)
     pred_path, meta_path = _paths(out_dir, variant, split, model)
     if overwrite:
@@ -163,7 +165,9 @@ def main() -> None:
     p.add_argument("-v", "--variant", required=True, type=str.upper, choices=list(VARIANTS))
     p.add_argument("-s", "--split", default="test", choices=["train", "validation", "test"])
     p.add_argument("-n", "--limit", type=int, default=0, help="number of items, 0 = whole split (default)")
-    p.add_argument("-m", "--model", default="qwen2.5:7b")
+    p.add_argument("-m", "--model", default=default_model(),
+                   help="model spec 'provider:model'; bare = Ollama "
+                        "(default: $AGENT_HOSPITAL_MODEL, else qwen2.5:7b)")
     p.add_argument("-o", "--out-dir", default=DEFAULT_OUT_DIR)
     p.add_argument("--overwrite", action="store_true", help="discard any existing prediction file first")
     p.add_argument("-q", "--quiet", action="store_true", help="suppress the per-item log")

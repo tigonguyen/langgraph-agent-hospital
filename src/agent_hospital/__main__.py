@@ -13,6 +13,7 @@ from textwrap import fill
 
 from agent_hospital.diseases import load_medqa_usmle
 from agent_hospital.diseases.medqa_usmle import MCQItem
+from agent_hospital.models import default_model
 from agent_hospital.qa import (
     VARIANTS,
     accuracy,
@@ -24,6 +25,7 @@ from agent_hospital.qa import (
     run_variant,
 )
 from agent_hospital.qa.mcq import summarize_rationale
+from agent_hospital.qa.variants import _PRESETS
 
 
 def warm_up(answer_fn) -> None:
@@ -51,18 +53,43 @@ def main() -> None:
                    help="dataset split; train=dev, test=official eval (default: train)")
     p.add_argument("-n", "--limit", type=int, default=10,
                    help="number of questions, or 0 for the whole split (default: 10)")
-    p.add_argument("-m", "--model", default="qwen2.5:7b",
+    p.add_argument("-m", "--model", default=default_model(),
                    help="model spec 'provider:model'; bare = Ollama. e.g. qwen2.5:14b, "
                         "anthropic:claude-sonnet-5, openai:gpt-4o, google:gemini-2.0-flash, "
-                        "openrouter:meta-llama/llama-3.3-70b-instruct (default: qwen2.5:7b)")
+                        "openrouter:meta-llama/llama-3.3-70b-instruct "
+                        "(default: $AGENT_HOSPITAL_MODEL, else qwen2.5:7b)")
     p.add_argument("-q", "--quiet", action="store_true",
                    help="suppress the per-item log, print only the summary")
+    p.add_argument("--remember", action="store_true",
+                   help="V3L only: WRITE lessons to the long-term store (default is recall-only). "
+                        "Use on the dev split to build the bank — writing during a scored run "
+                        "leaks one graded item's lesson into later graded items.")
+    p.add_argument("--lesson-bank", metavar="SPLIT",
+                   help="V3L only: which lesson-bank namespace to recall from (default: train). "
+                        "Independent of -s: reading train lessons while scoring test is intended.")
     args = p.parse_args()
+
+    # Only pass long-term overrides when they were actually given, so every other variant's
+    # RunConfig is untouched (`build_variant` rejects unknown fields for its preset anyway).
+    overrides: dict = {}
+    if args.remember:
+        overrides["long_term_read_only"] = False
+    if args.lesson_bank:
+        overrides["long_term_split"] = args.lesson_bank
+    if overrides and not _PRESETS[args.variant].long_term:
+        p.error(f"--remember/--lesson-bank apply to long-term variants only; "
+                f"{args.variant} has long_term=False (use -v V3L)")
 
     limit = args.limit or None
     items = load_medqa_usmle(args.split, limit=limit)
     print(f"Running {args.variant} ({VARIANTS[args.variant]}) on {len(items)} "
           f"{args.split} items with {args.model} (temp=0)")
+    if _PRESETS[args.variant].long_term:
+        bank = overrides.get("long_term_split", _PRESETS[args.variant].long_term_split)
+        writing = "WRITING lessons" if args.remember else "recall-only (not writing)"
+        print(f"  long-term memory: bank '{bank}', {writing}")
+        if args.remember and args.split not in ("train", "validation"):
+            print(f"  !! writing while scoring '{args.split}' leaks lessons between graded items")
     print("warming up (one throwaway item; spin-up excluded from latency)...\n")
 
     letters = "ABCD"
@@ -81,7 +108,7 @@ def main() -> None:
             print(fill(why, width=88, initial_indent=" " * 8, subsequent_indent=" " * 8), flush=True)
             print(flush=True)
 
-    answer = build_variant(args.variant, model=args.model)
+    answer = build_variant(args.variant, model=args.model, **overrides)
     warm_up(answer)
     records = run_variant(items, answer, progress=None if args.quiet else log)
     if not args.quiet:

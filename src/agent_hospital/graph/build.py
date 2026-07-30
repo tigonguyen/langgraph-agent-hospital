@@ -46,7 +46,11 @@ def build_graph(cfg: RunConfig):
     # be explicitly allowlisted or every checkpoint read logs a deprecation warning.
     serde = JsonPlusSerializer(
         allowed_msgpack_modules=[("agent_hospital.diseases.medqa_usmle", "MCQItem")])
-    checkpointer = InMemorySaver(serde=serde)
+    # Opt-in (cfg.checkpoint): one compiled graph serves every item, so an always-on saver
+    # accumulates a thread per question that nothing ever reads back — measured ~100 KB per
+    # item, ~128 MB over the 1273-item test split. Long-term memory does NOT come from here
+    # (a checkpointer is keyed by thread_id = one question); see graph/longterm.py.
+    checkpointer = InMemorySaver(serde=serde) if cfg.checkpoint else None
 
     g = StateGraph(QAState)
 
