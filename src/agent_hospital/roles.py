@@ -192,15 +192,16 @@ REPORT_VERIFIER = (
     "answer, then on the LAST line write 'Answer: X' where X is A, B, C, or D."
 )
 
-# V3/V4 short-term memory: a scribe condenses the clinical reasoner's report into shared
-# working notes that the decider and verifier then read instead of the raw report.
+# V3/V4 short-term memory: a scribe condenses the case summary, retrieved evidence, and clinical
+# reasoner's report — everything the team has produced so far — into shared working notes that
+# the verifier reads instead of re-reading each piece separately. The decider is unaffected.
 SCRIBE = (
-    "You are the case scribe. You are given the question and a colleague's clinical-reasoning "
-    "report (key findings, what is being asked, an option-by-option analysis, and a summary). "
-    "Condense it into the team's short working memory: a compact set of notes — the key findings, "
-    "what is being asked, and each option's verdict (supported / ruled out / uncertain) with a "
-    "one-line reason — that the decider and verifier will rely on instead of re-reading the full "
-    "report. Do NOT choose an answer."
+    "You are the case scribe. You are given the question, the team's case summary, any retrieved "
+    "evidence, and a colleague's clinical-reasoning report (key findings, what is being asked, an "
+    "option-by-option analysis, and a summary). Condense all of it into the team's short working "
+    "memory: a compact set of notes — the key findings, what is being asked, and each option's "
+    "verdict (supported / ruled out / uncertain) with a one-line reason — that the verifier will "
+    "rely on instead of re-reading everything separately. Do NOT choose an answer."
 )
 
 ROLE_PROMPTS: dict[str, str] = {

@@ -136,15 +136,15 @@ này khiến khảo sát ablation trung thực.
   \centering
   \caption{Các nút thực sự được nối trong mỗi biến thể.}
   \label{tab:variants}
-  \begin{tabular}{llc}
+  \begin{tabular}{@{} c l c @{}}
     \toprule
-    Biến thể & Các nút được nối & Số tác tử \\
+    Biến thể & Các nút được nối & Tác tử \\
     \midrule
-    V0 & \texttt{answer} & 1 \\
-    V1 & \texttt{agent}: tác tử gọi công cụ \texttt{search\_medmcqa} (agentic) & 1 \\
-    V2 & \texttt{panel(3) $\rightarrow$ aggregate $\rightarrow$ verify} (agentic RAG) & 5 \\
-    V3 & \texttt{reason $\rightarrow$ retrieve $\rightarrow$ panel $\rightarrow$ aggregate $\rightarrow$ verify} & 5 \\
-    V4 & \texttt{reason $\rightarrow$ retrieve $\rightarrow$ panel $\rightarrow$ aggregate} & 4 \\
+    V0 & \texttt{answer} & 1 \\[3pt]
+    V1 & \texttt{agent}\; (agentic, gọi \texttt{search\_medmcqa}) & 1 \\[3pt]
+    V2 & \texttt{case\;$\rightarrow$\;(search\;$\|$\;clinical)\;$\rightarrow$\;answer} & 4 \\[3pt]
+    V3 & \texttt{case\;$\rightarrow$\;(search\;$\|$\;clinical)\;$\rightarrow$\;answer\;$\rightarrow$\;verify}\;+\;memory & 5 \\[3pt]
+    V4 & \texttt{case\;$\rightarrow$\;(search\;$\|$\;clinical)\;$\rightarrow$\;answer}\;+\;memory & 4 \\
     \bottomrule
   \end{tabular}
 \end{table}

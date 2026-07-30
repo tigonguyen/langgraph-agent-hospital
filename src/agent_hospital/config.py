@@ -32,8 +32,9 @@ class RunConfig:
     rag: RagConfig | None = None           # None = no retrieval (V0)
     clinical_reason: bool = False          # dedicated clinical-reasoning stage before the decider (V2-V4)
     verify: bool = False                   # verifier node, reads the clinical report (V2/V3, off for V4)
-    memory: bool = False                   # short-term memory: scribe condenses the clinical report into
-                                            # working notes that the decider/verifier read instead (V3/V4)
+    memory: bool = False                   # short-term memory: scribe condenses case understanding +
+                                            # evidence + clinical report into working notes for the
+                                            # verifier only; a no-op without verify=True too (V3)
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
 
     def model_for(self, role: str) -> Any:

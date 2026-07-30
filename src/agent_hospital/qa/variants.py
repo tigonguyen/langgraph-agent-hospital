@@ -66,19 +66,22 @@ _PRESETS: dict[str, RunConfig] = {
     "V2": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=False)),
-    # V3 = V2 + short-term memory + verifier: a scribe condenses the case reasoner's report
-    # into shared working notes (state["working_memory"]) that the decider and verifier read
-    # instead of the raw report; a verifier audits the decider's choice against those notes
-    # (and, if needed, a targeted textbook check) before confirming or revising it. Two deltas
-    # from V2 (memory AND verify), not one — V2 dropped its own verifier, so this relationship
-    # is no longer a clean single-variable step; noted here rather than left implicit.
+    # V3 = V2 + verifier + short-term memory: a scribe condenses the case understanding,
+    # retrieved evidence, and clinical reasoner's report into shared working notes
+    # (state["working_memory"]) that ONLY the verifier reads (the decider always reads
+    # clinical_report directly, unaffected); the verifier audits the decider's choice against
+    # those notes (and, if needed, a targeted textbook check) before confirming or revising it.
+    # `memory` is purely in service of `verify` here (build_graph only builds the scribe node
+    # when both are set) — a single delta from V2 (the verifier, memory-equipped), not two.
     "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=False),
                     verify_rag=RagConfig(threshold=0.0)),
-    # V4 = V3 without the verifier (verify=False, everything else identical) — isolates
-    # exactly the verifier's marginal contribution (V3 - V4).
-    "V4": RunConfig(clinical_reason=True, answer_role="decider", memory=True,
+    # V4 = V3 without the verifier (verify=False, everything else identical). Since `memory`
+    # only matters when a verifier consumes it, V4 has no scribe either and is functionally
+    # V2 again — isolating exactly the verifier's (memory-equipped) marginal contribution
+    # (V3 - V4).
+    "V4": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=False)),
 }

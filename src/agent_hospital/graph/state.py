@@ -14,8 +14,8 @@ class QAState(TypedDict, total=False):
     query: str
     evidence: str          # formatted evidence block ("" = none)
     rationale: str         # most recent explanation text; overwritten by whichever node answers last
-    clinical_report: str   # clinical reasoner's untouched report (V2-V4) — read by decider AND
-                            # verifier; unlike rationale, never overwritten downstream
-    working_memory: str    # scribe's short-term working notes, condensed from clinical_report,
-                            # shared within the episode (V3/V4)
+    clinical_report: str   # clinical reasoner's untouched report (V2-V4) — read directly by the
+                            # decider; unlike rationale, never overwritten downstream
+    working_memory: str    # scribe's short-term working notes, condensed from case_understanding +
+                            # evidence + clinical_report — read by the verifier only (V3)
     answer: int | None     # final chosen option index

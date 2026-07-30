@@ -7,11 +7,18 @@ internally (understand, search, reason, decide), split into 4 nodes:
                    /            \\
               search          reasoning  <- Nodes 2 & 3: CONCURRENT, each ONE graph node,
                 |                 |          neither reads the other's output. Node 2 bundles
-              [scribe]            |          retrieve+digest into one node (a multi-step chain
-                 \\                /          racing a single long call has its LATER steps
-                  answer (decider)  <- Node 4  stranded in later supersteps otherwise — see
-                       |                       make_search_branch_node for the measured why).
-                   [verify]
+                 \\                /          retrieve+digest into one node (a multi-step chain
+                  answer (decider)  <- Node 4  racing a single long call has its LATER steps
+                   |        |                  stranded in later supersteps otherwise — see
+                   |     [scribe]               make_search_branch_node for the measured why).
+                    \\      /
+                    [verify]
+
+`[scribe]` (short-term memory, V3) is fed by the SAME join as `answer` — it runs concurrently
+with the decider, not after it, so adding it costs no decider latency. It condenses case
+understanding + evidence + clinical report into `state["working_memory"]` for `verify` alone
+to read; the decider is unaffected and always reads `clinical_report` directly. Built only
+when a verifier is present (`cfg.memory and cfg.verify`) since nothing else consumes it.
 
 A join with >1 predecessor MUST be wired as `add_edge([a, b], c)` (list form) so `c` runs
 ONCE after both complete — separate `add_edge(a, c)` / `add_edge(b, c)` calls each trigger
@@ -87,12 +94,7 @@ def build_graph(cfg: RunConfig):
     if cfg.clinical_reason:
         g.add_node("reasoning", nodes.make_reasoning_node(cfg))
         g.add_edge("understand", "reasoning")
-        last = "reasoning"
-        if cfg.memory:  # short-term memory: scribe condenses the report into working notes (V3/V4)
-            g.add_node("scribe", nodes.make_scribe_node(cfg))
-            g.add_edge(last, "scribe")
-            last = "scribe"
-        predecessors.append(last)
+        predecessors.append("reasoning")
 
     # Node 4: the decider, the join point for Nodes 2 and 3.
     g.add_node("answer", nodes.make_answer_node(cfg))
@@ -102,10 +104,27 @@ def build_graph(cfg: RunConfig):
         g.add_edge(predecessors[0] if predecessors else START, "answer")
     prev = "answer"
 
+    # Scribe (short-term memory, V3): fed by the SAME join as `answer` — runs concurrently
+    # with it, not after it — so it can condense case understanding + evidence + clinical
+    # report without adding decider latency. Only the verifier reads its output
+    # (`state["working_memory"]`, see make_scribe_node), so it's only built when there's a
+    # verifier to read it; with no verifier (V4) it would be a pure-cost no-op.
+    verify_predecessors = [prev]
+    if cfg.memory and cfg.clinical_reason and cfg.verify:
+        g.add_node("scribe", nodes.make_scribe_node(cfg))
+        if len(predecessors) > 1:
+            g.add_edge(predecessors, "scribe")
+        else:
+            g.add_edge(predecessors[0] if predecessors else START, "scribe")
+        verify_predecessors.append("scribe")
+
     # Verifier.
     if cfg.verify:
         g.add_node("verify", nodes.make_report_verify_node(cfg))
-        g.add_edge(prev, "verify")
+        if len(verify_predecessors) > 1:
+            g.add_edge(verify_predecessors, "verify")
+        else:
+            g.add_edge(verify_predecessors[0], "verify")
         prev = "verify"
 
     g.add_edge(prev, END)

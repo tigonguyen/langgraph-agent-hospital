@@ -319,8 +319,11 @@ def make_answer_node(cfg: RunConfig) -> Node:
 
     def node(state: dict) -> dict:
         # A prior clinical-reasoning report (V2-V4) informs the choice; the short
-        # justification written here replaces it as the user-facing explanation.
-        prior = _clinical_context(state)
+        # justification written here replaces it as the user-facing explanation. Reads
+        # `clinical_report` directly rather than `_clinical_context` — the decider is
+        # deliberately unaffected by the scribe's working memory (V3/V4), which exists
+        # for the verifier only (see make_scribe_node).
+        prior = state.get("clinical_report", "")
         extra = f"\n\nColleague's clinical-reasoning report:\n{prior}" if prior else ""
         reply = agent.say(_prompt(state, extra=extra, closing=REASON_THEN_ANSWER))
         return {"answer": parse_choice(reply), "rationale": reply.strip()}
@@ -329,25 +332,31 @@ def make_answer_node(cfg: RunConfig) -> Node:
 
 
 def make_scribe_node(cfg: RunConfig) -> Node:
-    """Short-term memory (V3/V4): distil the clinical reasoner's report into shared working
-    notes that the decider and verifier then read instead of the raw report (`_clinical_context`).
-    The notes live in `state["working_memory"]` for the rest of the episode (a per-question
-    working memory, not cross-episode).
+    """Short-term memory (V3/V4): distil the case summary, retrieved evidence, and clinical
+    reasoner's report — everything Nodes 1-3 produced — into shared working notes that ONLY
+    the verifier reads (`_clinical_context`). Runs off the same join as `answer` (see
+    build_graph), not nested inside the reasoning branch, so it can actually see `evidence`
+    without adding decider latency; the decider itself reads `clinical_report` directly and
+    is unaffected by this node. The notes live in `state["working_memory"]` for the rest of
+    the episode (a per-question working memory, not cross-episode).
     """
     agent = Agent("scribe", roles.ROLE_PROMPTS["scribe"], model=cfg.model_for("scribe"))
 
     def node(state: dict) -> dict:
+        understanding = state.get("case_understanding", "")
         report = state.get("clinical_report", "")
-        notes = agent.say(_prompt(state, extra=f"\n\nClinical-reasoning report:\n{report}",
-                                  closing=SCRIBE_NOTES))
+        extra = (f"\n\nCase summary:\n{understanding}" if understanding else "") + \
+                f"\n\nClinical-reasoning report:\n{report}"
+        notes = agent.say(_prompt(state, extra=extra, closing=SCRIBE_NOTES))
         return {"working_memory": notes.strip()}
 
     return node
 
 
 def _clinical_context(state: dict) -> str:
-    """Decider/verifier input: the scribe's working memory if present (V3/V4), else the
-    clinical reasoner's raw report (V2)."""
+    """Verifier input only: the scribe's condensed working memory if present (V3/V4), else
+    the clinical reasoner's raw report (V2). The decider reads `clinical_report` directly
+    instead (see make_answer_node) and never sees this."""
     return state.get("working_memory") or state.get("clinical_report", "")
 
 
@@ -355,11 +364,12 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
     """V2/V3's verifier: a cheap final check, not a second full derivation.
 
     Reads `_clinical_context(state)` — the reasoner's report or the scribe's condensed
-    notes, whichever is present, never overwritten by the decider — and audits the
-    decider's chosen letter against it. Only reaches for `cfg.verify_rag`'s independent
-    `search_textbooks` tool, on a query targeted at the CHOSEN option specifically, if
-    that context alone doesn't settle it. Falls back to the prior answer on parse
-    failure, like every other late-stage node.
+    notes, whichever is present — plus the decider's chosen letter and its own short
+    explanation (`state["rationale"]`, not yet overwritten), and audits that choice
+    against them. Only reaches for `cfg.verify_rag`'s independent `search_textbooks`
+    tool, on a query targeted at the CHOSEN option specifically, if that context alone
+    doesn't settle it. Falls back to the prior answer on parse failure, like every
+    other late-stage node.
     """
     if cfg.verify_rag:
         search, reset_calls = make_search_tool(replace(cfg, rag=cfg.verify_rag),
@@ -377,7 +387,8 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
         context = _clinical_context(state)
         extra = (f"\n\nClinical-reasoning report (option-by-option verdicts):\n{context}"
-                 f"\n\nChosen answer: {cur_letter}")
+                 f"\n\nChosen answer: {cur_letter}"
+                 f"\n\nColleague's explanation: {state.get('rationale', '')}")
         reply = agent.say(_prompt(state, extra=extra, closing=closing))
         revised = parse_choice(reply)
         return {"answer": revised if revised is not None else cur, "rationale": reply.strip()}
