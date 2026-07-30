@@ -14,10 +14,9 @@ from agent_hospital import roles
 from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_ANSWER_TEXTBOOK, AGENTIC_VERIFY,
-                                   ANALYSE_ONLY, DIGEST_EVIDENCE_ONLY, LETTER_ONLY,
-                                   REASON_THEN_ANSWER, SCRIBE_NOTES, UNDERSTAND_ONLY, format_mcq,
-                                   parse_choice)
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, ANALYSE_ONLY,
+                                   DIGEST_EVIDENCE_ONLY, LETTER_ONLY, REASON_THEN_ANSWER,
+                                   SCRIBE_NOTES, UNDERSTAND_ONLY, format_mcq, parse_choice)
 from agent_hospital.qa.reasoning import build_followup_agent, build_reasoning_agent, build_router
 
 Node = Callable[[dict], dict]
@@ -253,23 +252,19 @@ def make_medmcqa_tool(cfg: RunConfig, max_calls: int | None = None):
     return search_medmcqa, lambda: calls.__setitem__("n", 0)
 
 
-# Hard cap for agentic search (V1/V1a and the verifier's own search) — matches the "up to
+# Hard cap for agentic search (V1 and the verifier's own search) — matches the "up to
 # twice" confidence-gated retry the prompts describe; see _call_cap_guard for why a prompt-
 # only cap isn't enough.
 _MAX_AGENTIC_SEARCHES = 2
 
 # role -> (tool factory, closing instruction) for the single-agent agentic-RAG node below.
-# V1 searches MedMCQA (solved exam questions); V1a searches MedRAG Textbooks instead —
-# same one-agent-does-everything architecture, different corpus.
 _AGENTIC_TOOL_BY_ROLE = {
     "rag-agent": (lambda cfg: make_medmcqa_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES), AGENTIC_ANSWER),
-    "rag-agent-textbook": (lambda cfg: make_search_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES),
-                           AGENTIC_ANSWER_TEXTBOOK),
 }
 
 
 def make_agentic_rag_node(cfg: RunConfig) -> Node:
-    """V1/V1a as a single tool-using agent (agentic RAG).
+    """V1 as a single tool-using agent (agentic RAG).
 
     One agent, one tool (which tool + corpus depends on `cfg.answer_role`, see
     `_AGENTIC_TOOL_BY_ROLE`): it decides whether/what to search, the `create_agent`

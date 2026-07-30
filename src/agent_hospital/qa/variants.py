@@ -21,7 +21,6 @@ DEFAULT_MODEL = "qwen2.5:14b"
 VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only (MedMCQA)",
-    "V1A": "RAG-only (MedRAG Textbooks)",
     "V2": "Multi-agent (case reasoner + decider)",
     "V3": "Full system (V2 + short-term memory)",
     "V4": "Full system without verifier",
@@ -49,13 +48,6 @@ _PRESETS: dict[str, RunConfig] = {
     "V1": RunConfig(answer_role="rag-agent",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=True)),
-    # V1a: same one-agent architecture as V1, but searches MedRAG Textbooks (search_textbooks,
-    # MedCPT embeddings) instead of MedMCQA — the ladder's other RAG corpus, same design.
-    # threshold=0.0 (top-k, no gate), matching V1's agentic philosophy of trusting the agent
-    # to weigh results itself rather than gating them before it even sees them.
-    "V1A": RunConfig(answer_role="rag-agent-textbook",
-                     rag=RagConfig(collection="knowledge_medcpt", embedder="medcpt",
-                                   k=4, threshold=0.0, tool=True)),
     # V2: a dedicated case-reasoning agent (Node 1, spec §4.2) produces a shared case summary +
     # search query; a search node and a reasoning node run CONCURRENTLY off it (retrieve+digest
     # vs. own-knowledge clinical reasoning, each with its own confidence rating); a decider

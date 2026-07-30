@@ -38,13 +38,6 @@ AGENTIC_ANSWER = (
     "state your confidence (High/Medium/Low) as instructed above, then on the LAST line write "
     "'Answer: X' where X is A, B, C, or D."
 )
-# V1a agentic RAG (same as AGENTIC_ANSWER, but over MedRAG Textbooks instead of MedMCQA).
-AGENTIC_ANSWER_TEXTBOOK = (
-    "Call search_textbooks (up to twice, per the confidence-gated retry rule above) to retrieve "
-    "relevant textbook passages. Then, in at most 40 words, say why the best option is best and "
-    "state your confidence (High/Medium/Low) as instructed above, then on the LAST line write "
-    "'Answer: X' where X is A, B, C, or D."
-)
 # Verifier with textbook search (V2/V3): may check the proposed answer against reference
 # textbook passages before confirming/revising.
 AGENTIC_VERIFY = (

@@ -24,7 +24,7 @@ A join with >1 predecessor MUST be wired as `add_edge([a, b], c)` (list form) so
 ONCE after both complete — separate `add_edge(a, c)` / `add_edge(b, c)` calls each trigger
 `c` independently, causing two concurrent writes to the same state key.
 
-`rag.tool=True` (V1/V1a) instead binds retrieval AS a tool directly to a single answering
+`rag.tool=True` (V1) instead binds retrieval AS a tool directly to a single answering
 agent (agentic RAG, sequential by nature — the model must be re-invoked to consume its own
 tool call) rather than running it as a separate node/branch at all.
 """
@@ -41,7 +41,7 @@ from agent_hospital.graph.state import QAState
 def build_graph(cfg: RunConfig):
     g = StateGraph(QAState)
 
-    # V1/V1a: a single tool-using agent that both retrieves AND answers (agentic RAG).
+    # V1: a single tool-using agent that both retrieves AND answers (agentic RAG).
     # Skipped when the 4-node design is wired (V2-V4) — there, retrieval runs as its own
     # concurrent node instead (see module docstring).
     if cfg.rag and cfg.rag.tool and not cfg.clinical_reason:
