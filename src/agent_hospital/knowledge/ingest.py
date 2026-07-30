@@ -2,7 +2,14 @@
 
 Prototype on a small subset first (default 1000 snippets) to validate the pipeline,
 then raise `limit` to embed the full corpus. Snippets are used as-is (MedRAG is
-already chunked). Run as a script: `python -m agent_hospital.knowledge.ingest [limit]`.
+already chunked). Run as a script:
+
+    python -m agent_hospital.knowledge.ingest [limit] [shuffle_buffer] [embed_model]
+
+`embed_model` (default: none → Ollama `nomic-embed-text`, collection `knowledge`)
+picks a different embedder from `knowledge/embeddings.py:default_embeddings`; its
+collection is named `knowledge_<embed_model>` (e.g. `minilm` → `knowledge_minilm`),
+since a collection must be queried with the same embedder it was built with.
 """
 
 from __future__ import annotations
@@ -136,5 +143,17 @@ if __name__ == "__main__":
 
     n = int(sys.argv[1]) if len(sys.argv) > 1 else 1000
     shuffle = int(sys.argv[2]) if len(sys.argv) > 2 else 0
-    count = ingest_textbooks(limit=n, shuffle_buffer=shuffle, verbose=True)
+    embed_model = sys.argv[3] if len(sys.argv) > 3 else None
+
+    store = None
+    collection = "knowledge"
+    if embed_model:
+        from agent_hospital.knowledge.embeddings import default_embeddings
+
+        collection = f"knowledge_{embed_model}"
+        store = open_store(
+            collection=collection, embeddings=default_embeddings(embed_model)
+        )
+
+    count = ingest_textbooks(limit=n, store=store, shuffle_buffer=shuffle, verbose=True)
     print(f"ingested {count} snippets into the 'knowledge' collection")
