@@ -516,23 +516,47 @@ các nút này tồn tại để tạo ra.
 
 \subsection{Mô hình và prompt}
 Mô hình trả lời mặc định là \textbf{Qwen2.5}~\cite{qwen2025} (Ollama, có gọi công cụ): \texttt{qwen2.5:7b} làm mặc định
-cho CLI và \texttt{qwen2.5:14b} làm mặc định thư viện cho các con số được báo cáo. Mô hình 14B là điểm
+cho CLI (\texttt{agent\_hospital.\_\_main\_\_}, \texttt{agent\_hospital.predict}) và \texttt{qwen2.5:14b} làm mặc
+định thư viện (\texttt{qa/variants.py:DEFAULT\_MODEL}) cho các con số được báo cáo. Mô hình 14B là điểm
 cân bằng năng lực/tốc độ trên phần cứng mục tiêu; \texttt{qwen2.5:32b} không cho thêm độ chính xác (0.66
 so với 0.68) nhưng chậm gấp $\sim$4 lần. Mọi vai chạy ở \textbf{nhiệt độ~0}: ở nhiệt độ mặc định, chênh
 lệch $V1-V0$ dao động giữa các lần chạy lớn hơn cả bản thân hiệu ứng, nên tính tất định là bắt buộc để
-McNemar ghép cặp có ý nghĩa. Các nhà cung cấp đám mây (\texttt{anthropic:}, \texttt{openai:},
-\texttt{google:}, \texttt{openrouter:}) được hỗ trợ qua cùng một đặc tả \texttt{provider:model}.
+McNemar ghép cặp có ý nghĩa. Với mô hình Ollama, \texttt{models.py:resolve\_model} còn giới hạn mỗi
+lượt gọi sinh tối đa \texttt{num\_predict=1{,}024} token (một lần đo trước đó ghi nhận một vòng lặp gọi
+công cụ agentic sinh runaway hơn 38.000 token trên một câu, làm nghẽn hàng đợi vì Ollama chỉ phục vụ
+một yêu cầu một lúc); mức giới hạn này đủ rộng cho cả lượt lập luận không giới hạn độ dài của Node~3
+($\sim$900 token quan sát được) - giới hạn này chỉ áp cho Ollama. Các nhà cung cấp đám mây
+(\texttt{anthropic:}, \texttt{openai:}, \texttt{google:}, \texttt{openrouter:}) đều dùng chung một đặc
+tả \texttt{provider:model}, nhưng không bị giới hạn số token sinh ra này.
 
 System prompt của baseline (V0) và lượt người dùng cho câu trắc nghiệm, nguyên văn (giữ tiếng Anh vì đây
-là prompt vận hành thực tế):
+là prompt vận hành thực tế). Các vai còn lại (\texttt{rag-agent}, \texttt{case-reasoner},
+\texttt{clinical-reasoner}, \texttt{evidence-digest}, \texttt{decider}, \texttt{report-verifier}) nằm
+đầy đủ trong \texttt{roles.py}, tham chiếu theo vai trò ở \S\ref{sec:variants}:
 
 \begin{lstlisting}
 System (roles.py:BASELINE):
-You are an expert physician answering a medical board (USMLE)
-multiple-choice question. Choose the single best answer, with a
-brief justification.
+You are an expert physician answering a USMLE board multiple-choice
+question, from your own medical knowledge alone -- no references, no
+other physicians to consult.
 
-User turn (qa/mcq.py:format_mcq):
+Work the case in this order before answering:
+1. KEY FINDINGS -- note the salient demographics, symptoms, signs,
+labs, and timeline.
+2. WHAT IS BEING ASKED -- decide precisely what kind of question this
+is: most likely diagnosis, most appropriate next step in
+management/workup, underlying mechanism, causative organism,
+contraindication, or best next test. Reasoning correctly toward the
+wrong target is a common failure mode, so check this against the
+actual question stem, not just the vignette.
+3. OPTION-BY-OPTION -- weigh EVERY option, A through D, against the
+findings: which are supported, which are ruled out, and why.
+4. DECIDE -- choose the single option best supported by your
+reasoning above.
+
+Then give a brief justification for your choice.
+
+User turn (qa/mcq.py:format_mcq), đóng bằng qa/mcq.py:REASON_THEN_ANSWER:
 {question}
 
 A. {option 0}
@@ -540,46 +564,56 @@ B. {option 1}
 C. {option 2}
 D. {option 3}
 
-Reason briefly, then on the LAST line write 'Answer: X' where X is
-A, B, C, or D.
+In at most 30 words, say why the best option is best, then on the
+LAST line write 'Answer: X' where X is A, B, C, or D.
 \end{lstlisting}
 
 \texttt{parse\_choice} trích đáp án từ \texttt{Answer: X} hoặc \texttt{answer is X} (không phân biệt hoa
 thường), dự phòng bằng chữ cái \texttt{A|B|C|D} độc lập đầu tiên; phản hồi không trích được trả về
-\texttt{None} và bị tính là \emph{không hợp lệ}, không bao giờ bị tính nhầm thành câu trả lời sai. Tỷ lệ không
-hợp lệ đo được là \textbf{0.0\%} xuyên suốt.
+\texttt{None} và bị tính là \emph{không hợp lệ}, không bao giờ bị tính nhầm thành câu trả lời sai. Tỷ lệ
+không hợp lệ đo được là \textbf{0.0\%} cho V0 và V2, nhưng \textbf{3.85\%} cho V1 (Bảng~\ref{tab:official}):
+vòng lặp gọi công cụ agentic của V1 đôi khi không hội tụ về một chữ cái, không phải do lỗi của biểu thức
+trích xuất.
 
 \subsection{Cấu hình truy hồi}
 \label{sec:retrievalconfig}
+V1--V4 truy hồi trên đúng một cấu hình (\texttt{qa/variants.py:\_PRESETS}): cùng ngữ liệu, cùng
+embedder, cùng collection. Khác biệt duy nhất giữa các biến thể là \emph{ai gọi truy hồi} (mô hình tự
+gọi ở V1, đồ thị gọi thẳng ở V2--V4), không phải bốn biến thể đang truy hồi bốn thứ khác nhau.
+
 \begin{table}[h]
   \centering
-  \caption{Thiết lập truy hồi. Cùng ngữ liệu MedMCQA cho V1--V4, nhưng V1 dùng embedder khác V2--V4
-  kể từ đợt A/B gần nhất (\S\ref{sec:rag}).}
+  \caption{Cấu hình truy hồi, dùng chung cho V1--V4.}
   \label{tab:retrieval}
-  \begin{tabular}{@{}p{0.30\textwidth}p{0.31\textwidth}p{0.31\textwidth}@{}}
+  \begin{tabular}{@{}p{0.30\textwidth}p{0.62\textwidth}@{}}
     \toprule
-    Thiết lập & V1 & V2--V4 \\
+    Thiết lập & Giá trị (V1--V4) \\
     \midrule
-    Ngữ liệu & \multicolumn{2}{l}{MedMCQA: 182{,}822 câu thi đã giải} \\
-    Collection & \texttt{knowledge\_medmcqa\_qwen3} & \texttt{knowledge\_medmcqa\_nomic} \\
-    Kho vector & \multicolumn{2}{l}{Chroma, cosine / HNSW, lưu trữ bền} \\
-    Embedder & qwen3-embedding:4b (32K token) & nomic-embed-text (8192 token) \\
-    Cái được nhúng & \multicolumn{2}{l}{chỉ phần câu hỏi (đáp án/giải thích/chủ đề là metadata)} \\
-    Top-$k$ & \multicolumn{2}{l}{5, không cổng (\texttt{threshold=0.0})} \\
-    Cổng độ tương đồng & \multicolumn{2}{l}{không dùng ở bất kỳ đâu trong hệ thống hiện tại} \\
+    Ngữ liệu & MedMCQA: 182{,}822 câu thi đã giải \\
+    Collection & \texttt{knowledge\_medmcqa\_qwen3} \\
+    Kho vector & Chroma, cosine / HNSW, lưu trữ bền \\
+    Embedder & \texttt{qwen3-embedding:4b} (Ollama, ngữ cảnh 32K token) \\
+    Cái được nhúng & chỉ phần câu hỏi (đáp án/giải thích/chủ đề là metadata) \\
+    Top-$k$ & 5, không cổng (\texttt{threshold=0.0}) \\
+    Cổng độ tương đồng & không dùng ở bất kỳ đâu trong hệ thống hiện tại \\
+    Cách gọi truy hồi & V1: \texttt{rag-agent} tự quyết định gọi \texttt{search\_medmcqa} (tối đa 2
+    lần, \texttt{tool=True}). V2--V4: Node~2 do đồ thị gọi thẳng, không do mô hình quyết định
+    (\texttt{tool=False}). \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Cả hai embedder được chọn vì có ngữ cảnh dài: Query encoder của các embedder bất đối xứng thường gặp
-(vd.\ MedCPT) cắt truy vấn ở khoảng \textbf{64 token}, quá ngắn cho một tình huống USMLE mà câu hỏi
-thực nằm ở cuối, trong khi nomic (8192 token) và qwen3-embedding (32K token) đều nhúng trọn cả tình
-huống. Thiết kế trước dùng một cổng độ tương đồng bằng số, hiệu chỉnh riêng theo embedder; cổng số đó
-nay không còn ở bất kỳ đường truy hồi nào trong hệ thống: việc quyết định có tin bằng chứng hay không
-chuyển hẳn sang bước chốt đáp án, dựa trên nhãn tin cậy HIGH/MEDIUM/LOW mà chính mô hình tự chấm
-(\S\ref{sec:rag}) - một cổng số học phía trên nhãn tự chấm đó là dư thừa. Bộ kiểm chứng của V3 không
-có công cụ tra cứu riêng (\S\ref{sec:verifier}), nên bảng trên là toàn bộ cấu hình truy hồi trong hệ
-thống.
+Hệ thống chọn \texttt{qwen3-embedding:4b} vì ngữ cảnh 32K token của nó đủ dài để nhúng trọn một tình
+huống USMLE, kể cả những câu dài. Các embedder bất đối xứng hay dùng trong y khoa (như MedCPT) có
+Query encoder chỉ nhận khoảng 64 token, cắt mất đúng đoạn cuối câu - nơi câu hỏi thật sự nằm - nên
+không phù hợp cho dạng đề này. Thiết kế trước đó còn có thêm một cổng độ tương đồng bằng số (ngưỡng
+cosine, phải hiệu chỉnh lại mỗi khi đổi embedder); cổng đó nay đã bỏ hẳn, không còn ở bất kỳ đường
+truy hồi nào trong hệ thống. Việc có tin bằng chứng hay không chuyển sang bước chốt đáp án, dựa trên
+nhãn tin cậy HIGH/MEDIUM/LOW mà chính mô hình tự chấm (\S\ref{sec:rag}) - một cổng số đặt phía trên
+nhãn tự chấm đó là thừa. Bộ kiểm chứng của V3 cũng không bật công cụ tra cứu riêng
+(\texttt{verify\_rag=None} trong preset hiện tại, dù đồ thị có sẵn một công cụ
+\texttt{search\_textbooks} độc lập để dùng sau này nếu cần, \S\ref{sec:verifier}), nên bảng trên là
+toàn bộ cấu hình truy hồi thực tế của hệ thống.
 
 \subsection{Phần cứng / thiết lập API}
 \begin{itemize}[nosep]
@@ -591,11 +625,29 @@ thống.
   không phải mục tiêu bị dừng trước một lần chạy đo giờ để tránh tranh chấp GPU.
   \item \textbf{Dữ liệu:} \texttt{openlifescienceai/medqa} (train 10{,}178 / validation 1{,}272 /
   \textbf{test 1{,}273}), lưu cache cục bộ và nạp không cần mạng.
+  \item \textbf{Công cụ chạy chính thức:} \texttt{agent\_hospital.predict} chạy một biến thể trên một
+  split và ghi từng câu vào \texttt{<variant>\_<split>\_<model>.jsonl} (đáp án, đúng/sai, hợp lệ, độ
+  trễ, token vào/ra, giải thích) kèm một tệp \texttt{.meta.json} (mô hình, nhiệt độ, số câu, thời điểm
+  bắt đầu/kết thúc) - đúng yêu cầu tệp dự đoán và cấu hình tái lập của đề bài. Chạy lại cùng biến
+  thể/split/mô hình sẽ \emph{tiếp tục} từ câu dở dang thay vì chạy lại từ đầu (\texttt{--overwrite} để
+  bỏ qua), vì một lượt test đầy đủ ($n{=}1273$) trên mô hình 7B cục bộ có thể mất hàng giờ.
+  \texttt{agent\_hospital.evaluate} đọc mọi tệp \texttt{.jsonl} trong một thư mục và tính bảng
+  leaderboard (độ chính xác, KTC bootstrap, tỷ lệ không hợp lệ, độ trễ/token trung bình) cùng bảng so
+  sánh ghép cặp (mức tăng, Thắng/Thua/Hòa, McNemar) so với một biến thể nền - đây là công cụ tạo ra các
+  bảng ở \S\ref{sec:results}.
 \end{itemize}
 
-\paragraph{Tái lập một lần chạy.}
+\paragraph{Tái lập một lần chạy.} Chạy nhanh, có log từng câu, không ghi tệp dự đoán:
 \begin{lstlisting}
 HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 150
+\end{lstlisting}
+Chạy chính thức trên toàn bộ test, ghi tệp dự đoán + tệp cấu hình, tiếp tục được nếu bị ngắt giữa
+chừng:
+\begin{lstlisting}
+HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital.predict \
+  -v V0 -s test -m qwen2.5:7b
+HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital.evaluate \
+  --dir data/eval_runs --baseline V0
 \end{lstlisting}
 
 % =====================================================================
