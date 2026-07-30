@@ -111,43 +111,51 @@ nhau chỉ khác đúng một thành phần, mọi chênh lệch về độ chí
 bootstrap, tỷ lệ phản hồi không hợp lệ, phân tích Thắng/Thua/Hòa, và kiểm định ghép cặp McNemar), giúp
 phép so sánh trung thực. Phát hiện thực nghiệm cốt lõi của Nhóm là: trên MedQA \textbf{riêng truy
 hồi (retrieval) không giúp ích} (V1 $\le$ V0), trong khi \textbf{lập luận đa tác tử mới là bước cải
-thiện thực sự đầu tiên} (kết quả định lượng đang được đo lại trên test đầy đủ). Nhóm trình bày kết
-quả đo hiện tại, ghi lại đầy đủ kiến trúc, prompt và cấu hình truy hồi để tái lập được, đồng thời liệt
-kê các phần việc còn lại để đạt tới đánh giá chính thức đầy đủ.
+thiện thực sự đầu tiên} (có bằng chứng ở quy mô nhỏ; phép đo trên test đầy đủ chưa thực hiện). Nhóm
+trình bày kết quả đo hiện tại, ghi lại đầy đủ kiến trúc, prompt và cấu hình truy hồi để tái lập được,
+đồng thời liệt kê các phần việc còn lại để đạt tới đánh giá chính thức đầy đủ.
 \end{abstract}
 \bigskip
 
 % =====================================================================
 \section{Giới thiệu}
 % =====================================================================
-Các mô hình ngôn ngữ lớn (LLM) trả lời đúng nhiều câu hỏi thi y khoa ngay từ đầu, nhưng chúng cũng đưa
-ra những câu trả lời sai một cách rất tự tin (nghe thuyết phục nhưng sai), và không dễ thấy
-\emph{thành phần kiến trúc nào} thực sự làm giảm những lỗi đó. Dự án này đặt một câu hỏi về thiết kế
-chứ không phải triển khai lâm sàng: bắt đầu từ một LLM thuần, những thành phần nào giúp cải thiện đo
-lường được độ chính xác thực tế trên MedQA-USMLE, và cải thiện bao nhiêu? Cụ thể là ba thành phần: truy
-hồi tri thức (RAG), phối hợp nhiều tác tử (multi-agent), và một bước kiểm chứng (verifier).
+Các mô hình ngôn ngữ lớn (LLM) trả lời đúng nhiều câu hỏi thi y khoa ngay từ đầu, nhưng cũng đưa ra
+những câu trả lời sai một cách rất tự tin, và không dễ thấy \emph{thành phần kiến trúc nào} thực sự làm
+giảm những lỗi đó. MedAgents~\cite{tang2024medagents} cung cấp bằng chứng ban đầu rằng phối hợp đa tác tử
+theo dạng hội đồng chuyên gia -- các tác tử độc lập đề xuất phân tích, sau đó đi đến đồng thuận -- cải
+thiện lập luận y khoa zero-shot trên MedQA-USMLE; nhưng hệ thống đó gộp đồng thời nhiều thành phần (truy
+hồi, hội đồng, nhiều vòng thảo luận), khiến khó tách biệt đóng góp riêng của từng yếu tố. Nghiên cứu này đặt
+câu hỏi thiết kế: \emph{bắt đầu từ một LLM thuần, mỗi thành phần -- truy hồi tri thức (RAG), phối hợp
+đa tác tử (multi-agent), và bước kiểm chứng (verifier) -- đóng góp bao nhiêu vào độ chính xác thực tế
+trên MedQA-USMLE?}
 
 \paragraph{Bài toán.} Đầu vào là một câu hỏi trắc nghiệm MedQA-USMLE~\cite{jin2021medqa} (một tình huống lâm sàng kèm bốn
 lựa chọn A--D). Đầu ra bắt buộc là \emph{đúng một} lựa chọn cuối cùng cộng với một giải thích ngắn
 ($\le 30$ từ).
 
-\paragraph{Cách tiếp cận.} Nhóm không viết tay năm hệ thống riêng biệt. Thay vào đó, mỗi biến thể
-là \emph{cùng một} bộ khung LangGraph, chỉ bật/tắt các nút (node) khác nhau theo một cấu hình định sẵn
-tương ứng. Cách này giúp so sánh mang tính nhân quả: giữa V0 và V1 chỉ khác các nút truy hồi, giữa V2
-và V3 chỉ khác cụm hội chẩn / bác sĩ chính / kiểm chứng. Và vì chỉ một bộ đo chấm cả năm biến thể theo
-cùng một cách, mọi chênh lệch điểm số đều so sánh được trực tiếp.
+\paragraph{Cách tiếp cận.} Nhóm không thực hiện tách rời năm hệ thống riêng biệt. Thay vào đó, mỗi biến thể
+là \emph{cùng một} bộ khung LangGraph~\cite{langgraph2024}, chỉ bật/tắt các nút (node) khác nhau theo
+một cấu hình định sẵn. Kiến trúc hội đồng của V2--V4 bám theo MedAgents -- các chuyên gia nêu phân tích
+độc lập, một bác sĩ chính tổng hợp và chốt đáp án -- nhưng ở đây mỗi bước chỉ bổ sung \emph{đúng một}
+thành phần so với bước trước: V0$\to$V1 thêm truy hồi agentic, V1$\to$V2 thêm hội đồng đa tác tử,
+V3$\leftrightarrow$V4 bật/tắt bộ kiểm chứng. Vì một bộ đo duy nhất chấm cả năm biến thể theo cùng một
+bộ đánh giá, mọi chênh lệch điểm số đều so sánh được trực tiếp.
 
-\paragraph{Đóng góp.}
+\paragraph{Đóng góp của nhóm nghiên cứu.}
 \begin{enumerate}[nosep]
-  \item Một kiến trúc đa tác tử điều khiển bằng cấu hình (V0--V4), trong đó mỗi bậc thang khác bậc kế
-  tiếp đúng một thành phần (Mục~\ref{sec:arch}--\ref{sec:design}).
+  \item Một kiến trúc đa tác tử điều khiển bằng cấu hình (V0--V4), lấy cảm hứng từ
+  MedAgents~\cite{tang2024medagents}, trong đó mỗi cải tiến khác phiên bản trước đó đúng một thành phần
+  (Mục~\ref{sec:arch}--\ref{sec:design}).
   \item Một quy trình đánh giá ghép cặp, tái lập được, có kiểm định ý nghĩa thống kê
   (Mục~\ref{sec:setup}--\ref{sec:results}).
-  \item Kết quả thực nghiệm cho thấy trên MedQA, \emph{cấu trúc lập luận}, chứ không phải
-  \emph{truy hồi}, mới là đòn bẩy làm thay đổi độ chính xác (Mục~\ref{sec:results}--\ref{sec:discussion}).
+  \item Kết quả thực nghiệm cho thấy trên MedQA, \emph{cấu trúc lập luận đa tác tử}, chứ không phải
+  \emph{truy hồi}, mới là yếu tố làm thay đổi độ chính xác -- nhất quán với lý giải của MedAgents
+  nhưng lần đầu được tách biệt qua thiết kế ablation có kiểm soát
+  (Mục~\ref{sec:results}--\ref{sec:discussion}).
 \end{enumerate}
 
-\paragraph{Trạng thái đo lường (đọc phần này trước).} Kiến trúc (V0--V4) đã được xây dựng đầy đủ và kiểm
+\paragraph{Trạng thái đo lường.} Kiến trúc (V0--V4) đã được xây dựng đầy đủ và kiểm
 tra chạy được đầu-cuối, nhưng đã trải qua một đợt tái thiết kế sau lần đo gần nhất: V2--V4 đổi từ thiết
 kế hội đồng nhiều chuyên gia sang thiết kế bốn nút hiện tại (\S\ref{sec:design}), và V1--V4 nay dùng
 chung một luật quyết định mới thêm vào --- \emph{tin cậy bất đối xứng}. Vì vậy các số đo V1/V2 ở
