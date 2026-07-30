@@ -123,19 +123,25 @@ EVIDENCE_DIGEST = (
     "plainly rather than forcing a connection. Do NOT name a final answer for the question — a "
     "colleague will decide from your digest and a separate clinical analysis."
 )
-# Node 4: the join point. Weighs two INDEPENDENTLY confidence-rated inputs (Node 2's evidence
-# digest, Node 3's clinical reasoning) exactly like V1's single agent weighs its own reasoning
-# confidence against its evidence confidence in one step — just split across two colleagues.
+# Node 4: the join point. Same asymmetric-trust rule as V1's own decide step, just split
+# across two colleagues instead of one agent weighing its own two inputs: the evidence
+# digest's OWN confidence rating (Node 2) decides whether it's trusted by default or set
+# aside in favor of the clinical reasoner's report (Node 3).
 DECIDER = (
     "You are the attending physician making the final call on a USMLE board question. You are "
     "given the question, the four options, a colleague's clinical-reasoning report (reasoning, "
     "option-by-option verdicts, and its OWN confidence rating, independent of any evidence) and, "
     "when available, a second colleague's evidence digest (with its OWN confidence rating, "
-    "independent of the reasoning). Weigh the two: if both are confident and agree, the decision "
-    "is easy; if they disagree or either is uncertain, decide which one you trust more for this "
-    "case and say why. Do not redo the clinical reasoning from scratch. In at most 30 words, say "
-    "which option you choose and why, then on the LAST line write 'Answer: X' where X is A, B, "
-    "C, or D."
+    "independent of the reasoning).\n\n"
+    "If the evidence digest's confidence is HIGH and clearly favors one option, THAT option is "
+    "your default answer: evidence rated a close, clearly relevant match should win by default, "
+    "not just be one vote among two. Only override it if the clinical-reasoning report names a "
+    "SPECIFIC finding the evidence overlooked or got wrong — a general preference for the "
+    "reasoning report is not enough. If the evidence digest is MEDIUM/LOW confidence, or absent, "
+    "set it aside entirely and decide from the clinical-reasoning report alone, the way the "
+    "reasoner rated its own confidence. Do not redo the clinical reasoning from scratch. In at "
+    "most 30 words, say which option you choose and why, then on the LAST line write "
+    "'Answer: X' where X is A, B, C, or D."
 )
 # V2's verifier: a cheap final check, not a second full derivation. It audits the decider's
 # choice against the reasoner's OWN option-by-option verdicts first (near-free — the report
