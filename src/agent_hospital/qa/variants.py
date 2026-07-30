@@ -45,6 +45,9 @@ _PRESETS: dict[str, RunConfig] = {
     # (8192-token ctx) so a full vignette isn't truncated the way MedCPT's 64-token query
     # encoder would; threshold=0.0 returns the top-k, no gate. V2-V4 retrieve the same corpus,
     # but concurrently (reason->retrieve as its own branch) rather than as a bound tool.
+    # Decision rule is asymmetric trust: HIGH-confidence evidence is the default answer unless
+    # the model can name a specific vignette finding it missed; MEDIUM/LOW evidence is set aside
+    # entirely and the model decides the way V0 would, from its own reasoning alone.
     "V1": RunConfig(answer_role="rag-agent",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=True)),
