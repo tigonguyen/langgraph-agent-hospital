@@ -111,10 +111,12 @@ LangGraph, nhưng bật/tắt vài thành phần theo một cấu hình định 
 nhau chỉ khác đúng một thành phần, mọi chênh lệch về độ chính xác đều quy thẳng được về thành phần đó. Tất cả biến thể dùng chung một giao diện thống nhất và một bộ đo (độ chính xác kèm khoảng tin cậy
 bootstrap, tỷ lệ phản hồi không hợp lệ, phân tích Thắng/Thua/Hòa, và kiểm định ghép cặp McNemar), giúp
 phép so sánh trung thực. Phát hiện thực nghiệm cốt lõi của Nhóm là: trên MedQA \textbf{riêng truy
-hồi (retrieval) không giúp ích} (V1 $\le$ V0), trong khi \textbf{lập luận đa tác tử mới là bước cải
-thiện thực sự đầu tiên} (có bằng chứng ở quy mô nhỏ; phép đo trên test đầy đủ chưa thực hiện). Nhóm
-trình bày kết quả đo hiện tại, ghi lại đầy đủ kiến trúc, prompt và cấu hình truy hồi để tái lập được,
-đồng thời liệt kê các phần việc còn lại để đạt tới đánh giá chính thức đầy đủ.
+hồi (retrieval) không giúp ích} (V1: $-1.7$ điểm so với V0, không có ý nghĩa thống kê), trong khi
+\textbf{lập luận đa tác tử mới là bước cải thiện thực sự đầu tiên} (V2: $+5.3$ điểm, McNemar
+$p{=}0.044$) - đo trên 300 câu đầu của tập test; bộ kiểm chứng (V3) hiện chưa cho thấy cải thiện thêm
+so với V2 ở quy mô này. Nhóm trình bày kết quả đo hiện tại, ghi lại đầy đủ kiến trúc, prompt và cấu
+hình truy hồi để tái lập được, đồng thời liệt kê các phần việc còn lại để đạt tới đánh giá chính thức
+đầy đủ trên toàn bộ 1273 câu.
 \end{abstract}
 \bigskip
 
@@ -159,14 +161,12 @@ chênh lệch điểm số đều so sánh được trực tiếp.
   (Mục~\ref{sec:results}--\ref{sec:discussion}).
 \end{enumerate}
 
-\paragraph{Trạng thái đo lường.} Kiến trúc (V0--V4) đã được xây dựng đầy đủ và kiểm
-tra chạy được đầu-cuối, nhưng đã trải qua một đợt tái thiết kế sau lần đo gần nhất: V2--V4 đổi từ thiết
-kế hội đồng nhiều chuyên gia sang thiết kế bốn nút hiện tại (\S\ref{sec:design}), và V1--V4 nay dùng
-chung một luật quyết định mới thêm vào - \emph{tin cậy bất đối xứng}. Vì vậy các số đo V1/V2 ở
-\S\ref{sec:results} mô tả thiết kế trước đó, không phải kiến trúc hiện tại, và cần đo lại; chỉ V0
-(không dùng truy hồi hay tác tử thứ hai, nên không bị đợt tái thiết kế này ảnh hưởng) còn giữ nguyên
-giá trị tham chiếu. Mỗi khoảng trống như vậy đều được đánh dấu \todo{} để người đọc biết chính xác điều
-gì đã đo và điều gì mới là dự kiến.
+\paragraph{Trạng thái đo lường.} Kiến trúc (V0--V4) đã được xây dựng đầy đủ và kiểm tra chạy được
+đầu-cuối. Báo cáo này đo V0--V3 trên kiến trúc \emph{hiện tại} (thiết kế bốn nút + luật tin cậy bất
+đối xứng, \S\ref{sec:design}) ở $n{=}300$/1273 câu test (\S\ref{sec:results}): V2 là cải thiện có ý
+nghĩa thống kê đầu tiên so với V0 ($p{=}0.044$); V1 (retrieval) và V3 (+ bộ kiểm chứng) chưa cho thấy
+khác biệt có ý nghĩa so với V0. V4 chưa được đo. Mỗi khoảng trống còn lại (đo ở $n{=}1273$, đo V4) đều
+được đánh dấu \todo{} để người đọc biết chính xác điều gì đã đo và điều gì mới là dự kiến.
 
 % =====================================================================
 \FloatBarrier
@@ -603,131 +603,161 @@ HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 150
 \section{Kết quả đánh giá}
 \label{sec:results}
 % =====================================================================
-Chỉ số chính là độ chính xác, $\text{Độ chính xác} = (\text{số dự đoán đúng}) / (\text{số câu hỏi})$;
-với đánh giá chính thức, mẫu số là toàn bộ tập test, $1273$. Nhóm báo cáo thêm tỷ lệ phản hồi không
-hợp lệ, mức tăng độ chính xác $\text{Acc}(V3)-\text{Acc}(V0)$, Thắng/Thua/Hòa so với baseline, khoảng tin
-cậy bootstrap 95\%, kiểm định ghép cặp McNemar, và độ trễ.
+Chỉ số chính là độ chính xác, $\text{Độ chính xác} = (\text{số dự đoán đúng}) / (\text{số câu hỏi})$.
+Nhóm báo cáo thêm tỷ lệ phản hồi không hợp lệ, mức tăng độ chính xác so với V0, Thắng/Thua/Hòa so với
+baseline, khoảng tin cậy bootstrap 95\%, kiểm định ghép cặp McNemar, độ trễ và số token.
 
-\paragraph{Trạng thái đo lường.} Mục này chỉ báo cáo \textbf{lần chạy chính thức trên toàn bộ tập test}
-($n{=}1273$, qwen2.5:7b, nhiệt độ~0). Các số ở quy mô nhỏ trước đây (n=80, 14b) đã được gỡ bỏ để tránh
-nhầm lẫn. Hiện mới có V0; V1--V4 đang chạy trên cùng tập câu, nên các chỉ số ghép cặp (mức tăng,
-Thắng/Thua/Hòa, McNemar) sẽ được điền khi đủ dữ liệu.
+\paragraph{Trạng thái đo lường.} Mục này báo cáo một lần chạy trên \textbf{300 câu đầu của tập test}
+($n{=}300$/1273, qwen2.5:7b, nhiệt độ~0) cho cả bốn biến thể V0--V3, trên kiến trúc \emph{hiện tại}
+(thiết kế bốn nút + luật tin cậy bất đối xứng, \S\ref{sec:variants}) và ngữ liệu truy hồi hiện tại
+(qwen3-embedding:4b cho V1--V3, \S\ref{sec:rag}) - không phải thiết kế hội đồng cũ mà các số liệu
+trước đây trong báo cáo mô tả. V4 chưa được đo. \todo{Chạy trên toàn bộ $n{=}1273$ để có số liệu chính
+thức; $n{=}300$ ở đây đã đủ lớn để McNemar có ý nghĩa cho V2 và V2 vs V1, nhưng V3 vs V0 và V3 vs V2
+vẫn chưa đạt ngưỡng có ý nghĩa thống kê (xem dưới).}
 
-\subsection{Bảng chính (main board): test đầy đủ ($n{=}1273$, qwen2.5:7b)}
-Lần chạy chính thức trên \emph{toàn bộ} tập test dùng \textbf{qwen2.5:7b} (nhẹ hơn 14b để chạy hết 1273
-câu). Hiện mới có V0; các biến thể còn lại đang được chạy trên cùng tập câu để tính các chỉ số ghép cặp.
+\subsection{Bảng chính (main board): 300 câu đầu của tập test, qwen2.5:7b}
 \begin{table}[h]
   \centering
-  \caption{Kết quả chính thức: MedQA test đầy đủ, qwen2.5:7b, nhiệt độ~0, $n{=}1273$.}
+  \caption{Kết quả trên 300 câu đầu của tập test, qwen2.5:7b, nhiệt độ~0.}
   \label{tab:official}
-  \begin{tabular}{lccccc}
+  \small
+  \begin{tabular}{@{}p{0.2\textwidth}cccrr@{}}
     \toprule
     Biến thể & Độ chính xác & KTC bootstrap 95\% & Không hợp lệ & Độ trễ/câu & Token/câu \\
     \midrule
-    V0: LLM trực tiếp & \textbf{0.615} (783/1273) & [0.588, 0.641] & 0.0\% & 0.97\,s & 329 \\
-    V1: RAG-only (agentic) & 0.573 (730/1273) & [0.546, 0.602] & 3.85\% & 3.98\,s & 1668 \\
-    V2: Hội đồng + kiểm chứng (agentic) & 0.608 (774/1273) & [0.581, 0.634] & 0.0\% & 23.84\,s & 5304 \\
-    V3--V4            & \multicolumn{5}{c}{\todo{đang chạy trên test đầy đủ, qwen2.5:7b}} \\
+    V0: LLM trực tiếp & 0.613 (184/300) & [0.557, 0.670] & 0.0\% & 1.71\,s & 489 \\
+    V1: RAG-only (agentic) & 0.597 (179/300) & [0.540, 0.650] & 0.0\% & 4.64\,s & 2880 \\
+    V2: Đa tác tử (4 nút) & \textbf{0.667} (200/300) & [0.613, 0.717] & 0.0\% & 19.13\,s & 4371 \\
+    V3: V2 + bộ kiểm chứng & 0.650 (195/300) & [0.597, 0.703] & 0.0\% & 22.31\,s & 5905 \\
     \bottomrule
   \end{tabular}
 \end{table}
-Token/câu (đầu vào + đầu ra) là thước đo chi phí cho mô hình cục bộ. V1 \textbf{thấp hơn V0}
-($-4.2$ điểm), tốn gấp $\sim 5$ lần token và $\sim 4$ lần độ trễ, và có tỷ lệ phản hồi không hợp lệ
-cao hơn hẳn (3.85\% so với 0\%) - vòng lặp gọi công cụ đôi khi không hội tụ về một chữ cái. V2 \textbf{gần
-bằng V0} ($-0.7$ điểm, khoảng tin cậy chồng lấn phần lớn), tỷ lệ không hợp lệ trở về 0\% (hội đồng + bộ kiểm
-chứng loại bỏ được vấn đề không hội tụ của V1), nhưng chi phí rất cao: $\sim$25 lần độ trễ và $\sim$16 lần
-token so với V0. Kết quả này nhất quán với mọi lần đo trước đó trong dự án: retrieval không giúp ích trên
-MedQA ở mô hình này; cấu trúc đa tác tử (V2) phục hồi phần lớn khoảng cách của V1 nhưng chưa vượt qua V0.
-\todo{Bản ghi từng câu của V0 (dùng để chấm điểm) đã mất do dọn dẹp thư mục tạm giữa chừng; số của V0
-trên chỉ còn ở dạng tổng hợp (accuracy/KTC/độ trễ/token), nên Bảng~\ref{tab:paired} (so sánh ghép cặp,
-Thắng/Thua/Hòa, McNemar) cho V1/V2 vs V0 hiện chưa tính được - cần chạy lại V0 để có bản ghi ghép cặp
-nếu muốn số liệu đó.}
+Tỷ lệ không hợp lệ là \textbf{0.0\% ở cả bốn biến thể} - khác hẳn thiết kế trước, nơi V1 (agentic, thiết
+kế cũ) có 3.85\% không hợp lệ vì vòng lặp gọi công cụ đôi khi không hội tụ về một chữ cái; luật quyết
+định hiện tại (tin cậy bất đối xứng, không bắt buộc chỉ trả lời một chữ cái) giải quyết hẳn vấn đề đó.
+V1 \textbf{thấp hơn V0} ($-1.7$ điểm, khoảng tin cậy chồng lấn gần như toàn bộ - xem McNemar dưới), nhất
+quán với mọi lần đo retrieval-only trong dự án. V2 \textbf{cao nhất} ($+5.3$ điểm so với V0), và V3
+($+3.7$ điểm) đứng giữa V0 và V2 - thấp hơn V2 một chút chứ không cao hơn.
 
-\subsection{So sánh với baseline và khảo sát ablation (so sánh ghép cặp)}
+\subsection{So sánh với baseline (so sánh ghép cặp)}
 \begin{table}[h]
   \centering
-  \caption{So sánh ghép cặp trên test đầy đủ ($n{=}1273$, qwen2.5:7b). Tính từ bản ghi từng câu của V0 và mỗi biến thể.}
+  \caption{So sánh ghép cặp trên 300 câu đầu của tập test, qwen2.5:7b. Tính trực tiếp từ bản ghi từng câu.}
   \label{tab:paired}
-  \begin{tabular}{lccc}
+  \small
+  \begin{tabular}{@{}p{0.3\textwidth}cc c@{}}
     \toprule
-    Cặp so sánh & Mức tăng độ chính xác & Thắng/Thua/Hòa & McNemar $p$ \\
+    Cặp so sánh & Mức tăng & T/T/H & McNemar $p$ \\
     \midrule
-    V1 vs V0 (chỉ độ chính xác) & $-4.2$ điểm & \multicolumn{2}{c}{\todo{cần bản ghi ghép cặp của V0 (xem trên)}} \\
-    V2 vs V0 (chỉ độ chính xác) & $-0.7$ điểm & \multicolumn{2}{c}{\todo{cần bản ghi ghép cặp của V0 (xem trên)}} \\
-    V3 vs V0 (mức tăng $\text{Acc}(V3)-\text{Acc}(V0)$) & \multicolumn{3}{c}{\todo{đang chạy}} \\
-    V3 vs V4 (hiệu ứng kiểm chứng) & \multicolumn{3}{c}{\todo{đang chạy}} \\
+    V1 vs V0 & $-1.7$ điểm & 29/34/237 & $0.615$ (không ý nghĩa) \\
+    \textbf{V2 vs V0} & $\mathbf{+5.3}$ \textbf{điểm} & \textbf{36/20/244} & $\mathbf{0.044}$ \textbf{(có ý nghĩa)} \\
+    V3 vs V0 & $+3.7$ điểm & 34/23/243 & $0.185$ (không ý nghĩa) \\
+    V3 vs V2 (hiệu ứng kiểm chứng) & $-1.7$ điểm & 3/8/289 & $0.227$ (không ý nghĩa) \\
+    V2 vs V1 (đa tác tử so với truy hồi) & $+7.0$ điểm & 48/27/225 & $0.020$ (có ý nghĩa) \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \subsection{Phân tích Thắng/Thua/Hòa}
 Cột T/T/H đếm theo từng câu: biến thể sửa được lỗi của baseline (thắng), làm hỏng một câu baseline vốn
-đúng (thua), hay trùng khớp (hòa) - đây là đầu vào cho kiểm định McNemar ở Bảng~\ref{tab:paired}.
-\todo{V1/V2 vs V0 chưa tính được: bản ghi từng câu của V0 đã mất (xem ghi chú ở Bảng~\ref{tab:official}).
-Điền phần còn lại từ bản ghi test đầy đủ khi V3--V4 chạy xong.}
+đúng (thua), hay trùng khớp (hòa). \textbf{V2 vs V0}: 36 thắng so với 20 thua - V2 sửa được gần gấp đôi
+số câu nó làm hỏng, và với 56 câu bất đồng (discordant), McNemar cho $p{=}0.044$: đây là cải thiện có ý
+nghĩa thống kê đầu tiên trong toàn bộ khảo sát. \textbf{V1 vs V0}: 29/34, gần như cân bằng - truy hồi
+sửa một số câu nhưng làm hỏng nhiều hơn, ròng lại là một khoản lỗ nhỏ không đáng kể. \textbf{V3 vs V2}:
+chỉ 11 câu bất đồng trên 300 (3 thắng, 8 thua cho V3) - bộ kiểm chứng hiếm khi đổi đáp án của Node~4, và
+khi đổi thì đổi sai nhiều hơn đổi đúng, dù mẫu quá nhỏ để kết luận chắc chắn ($p{=}0.227$). \textbf{Chưa
+có bằng chứng ở quy mô này rằng bộ kiểm chứng cải thiện độ chính xác} - đây là phát hiện ngược với kỳ
+vọng ban đầu của Nhóm, và được báo cáo trung thực thay vì diễn giải có lợi cho thiết kế.
 
 \subsection{Chi phí và độ trễ}
 Chi phí đo bằng \emph{độ trễ} và \emph{số token} (đầu vào + đầu ra) cho mô hình cục bộ (không có phí API).
-V0 trên test đầy đủ: \textbf{0.97\,s/câu}, \textbf{329 token/câu}, tỷ lệ phản hồi không hợp lệ \textbf{0\%}.
-V1 (agentic): \textbf{3.98\,s/câu} ($\sim$4$\times$ V0), \textbf{1668 token/câu} ($\sim$5$\times$ V0), không
-hợp lệ \textbf{3.85\%} - vòng lặp gọi công cụ (tìm rồi trả lời) sinh nhiều token hơn hẳn một lượt trả
-lời trực tiếp, và thỉnh thoảng không hội tụ về một chữ cái. V2 (hội đồng 3 chuyên gia + bác sĩ chính + bộ
-kiểm chứng, agentic): \textbf{23.84\,s/câu} ($\sim$25$\times$ V0), \textbf{5304 token/câu} ($\sim$16$\times$
-V0), không hợp lệ \textbf{0\%} - nhiều tác tử tuần tự (không chạy song song) mỗi tác tử có thể gọi công
-cụ, nên chi phí cộng dồn nhanh; xem \S\ref{sec:design} về khả năng chạy song song 3 chuyên gia để giảm độ
-trễ. \todo{Bổ sung độ trễ và token của V3--V4 khi chạy xong; V3 (giống V2 nhưng thêm bộ nhớ ngắn hạn) kỳ
-vọng cao hơn 23.84\,s/câu của V2; V4 dùng thiết kế truy hồi cũ (graph-invoked), chưa đo lại ở qwen2.5:7b.}
+V0: \textbf{1.71\,s/câu}, \textbf{489 token/câu}. V1 (agentic, qwen3-embedding:4b): \textbf{4.64\,s/câu}
+($\sim$3$\times$ V0), \textbf{2880 token/câu} ($\sim$6$\times$ V0) - vòng lặp gọi công cụ (tìm rồi trả
+lời) sinh nhiều token hơn một lượt trả lời trực tiếp, nhưng nhanh hơn hẳn thiết kế cũ (trước đây 3.98\,s
+với nomic-embed-text ở phiên bản panel). V2 (4 nút: hiểu ca bệnh + tìm kiếm + lập luận + quyết định):
+\textbf{19.13\,s/câu} ($\sim$11$\times$ V0), \textbf{4371 token/câu} ($\sim$9$\times$ V0) - bốn tác tử
+tuần tự (Node~2 và Node~3 chạy đồng thời nhưng Node~1 và Node~4 vẫn tuần tự), nên chi phí cộng dồn theo
+số lượt gọi LLM. V3 (V2 + bộ kiểm chứng): \textbf{22.31\,s/câu} ($\sim$3.2\,s hơn V2, đúng bằng chi phí
+một lượt gọi LLM thêm của Node~5), \textbf{5905 token/câu}. Vì bộ kiểm chứng không cho thấy cải thiện độ
+chính xác đáng kể ở quy mô này (\S5.2), chi phí thêm $\sim$17\% độ trễ và $\sim$35\% token của V3 so với
+V2 hiện chưa được biện minh bằng bằng chứng - một điểm cần theo dõi khi đo ở quy mô lớn hơn.
+\todo{Chạy V4 (V2 không có Node~5, cùng cấu hình) để đối chiếu trực tiếp với V3; hiện V4 chưa được đo.
+Chạy lại toàn bộ ở $n{=}1273$ khi có thời gian, đặc biệt để xác nhận hoặc bác bỏ ý nghĩa thống kê của
+V3 vs V0 và V3 vs V2, cả hai hiện đang ở ranh giới ($p{=}0.185$ và $p{=}0.227$).}
 
 % =====================================================================
 \FloatBarrier
 \section{Phân tích lỗi}
 \label{sec:error}
 % =====================================================================
-\todo{Mục này cần tệp dự đoán từng câu (\S9) để hoàn thiện; dưới đây là mô tả định tính hiện
-tại từ các lần chạy ghép cặp.}
+Mục này dùng tệp dự đoán từng câu của V0--V3 (\texttt{data/eval\_runs/*.jsonl}, $n{=}300$, xem
+\S\ref{sec:results}) - không còn chỉ là mô tả định tính.
 
-Tỷ lệ không hợp lệ là 0.0\% trên mọi biến thể đã đo, nên mọi lỗi đều là chọn sai lựa chọn thực sự, không
+Tỷ lệ không hợp lệ là 0.0\% trên cả bốn biến thể, nên mọi lỗi đều là chọn sai lựa chọn thực sự, không
 phải lỗi trích xuất. Hai mẫu hình hiện rõ trong dữ liệu ghép cặp:
 \begin{itemize}[nosep]
-  \item \textbf{Câu trung tính với truy hồi.} Trên đa số câu, truy hồi hầu như không đổi đáp án,
-  nhất quán với việc MedQA chủ yếu đòi hỏi lập luận: mô hình vốn đã nắm dữ kiện, nên thêm dữ kiện không
-  đổi đáp án.
-  \item \textbf{Câu nhạy với lập luận.} Các câu mà V2 sửa được so với V1 là những câu mà việc cấu trúc
-  hoá phân tích (dấu hiệu $\rightarrow$ câu hỏi hỏi gì $\rightarrow$ từng lựa chọn) làm đổi quyết định,
-  dù bằng chứng truy hồi giống hệt. Điều này khu trú mức tăng vào khâu lập luận.
+  \item \textbf{Câu trung tính với truy hồi.} V1 vs V0: 29 thắng, 34 thua, 237 hòa (\S\ref{sec:results})
+  - trên đa số câu (79\%), truy hồi không đổi đáp án, nhất quán với việc MedQA chủ yếu đòi hỏi lập
+  luận chứ không phải tra cứu dữ kiện.
+  \item \textbf{Câu nhạy với cấu trúc lập luận.} V2 vs V1: 48 thắng, 27 thua (\S\ref{sec:results}) -
+  tách hiểu ca bệnh / tìm kiếm / lập luận / quyết định thành bốn nút làm đổi quyết định trên nhiều câu
+  hơn hẳn so với chênh lệch do riêng truy hồi gây ra, khu trú phần lớn mức tăng vào khâu cấu trúc lập
+  luận chứ không phải bằng chứng truy hồi (vẫn cùng một nguồn MedMCQA).
 \end{itemize}
 
 \begin{table}[h]
   \centering
-  \caption{Bảng phân tích lỗi (khung; sẽ điền từ tệp dự đoán).}
+  \caption{Phân tích lỗi với ví dụ thật từ tệp dự đoán $n{=}300$ (V0 vs V2).}
   \label{tab:error}
-  \begin{tabular}{lll}
+  \small
+  \begin{tabular}{@{}p{0.26\textwidth}p{0.11\textwidth}p{0.53\textwidth}@{}}
     \toprule
-    Loại lỗi & Mã câu ví dụ & Ghi chú \\
+    Loại lỗi & Mã câu & Ghi chú \\
     \midrule
-    Lỗi lập luận (tích hợp sai) & \todo{} & truy hồi đúng dữ kiện nhưng chọn sai lựa chọn \\
-    Bị phương án nhiễu đánh lừa & \todo{} & tự tin chọn một phương án hợp lý nhưng sai \\
-    Truy hồi trượt / bằng chứng lạc đề & \todo{} & cổng nhận một đoạn không phân biệt được \\
-    Thiếu tri thức & \todo{} & dữ kiện thực sự vắng ở cả mô hình lẫn ngữ liệu \\
+    V2 lập luận chi tiết nhưng chốt sai, trong khi V0 (một lượt) tình cờ đúng &
+    \texttt{test-00012} &
+    V0 chọn đúng (B); Node~3 của V2 xây một chuỗi lập luận cụ thể dẫn tới u xơ thần kinh loại 2, decider
+    theo lập luận đó và chọn D (sai). \\
+    Bị phương án nghe hợp lý nhưng sai đánh lừa &
+    \texttt{test-00013} &
+    V0 chọn đúng (D, sa van hai lá); V2 lập luận nghiêng về bệnh cơ tim phì đại tắc nghẽn (HOCM) và
+    chọn A (sai) - một chẩn đoán phân biệt hợp lý nhưng không khớp đặc điểm tiếng thổi trong đề bài. \\
+    V2 sửa đúng nhờ tri thức chuyên biệt hơn &
+    \texttt{test-00003} &
+    V0 chọn sai (B, nhiễm khuẩn vùng chậu); Node~3 của V2 xác định đúng đặc điểm vi khuẩn học (khuẩn lạc
+    hồng trên môi trường MacConkey) và chọn D (đúng). \\
+    V2 sửa đúng nhờ bám sát đúng câu hỏi được hỏi &
+    \texttt{test-00024} &
+    V0 chọn sai (B, tràn khí màng phổi áp lực); V2 nhận ra câu hỏi thực sự là bước xử trí tiếp theo chứ
+    không phải chẩn đoán, chọn A (đặt nội khí quản, đúng). \\
     \bottomrule
   \end{tabular}
 \end{table}
+\todo{Bảng trên mới liệt kê 4 ví dụ minh hoạ, chưa phải phân loại lỗi có hệ thống trên toàn bộ các câu
+bất đồng; có thể mở rộng bằng cách phân loại tự động (vd.\ LLM-judge) trên tệp dự đoán khi có thời
+gian.}
 
 % =====================================================================
 \FloatBarrier
 \section{Thảo luận}
 \label{sec:discussion}
 % =====================================================================
-Bài học nổi bật là: \textbf{trên MedQA, đòn bẩy là lập luận, không phải truy hồi}. Đây không phải lỗi
-tinh chỉnh: Nhóm đã thử hai ngữ liệu (sách giáo khoa $-3.7$ điểm; MedMCQA $+0.5$ điểm, không ý
-nghĩa), đã hiệu chỉnh cổng, và đã rút gọn truy vấn, mà truy hồi vẫn không làm thay đổi độ chính xác.
-Y văn cũng ghi nhận điều tương tự: mức tăng của RAG không đồng đều giữa các bộ dữ liệu: mạnh trên các bộ
-nặng về tra cứu (PubMedQA, BioASQ) và yếu trên các bộ nặng về lập luận/trí nhớ như MedQA, vì một mô hình
-đủ mạnh vốn đã nắm sẵn tri thức trong sách giáo khoa và phần việc còn lại là \emph{tích hợp}. Kết quả V2 của
-Nhóm là mặt tích cực của câu chuyện này: một cách tách hai tác tử phân biệt phân tích lâm
-sàng có cấu trúc với quyết định cuối cùng tạo ra mức cải thiện có ý nghĩa thống kê đầu tiên, và làm được
-điều đó trên \emph{cùng} bằng chứng truy hồi mà V1 đã có. Điều đó chỉ hướng đòn bẩy tiếp theo vào cấu trúc
-lập luận (hội đồng, bác sĩ chính, bộ kiểm chứng), đúng là thứ V3/V4 được dựng để kiểm tra.
+Bài học nổi bật là: \textbf{trên MedQA, đòn bẩy là cấu trúc lập luận, không phải truy hồi}. Đây không
+phải lỗi tinh chỉnh: Nhóm đã đổi embedder (nomic-embed-text $\to$ qwen3-embedding:4b), bỏ cổng độ tương
+đồng để thay bằng nhãn tin cậy tự chấm, và cho phép tác tử tự quyết định khi nào/tìm gì thay vì một
+pipeline cố định - mà truy hồi vẫn không làm thay đổi độ chính xác một cách có ý nghĩa ($-1.7$ điểm so
+với V0, $p{=}0.615$). Y văn cũng ghi nhận điều tương tự: mức tăng của RAG không đồng đều giữa các bộ dữ liệu: mạnh trên các bộ nặng về tra cứu
+(PubMedQA, BioASQ) và yếu trên các bộ nặng về lập luận/trí nhớ như MedQA, vì một mô hình đủ mạnh vốn đã
+nắm sẵn tri thức và phần việc còn lại là \emph{tích hợp}. Kết quả V2 của Nhóm là mặt tích cực của câu
+chuyện này: tách hiểu ca bệnh / tìm kiếm / lập luận / quyết định thành bốn nút, trên \emph{cùng} bằng
+chứng truy hồi mà V1 đã có, tạo ra mức cải thiện có ý nghĩa thống kê đầu tiên trong toàn bộ khảo sát
+($+5.3$ điểm so với V0, $p{=}0.044$; $+7.0$ điểm so với V1, $p{=}0.020$). Điều bất ngờ là bước tiếp
+theo - thêm bộ kiểm chứng (V3) - \emph{chưa} cho thấy cải thiện thêm ở quy mô này: V3 thấp hơn V2 một
+chút ($-1.7$ điểm, không ý nghĩa), dù tốn thêm đáng kể độ trễ và token. Có thể đọc theo hai hướng: (i)
+lợi ích của kiểm chứng thật sự nhỏ hoặc bằng không trên MedQA khi lập luận nền đã đủ tốt (Node~3 của V2
+đã tự chấm độ tin cậy, nên phần việc ``kiểm tra lại'' phần lớn đã làm rồi), hoặc (ii) $n{=}300$ chưa đủ
+lớn để phân biệt một hiệu ứng nhỏ với nhiễu ngẫu nhiên - hai giả thuyết này cần đo ở $n{=}1273$ để phân
+định.
 
 % =====================================================================
 \FloatBarrier
@@ -735,16 +765,17 @@ lập luận (hội đồng, bác sĩ chính, bộ kiểm chứng), đúng là t
 \label{sec:limitations}
 % =====================================================================
 \begin{itemize}[nosep]
-  \item \textbf{Quy mô.} Hiện mới có V0 trên test đầy đủ ($n{=}1273$, qwen2.5:7b); V1--V4 đang chạy, nên
-  các so sánh ghép cặp còn trống cho tới khi đủ dữ liệu.
+  \item \textbf{Quy mô.} V0--V3 mới đo ở $n{=}300$/1273 câu test; V4 chưa được đo. Ở quy mô này, V3 vs
+  V0 ($p{=}0.185$) và V3 vs V2 ($p{=}0.227$) chưa đạt ngưỡng có ý nghĩa thống kê - có thể đổi chiều khi
+  đo trên toàn bộ 1273 câu.
   \item \textbf{Thiếu thành phần.} Bộ nhớ dài hạn (\S4.5) chưa được xây; bộ nhớ ngắn hạn (\S4.4) chỉ
   mới ở dạng hẹp (đọc trạng thái đồ thị dùng chung, chỉ phục vụ bộ kiểm chứng), nên hệ thống hiện tại
   vẫn chưa phải ``hệ đầy đủ'' theo đề bài.
-  \item \textbf{Chưa có chỉ số token/chi phí.} Mới chỉ ghi độ trễ; chưa có chi phí token và tiền.
-  \item \textbf{Chưa có tệp dự đoán / công cụ phân tích lỗi} (\S9), nên phân tích lỗi còn định tính.
-  \item \textbf{Số liệu cũ đã bị thay thế.} Việc thêm giải thích $\le 30$ từ, rồi đợt tái thiết kế V2--V4
-  và luật tin cậy bất đối xứng, đã lần lượt làm đổi mọi prompt, nên các phép đo trước mỗi lần đổi không
-  còn áp dụng cho thiết kế hiện tại và đang được đo lại.
+  \item \textbf{Chưa có chi phí tiền.} Đã có độ trễ và số token (\S\ref{sec:results}); chưa quy đổi ra
+  chi phí tiền (không áp dụng cho mô hình cục bộ, nhưng cần nếu so sánh với API đám mây).
+  \item \textbf{Bộ kiểm chứng chưa chứng minh được lợi ích.} V3 (V2 + bộ kiểm chứng) thấp hơn V2 một
+  chút ($-1.7$ điểm, không ý nghĩa) trong khi tốn thêm $\sim$17\% độ trễ và $\sim$35\% token - ngược với
+  kỳ vọng thiết kế ban đầu của Nhóm; cần đo ở quy mô lớn hơn trước khi kết luận.
   \item \textbf{Cổng do mô hình tự chấm chưa được kiểm định.} Cổng độ tương đồng bằng số đã được thay
   bằng nhãn tin cậy tự chấm của chính mô hình (\S\ref{sec:rag}); độ tin cậy của chính nhãn tự chấm đó
   (so với một ngưỡng số khách quan) chưa được đo.
@@ -758,12 +789,15 @@ lập luận (hội đồng, bác sĩ chính, bộ kiểm chứng), đúng là t
 \label{sec:conclusion}
 % =====================================================================
 Nhóm đã xây một hệ đa tác tử y khoa điều khiển bằng cấu hình dưới dạng một thang biến thể năm bậc
-(ablation ladder) trên MedQA-USMLE, trong đó mỗi bậc khác nhau đúng một thành phần và được chấm bởi một bộ đo ghép
-cặp, có nhận thức về ý nghĩa thống kê. Bằng chứng hiện tại rõ ràng ở điểm cốt lõi: riêng truy hồi không
-cải thiện độ chính xác MedQA, trong khi một cách tách lập luận đa tác tử thì có (kết quả định lượng đang
-được đo lại trên test đầy đủ). Các bước tiếp theo trước mắt là (i) thống nhất ngữ liệu truy hồi giữa các bậc,
-(ii) chạy toàn bộ tập test chính thức ($n{=}1273$), (iii) đo V3/V4 ở quy mô lớn và tách riêng hiệu ứng
-bộ kiểm chứng ($V3-V4$), và (iv) thêm bộ nhớ, tệp dự đoán, và theo dõi chi phí token để khép các khoảng
+(ablation ladder) trên MedQA-USMLE, trong đó mỗi bậc khác nhau đúng một thành phần và được chấm bởi một
+bộ đo ghép cặp, có nhận thức về ý nghĩa thống kê. Bằng chứng đo được ở $n{=}300$ rõ ràng ở điểm cốt lõi:
+riêng truy hồi không cải thiện độ chính xác MedQA (V1 vs V0: $-1.7$ điểm, không ý nghĩa), trong khi tách
+cấu trúc lập luận thành bốn nút thì có (V2 vs V0: $+5.3$ điểm, $p{=}0.044$) - cải thiện có ý nghĩa thống
+kê đầu tiên trong toàn bộ khảo sát. Thêm bộ kiểm chứng (V3) chưa cho thấy lợi ích thêm ở quy mô này (V3
+vs V2: $-1.7$ điểm, không ý nghĩa), một kết quả bất ngờ cần đo ở quy mô lớn hơn để phân định. Các bước
+tiếp theo trước mắt là (i) chạy toàn bộ tập test chính thức ($n{=}1273$) để xác nhận hoặc bác bỏ ý nghĩa
+thống kê của V3 vs V0 và V3 vs V2, (ii) đo V4 (hiện chưa đo) để tách riêng hiệu ứng bộ kiểm chứng
+($V3-V4$) một cách trực tiếp, và (iii) thêm bộ nhớ dài hạn và theo dõi chi phí tiền để khép các khoảng
 trống còn lại so với đề bài. Hệ thống được thiết kế sao cho mỗi việc trên là một thay đổi cấu hình hoặc
 bộ đo chứ không phải viết lại.
 
@@ -774,7 +808,7 @@ bộ đo chứ không phải viết lại.
 \label{app:repro}
 \begin{table}[h]
   \centering
-  \begin{tabular}{ll}
+  \begin{tabular}{@{}p{0.22\textwidth}p{0.7\textwidth}@{}}
     \toprule
     Mục & Giá trị \\
     \midrule
@@ -784,7 +818,7 @@ bộ đo chứ không phải viết lại.
     Truy hồi & embedder qwen3-embedding:4b (V1) / nomic-embed-text (V2--V4), Chroma cosine/HNSW, top-$k$=5, không cổng \\
     Seed ngẫu nhiên & \texttt{bootstrap\_ci(seed=0)}; còn lại là giải mã greedy \\
     Phần cứng & máy Mac Apple Silicon, 48\,GB, Ollama cục bộ \\
-    Dữ liệu & \texttt{openlifescienceai/medqa} (test $n{=}1273$), cache ngoại tuyến \\
+    Dữ liệu & \texttt{openlifescienceai/medqa} (test $n{=}1273$; báo cáo này dùng 300 câu đầu), cache ngoại tuyến \\
     Điểm vào & \texttt{build\_variant(id, model=, temperature=0, **overrides)} \\
     \bottomrule
   \end{tabular}
