@@ -41,25 +41,27 @@ AnswerFn = Callable[[MCQItem], AnswerResult]
 _PRESETS: dict[str, RunConfig] = {
     "V0": RunConfig(answer_role="baseline", rag=None),
     # V1: a SINGLE agent that calls a `search_medmcqa` tool over the MedMCQA database of
-    # solved board questions (agentic RAG — the model drives retrieval). nomic embeddings
-    # (8192-token ctx) so a full vignette isn't truncated the way MedCPT's 64-token query
-    # encoder would; threshold=0.0 returns the top-k, no gate. V2-V4 retrieve the same corpus,
-    # but concurrently (reason->retrieve as its own branch) rather than as a bound tool.
+    # solved board questions (agentic RAG — the model drives retrieval). qwen3-embedding:4b
+    # (32K-token ctx) so a full vignette isn't truncated the way MedCPT's 64-token query
+    # encoder would; threshold=0.0 returns the top-k, no gate. Switched from nomic-embed-text
+    # after a small-n (n=40) A/B: qwen3-embedding:4b matched V0 (0.600 vs 0.600) and beat nomic
+    # (0.550) while ~20% faster — see docs/report/report.tex §3.2. V2-V4 now share this embedder
+    # and collection too (switched after the same A/B), so V1-V4 retrieve identically again.
     # Decision rule is asymmetric trust: HIGH-confidence evidence is the default answer unless
     # the model can name a specific vignette finding it missed; MEDIUM/LOW evidence is set aside
     # entirely and the model decides the way V0 would, from its own reasoning alone.
     "V1": RunConfig(answer_role="rag-agent",
-                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                    rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=True)),
     # V2: a dedicated case-reasoning agent (Node 1, spec §4.2) produces a shared case summary +
     # search query; a search node and a reasoning node run CONCURRENTLY off it (retrieve+digest
     # vs. own-knowledge clinical reasoning, each with its own confidence rating); a decider
     # joins both and weighs them. 4 agents, no verifier. `tool=False`: retrieval is its own
     # concurrent branch (build_graph wires it and reasoning both off Node 1) rather than bound
-    # to an agent as a tool. Same RAG corpus as V1, so V2 - V1 isolates exactly the effect of
-    # splitting one agent into case-reasoner + search + reasoning + decider, not the RAG design.
+    # to an agent as a tool. Same RAG corpus AND embedder as V1, so V2 - V1 isolates exactly the
+    # effect of splitting one agent into case-reasoner + search + reasoning + decider.
     "V2": RunConfig(clinical_reason=True, answer_role="decider",
-                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                    rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
     # V3 = V2 + verifier + short-term memory: the verifier reads the shared case understanding
     # AND the clinical reasoner's report straight from state (no separate memory agent — Nodes
@@ -69,12 +71,12 @@ _PRESETS: dict[str, RunConfig] = {
     # own report is the whole job. `memory` is purely in service of `verify` here — a single
     # delta from V2 (the verifier, memory-equipped), not two.
     "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
-                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                    rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
     # V4 = V3 without the verifier (verify=False, everything else identical) — isolates
     # exactly the verifier's (memory-equipped) marginal contribution (V3 - V4).
     "V4": RunConfig(clinical_reason=True, answer_role="decider",
-                    rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
+                    rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
 }
 
