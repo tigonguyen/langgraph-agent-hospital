@@ -35,32 +35,6 @@ def build_reasoning_agent(model: BaseChatModel | str = "qwen2.5:14b") -> Callabl
     return to_query
 
 
-# i-MedRAG (Xiong et al., 2024): instead of one retrieval pass, ask the model whether the
-# evidence gathered so far is enough; if not, it proposes ONE follow-up query, chaining
-# retrieval rounds like a differential-diagnosis workup.
-IMEDRAG_FOLLOWUP_SYS = (
-    "You are a physician gathering evidence for a USMLE question through iterative literature "
-    "lookups. You are shown the question and the evidence gathered so far. If it is already "
-    "enough to answer confidently, output exactly DONE. Otherwise output ONE focused follow-up "
-    "search query (max ~20 words) for the single most useful missing piece of information. "
-    "Output ONLY 'DONE' or the query — no other text."
-)
-
-
-def build_followup_agent(model: BaseChatModel | str = "qwen2.5:14b") -> Callable[[MCQItem, str], str]:
-    """Return a fn (item, evidence_so_far) -> next query, or "" once no more is needed."""
-    agent = Agent("imedrag-followup", IMEDRAG_FOLLOWUP_SYS, model=model)
-
-    def next_query(item: MCQItem, evidence_so_far: str) -> str:
-        ev = evidence_so_far or "(none yet)"
-        reply = agent.say(
-            f"Question:\n{item.question}\n\nEvidence gathered so far:\n{ev}\n\nDecision:"
-        ).strip()
-        return "" if reply.upper().startswith("DONE") else reply
-
-    return next_query
-
-
 # V1b — adaptive RAG-tier routing (RAGCare-QA / Self-RAG style): a cheap per-question
 # decision on whether a textbook lookup is likely to help (a fact-lookup question) versus
 # hurt or do nothing (a reasoning-heavy question — where plain V0 already wins per this

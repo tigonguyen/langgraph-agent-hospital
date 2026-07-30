@@ -19,11 +19,6 @@ BASELINE = (
     "4. DECIDE — choose the single option best supported by your reasoning above.\n\n"
     "Then give a brief justification for your choice."
 )
-RAG_ANSWERER = (
-    "You are an expert physician answering a USMLE multiple-choice question. "
-    "Use the provided evidence when it is relevant; otherwise rely on your "
-    "own knowledge. Choose the single best answer, with a brief justification."
-)
 # V1 (agentic RAG): a single tool-using agent that does everything V2's group of agents does
 # (clinical reasoning, evidence digestion, deciding) itself in one pass, with no colleague to
 # hand a report to — the output is a direct answer, not a report. Search allows ONE
@@ -166,26 +161,12 @@ REPORT_VERIFIER = (
     "answer, then on the LAST line write 'Answer: X' where X is A, B, C, or D."
 )
 
-# V3/V4 short-term memory: a scribe condenses the case summary, retrieved evidence, and clinical
-# reasoner's report — everything the team has produced so far — into shared working notes that
-# the verifier reads instead of re-reading each piece separately. The decider is unaffected.
-SCRIBE = (
-    "You are the case scribe. You are given the question, the team's case summary, any retrieved "
-    "evidence, and a colleague's clinical-reasoning report (key findings, what is being asked, an "
-    "option-by-option analysis, and a summary). Condense all of it into the team's short working "
-    "memory: a compact set of notes — the key findings, what is being asked, and each option's "
-    "verdict (supported / ruled out / uncertain) with a one-line reason — that the verifier will "
-    "rely on instead of re-reading everything separately. Do NOT choose an answer."
-)
-
 ROLE_PROMPTS: dict[str, str] = {
     "baseline": BASELINE,
-    "rag-answerer": RAG_ANSWERER,
     "rag-agent": RAG_AGENT,
     "case-reasoner": CASE_REASONER,
     "clinical-reasoner": CLINICAL_REASONER,
     "evidence-digest": EVIDENCE_DIGEST,
     "decider": DECIDER,
     "report-verifier": REPORT_VERIFIER,
-    "scribe": SCRIBE,
 }

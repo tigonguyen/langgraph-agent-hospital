@@ -19,7 +19,6 @@ class RagConfig:
     threshold: float = 0.60                # gate for graph-invoked retrieval (V2-V4); 0.0 = keep top-k
     distill_query: bool = True
     tool: bool = False                     # bind retrieval as a tool the agent calls (agentic V1)
-    iterative_max: int = 0                 # i-MedRAG: >0 rounds of follow-up-query retrieval (prototype)
     adaptive: bool = False                 # V1b: per-question router — skip retrieval when a
                                             # question looks reasoning-heavy rather than fact-lookup
 
@@ -32,9 +31,9 @@ class RunConfig:
     rag: RagConfig | None = None           # None = no retrieval (V0)
     clinical_reason: bool = False          # dedicated clinical-reasoning stage before the decider (V2-V4)
     verify: bool = False                   # verifier node, reads the clinical report (V2/V3, off for V4)
-    memory: bool = False                   # short-term memory: scribe condenses case understanding +
-                                            # evidence + clinical report into working notes for the
-                                            # verifier only; a no-op without verify=True too (V3)
+    memory: bool = False                   # short-term memory: lets the verifier also read the
+                                            # shared case understanding, straight from state, no
+                                            # separate agent; a no-op without verify=True too (V3)
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
 
     def model_for(self, role: str) -> Any:

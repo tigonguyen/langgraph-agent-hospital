@@ -19,11 +19,6 @@ UNDERSTAND_ONLY = (
 ANALYSE_ONLY = "Write your analysis as instructed above. Do NOT state a final answer."
 # Layer 1, branch B: digest retrieved passages into a summary (no final answer).
 DIGEST_EVIDENCE_ONLY = "Write your digest as instructed above. Do NOT state a final answer."
-# V3/V4 scribe: distil the clinical report into shared working memory (no final answer).
-SCRIBE_NOTES = (
-    "Write compact working notes: (1) key findings; (2) for each option A-D, mark "
-    "supported / ruled-out / uncertain with a one-line reason. Do NOT pick a final answer."
-)
 REASON_THEN_ANSWER = (
     "In at most 30 words, say why the best option is best, then on the LAST line "
     "write 'Answer: X' where X is A, B, C, or D."

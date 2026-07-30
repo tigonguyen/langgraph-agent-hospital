@@ -16,8 +16,8 @@ from agent_hospital.config import RunConfig
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
 from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, ANALYSE_ONLY,
                                    DIGEST_EVIDENCE_ONLY, LETTER_ONLY, REASON_THEN_ANSWER,
-                                   SCRIBE_NOTES, UNDERSTAND_ONLY, format_mcq, parse_choice)
-from agent_hospital.qa.reasoning import build_followup_agent, build_reasoning_agent, build_router
+                                   UNDERSTAND_ONLY, format_mcq, parse_choice)
+from agent_hospital.qa.reasoning import build_reasoning_agent, build_router
 
 Node = Callable[[dict], dict]
 _LETTERS = "ABCD"
@@ -102,46 +102,6 @@ def make_understand_node(cfg: RunConfig) -> Node:
         m = re.search(r"search query:\s*(.+)", reply, re.IGNORECASE | re.DOTALL)
         query = m.group(1).strip().splitlines()[0] if m else state["item"].question
         return {"case_understanding": reply, "query": query}
-
-    return node
-
-
-def make_iterative_retrieve_node(cfg: RunConfig) -> Node:
-    """i-MedRAG-style iterative retrieval (Xiong et al., 2024): distill an initial query,
-    retrieve, then repeatedly ask for ONE follow-up query grounded in the evidence gathered
-    so far, retrieving again, until the model signals it has enough or `rag.iterative_max`
-    rounds are used. Evidence accumulates (deduped) across rounds — unlike `make_retrieve_node`,
-    each follow-up round costs one LLM call (the price of chaining retrieval, not just gating it).
-    """
-    rag = cfg.rag
-    reasoner = build_reasoning_agent(cfg.model_for("reasoner"))
-    next_query = build_followup_agent(cfg.model_for("reasoner"))
-    holder: dict[str, Any] = {}
-
-    def node(state: dict) -> dict:
-        if "store" not in holder:
-            holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
-        item = state["item"]
-
-        query = reasoner(item)
-        queries = [query]
-        hits: list[tuple[Any, float]] = []
-        seen: set[str] = set()
-
-        for i in range(rag.iterative_max):
-            for doc, score in retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"]):
-                key = (doc.metadata.get("answer") or doc.page_content).strip().lower()
-                if key not in seen:
-                    seen.add(key)
-                    hits.append((doc, score))
-            if i == rag.iterative_max - 1:
-                break
-            query = next_query(item, format_evidence(hits))
-            if not query:
-                break
-            queries.append(query)
-
-        return {"evidence": format_evidence(hits), "query": " | ".join(queries)}
 
     return node
 
@@ -314,10 +274,8 @@ def make_answer_node(cfg: RunConfig) -> Node:
 
     def node(state: dict) -> dict:
         # A prior clinical-reasoning report (V2-V4) informs the choice; the short
-        # justification written here replaces it as the user-facing explanation. Reads
-        # `clinical_report` directly rather than `_clinical_context` — the decider is
-        # deliberately unaffected by the scribe's working memory (V3/V4), which exists
-        # for the verifier only (see make_scribe_node).
+        # justification written here replaces it as the user-facing explanation. The
+        # decider never reads the case understanding — only the verifier does (V3).
         prior = state.get("clinical_report", "")
         extra = f"\n\nColleague's clinical-reasoning report:\n{prior}" if prior else ""
         reply = agent.say(_prompt(state, extra=extra, closing=REASON_THEN_ANSWER))
@@ -326,45 +284,18 @@ def make_answer_node(cfg: RunConfig) -> Node:
     return node
 
 
-def make_scribe_node(cfg: RunConfig) -> Node:
-    """Short-term memory (V3/V4): distil the case summary, retrieved evidence, and clinical
-    reasoner's report — everything Nodes 1-3 produced — into shared working notes that ONLY
-    the verifier reads (`_clinical_context`). Runs off the same join as `answer` (see
-    build_graph), not nested inside the reasoning branch, so it can actually see `evidence`
-    without adding decider latency; the decider itself reads `clinical_report` directly and
-    is unaffected by this node. The notes live in `state["working_memory"]` for the rest of
-    the episode (a per-question working memory, not cross-episode).
-    """
-    agent = Agent("scribe", roles.ROLE_PROMPTS["scribe"], model=cfg.model_for("scribe"))
-
-    def node(state: dict) -> dict:
-        understanding = state.get("case_understanding", "")
-        report = state.get("clinical_report", "")
-        extra = (f"\n\nCase summary:\n{understanding}" if understanding else "") + \
-                f"\n\nClinical-reasoning report:\n{report}"
-        notes = agent.say(_prompt(state, extra=extra, closing=SCRIBE_NOTES))
-        return {"working_memory": notes.strip()}
-
-    return node
-
-
-def _clinical_context(state: dict) -> str:
-    """Verifier input only: the scribe's condensed working memory if present (V3/V4), else
-    the clinical reasoner's raw report (V2). The decider reads `clinical_report` directly
-    instead (see make_answer_node) and never sees this."""
-    return state.get("working_memory") or state.get("clinical_report", "")
-
-
 def make_report_verify_node(cfg: RunConfig) -> Node:
     """V2/V3's verifier: a cheap final check, not a second full derivation.
 
-    Reads `_clinical_context(state)` — the reasoner's report or the scribe's condensed
-    notes, whichever is present — plus the decider's chosen letter and its own short
-    explanation (`state["rationale"]`, not yet overwritten), and audits that choice
-    against them. Only reaches for `cfg.verify_rag`'s independent `search_textbooks`
-    tool, on a query targeted at the CHOSEN option specifically, if that context alone
-    doesn't settle it. Falls back to the prior answer on parse failure, like every
-    other late-stage node.
+    Reads the clinical reasoner's report straight from `state["clinical_report"]` — plus,
+    when `cfg.memory` (V3) is set, the shared case understanding too — and the decider's
+    chosen letter and its own short explanation (`state["rationale"]`, not yet overwritten),
+    and audits that choice against them. No separate memory agent: everything Nodes 1-3
+    produced already lives in the shared graph state, so this just reads more of it directly
+    (`state["evidence"]` is auto-prepended by `_prompt` like every other node). Only reaches
+    for `cfg.verify_rag`'s independent `search_textbooks` tool, on a query targeted at the
+    CHOSEN option specifically, if that context alone doesn't settle it. Falls back to the
+    prior answer on parse failure, like every other late-stage node.
     """
     if cfg.verify_rag:
         search, reset_calls = make_search_tool(replace(cfg, rag=cfg.verify_rag),
@@ -380,10 +311,12 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
         reset_calls()
         cur = state.get("answer")
         cur_letter = _LETTERS[cur] if cur is not None else "unknown"
-        context = _clinical_context(state)
-        extra = (f"\n\nClinical-reasoning report (option-by-option verdicts):\n{context}"
-                 f"\n\nChosen answer: {cur_letter}"
-                 f"\n\nColleague's explanation: {state.get('rationale', '')}")
+        report = state.get("clinical_report", "")
+        understanding = state.get("case_understanding", "") if cfg.memory else ""
+        extra = ((f"\n\nCase summary:\n{understanding}" if understanding else "")
+                 + f"\n\nClinical-reasoning report (option-by-option verdicts):\n{report}"
+                 + f"\n\nChosen answer: {cur_letter}"
+                 + f"\n\nColleague's explanation: {state.get('rationale', '')}")
         reply = agent.say(_prompt(state, extra=extra, closing=closing))
         revised = parse_choice(reply)
         return {"answer": revised if revised is not None else cur, "rationale": reply.strip()}

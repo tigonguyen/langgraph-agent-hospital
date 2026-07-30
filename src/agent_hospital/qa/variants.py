@@ -61,21 +61,18 @@ _PRESETS: dict[str, RunConfig] = {
     "V2": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=False)),
-    # V3 = V2 + verifier + short-term memory: a scribe condenses the case understanding,
-    # retrieved evidence, and clinical reasoner's report into shared working notes
-    # (state["working_memory"]) that ONLY the verifier reads (the decider always reads
-    # clinical_report directly, unaffected); the verifier audits the decider's choice against
-    # those notes (and, if needed, a targeted textbook check) before confirming or revising it.
-    # `memory` is purely in service of `verify` here (build_graph only builds the scribe node
-    # when both are set) — a single delta from V2 (the verifier, memory-equipped), not two.
+    # V3 = V2 + verifier + short-term memory: the verifier reads the shared case understanding
+    # AND the clinical reasoner's report straight from state (no separate memory agent — Nodes
+    # 1-3's outputs already sit in the graph's shared state) and audits the decider's choice
+    # against them before confirming or revising it. No independent search tool (dropped the
+    # MedRAG Textbooks/MedCPT verify_rag check) — the consistency check against the reasoner's
+    # own report is the whole job. `memory` is purely in service of `verify` here — a single
+    # delta from V2 (the verifier, memory-equipped), not two.
     "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
-                                  k=5, threshold=0.0, tool=False),
-                    verify_rag=RagConfig(threshold=0.0)),
-    # V4 = V3 without the verifier (verify=False, everything else identical). Since `memory`
-    # only matters when a verifier consumes it, V4 has no scribe either and is functionally
-    # V2 again — isolating exactly the verifier's (memory-equipped) marginal contribution
-    # (V3 - V4).
+                                  k=5, threshold=0.0, tool=False)),
+    # V4 = V3 without the verifier (verify=False, everything else identical) — isolates
+    # exactly the verifier's (memory-equipped) marginal contribution (V3 - V4).
     "V4": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_nomic", embedder="nomic-embed-text",
                                   k=5, threshold=0.0, tool=False)),
@@ -108,7 +105,10 @@ def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0
         # are involved or whether they run concurrently (thread-safe). Requires no changes
         # to any node/Agent code; LangGraph forwards `config` into every nested invocation.
         usage = UsageMetadataCallbackHandler()
-        out = graph.invoke({"item": item}, config={"callbacks": [usage]})
+        # thread_id = item.id: one checkpoint thread per episode/question, never shared
+        # across items, so this is short-term (single-episode) memory only — see build_graph.
+        config = {"callbacks": [usage], "configurable": {"thread_id": item.id}}
+        out = graph.invoke({"item": item}, config=config)
         tokens_in = sum(u.get("input_tokens", 0) or 0 for u in usage.usage_metadata.values())
         tokens_out = sum(u.get("output_tokens", 0) or 0 for u in usage.usage_metadata.values())
         return AnswerResult(answer=out.get("answer"), rationale=out.get("rationale", ""),

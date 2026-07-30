@@ -9,16 +9,13 @@ internally (understand, search, reason, decide), split into 4 nodes:
                 |                 |          neither reads the other's output. Node 2 bundles
                  \\                /          retrieve+digest into one node (a multi-step chain
                   answer (decider)  <- Node 4  racing a single long call has its LATER steps
-                   |        |                  stranded in later supersteps otherwise — see
-                   |     [scribe]               make_search_branch_node for the measured why).
-                    \\      /
-                    [verify]
+                       |                       stranded in later supersteps otherwise — see
+                    [verify]                   make_search_branch_node for the measured why).
 
-`[scribe]` (short-term memory, V3) is fed by the SAME join as `answer` — it runs concurrently
-with the decider, not after it, so adding it costs no decider latency. It condenses case
-understanding + evidence + clinical report into `state["working_memory"]` for `verify` alone
-to read; the decider is unaffected and always reads `clinical_report` directly. Built only
-when a verifier is present (`cfg.memory and cfg.verify`) since nothing else consumes it.
+Short-term memory (V3) is NOT a separate agent: `case_understanding`, `evidence`, and
+`clinical_report` already sit in the shared graph state that every node reads, so `verify`
+(the only consumer) reads them straight from `state` when `cfg.memory` is set — no LLM call
+needed just to pass information one node already produced to another.
 
 A join with >1 predecessor MUST be wired as `add_edge([a, b], c)` (list form) so `c` runs
 ONCE after both complete — separate `add_edge(a, c)` / `add_edge(b, c)` calls each trigger
@@ -31,6 +28,8 @@ tool call) rather than running it as a separate node/branch at all.
 
 from __future__ import annotations
 
+from langgraph.checkpoint.memory import InMemorySaver
+from langgraph.checkpoint.serde.jsonplus import JsonPlusSerializer
 from langgraph.graph import END, START, StateGraph
 
 from agent_hospital.config import RunConfig
@@ -39,6 +38,16 @@ from agent_hospital.graph.state import QAState
 
 
 def build_graph(cfg: RunConfig):
+    # Short-term (per-episode) checkpointing: snapshots QAState after every node, keyed by
+    # the thread_id the caller passes at invoke time (build_variant uses the item id, one
+    # thread per question — never shared across items, so this adds no cross-episode memory).
+    # In-process only (not written to disk), so it doesn't survive past this Python process.
+    # MCQItem (state["item"]) is a plain dataclass, not a registered msgpack type, so it must
+    # be explicitly allowlisted or every checkpoint read logs a deprecation warning.
+    serde = JsonPlusSerializer(
+        allowed_msgpack_modules=[("agent_hospital.diseases.medqa_usmle", "MCQItem")])
+    checkpointer = InMemorySaver(serde=serde)
+
     g = StateGraph(QAState)
 
     # V1: a single tool-using agent that both retrieves AND answers (agentic RAG).
@@ -48,7 +57,7 @@ def build_graph(cfg: RunConfig):
         g.add_node("agent", nodes.make_agentic_rag_node(cfg))
         g.add_edge(START, "agent")
         g.add_edge("agent", END)
-        return g.compile()
+        return g.compile(checkpointer=checkpointer)
 
     # Node 1 (V2-V4 only): shared case understanding + search query, read by Nodes 2 and 3
     # below instead of each independently re-deriving its own.
@@ -67,11 +76,7 @@ def build_graph(cfg: RunConfig):
     # interpreted summary of the k retrieved docs (not raw snippets), so `answer`/`verify`
     # pick it up via the existing `_prompt` auto-prepend with no changes needed there.
     if cfg.rag and not cfg.rag.tool:
-        if cfg.rag.iterative_max > 0:
-            g.add_node("retrieve", nodes.make_iterative_retrieve_node(cfg))
-            g.add_edge(rag_start, "retrieve")
-            predecessors.append("retrieve")
-        elif cfg.rag.adaptive:
+        if cfg.rag.adaptive:
             g.add_node("retrieve", nodes.make_adaptive_rag_node(cfg))
             g.add_edge(rag_start, "retrieve")
             predecessors.append("retrieve")
@@ -104,28 +109,12 @@ def build_graph(cfg: RunConfig):
         g.add_edge(predecessors[0] if predecessors else START, "answer")
     prev = "answer"
 
-    # Scribe (short-term memory, V3): fed by the SAME join as `answer` — runs concurrently
-    # with it, not after it — so it can condense case understanding + evidence + clinical
-    # report without adding decider latency. Only the verifier reads its output
-    # (`state["working_memory"]`, see make_scribe_node), so it's only built when there's a
-    # verifier to read it; with no verifier (V4) it would be a pure-cost no-op.
-    verify_predecessors = [prev]
-    if cfg.memory and cfg.clinical_reason and cfg.verify:
-        g.add_node("scribe", nodes.make_scribe_node(cfg))
-        if len(predecessors) > 1:
-            g.add_edge(predecessors, "scribe")
-        else:
-            g.add_edge(predecessors[0] if predecessors else START, "scribe")
-        verify_predecessors.append("scribe")
-
-    # Verifier.
+    # Verifier. `cfg.memory` (V3) just tells it to also read case_understanding from state
+    # (see make_report_verify_node) — no extra node or LLM call, the state is already there.
     if cfg.verify:
         g.add_node("verify", nodes.make_report_verify_node(cfg))
-        if len(verify_predecessors) > 1:
-            g.add_edge(verify_predecessors, "verify")
-        else:
-            g.add_edge(verify_predecessors[0], "verify")
+        g.add_edge(prev, "verify")
         prev = "verify"
 
     g.add_edge(prev, END)
-    return g.compile()
+    return g.compile(checkpointer=checkpointer)
