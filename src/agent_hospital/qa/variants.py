@@ -5,7 +5,7 @@
 
 Each variant is a preset `RunConfig` compiled into a `StateGraph` by `build_graph`.
 `**overrides` tweak the config for experiments, e.g.
-    build_variant("V1", rag=RagConfig(collection="knowledge_medcpt", embedder="medcpt"))
+    build_variant("V1", rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b"))
 """
 
 from __future__ import annotations

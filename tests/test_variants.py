@@ -35,7 +35,7 @@ def test_overrides_apply():
     from agent_hospital.config import RagConfig
 
     # A config override should build without error (e.g. a different collection).
-    assert callable(build_variant("V1", model="dummy", rag=RagConfig(collection="knowledge_medcpt")))
+    assert callable(build_variant("V1", model="dummy", rag=RagConfig(collection="knowledge_test")))
 
 
 def test_unknown_variant_raises():

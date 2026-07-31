@@ -13,8 +13,8 @@ from typing import Any
 
 @dataclass(frozen=True)
 class RagConfig:
-    collection: str = "knowledge_medcpt"
-    embedder: str = "medcpt"
+    collection: str = "knowledge_medmcqa_qwen3"
+    embedder: str = "qwen3-embedding:4b"
     k: int = 4
     threshold: float = 0.60                # gate for graph-invoked retrieval; 0.0 = keep top-k
     distill_query: bool = True
