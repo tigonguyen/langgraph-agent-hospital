@@ -22,6 +22,8 @@ design and reflect the unified MedMCQA corpus across V1–V4.
 | [v0_flow.svg](v0_flow.svg) | V0 — single `answer` node, and what happens inside it | §3 System Design |
 | [v1_flow.svg](v1_flow.svg) | V1 — retrieval, the gate, and the two prompt paths (stale, see above) | §3 RAG design |
 | [v2_flow.svg](v2_flow.svg) | V2 — the three agents and where each LLM call falls (stale, see above) | §3 Agent architecture |
+| [memory_design.svg](memory_design.svg) | short-term memory — the shared `QAState` table: who writes each field, who reads it | §3 Memory design |
+| [longterm_memory.svg](longterm_memory.svg) | long-term memory — the two namespaced banks (`medqa-lessons` read/written by the decider; `medqa-mistakes` read by the verifier, written only by `distill_mistake`) and the contamination guards | §3 Memory design |
 
 **Colour convention** (consistent across the flow diagrams; `system_stack.svg` uses its own legend for
 platform layers — data / embedding / orchestration / LLM call / evaluation):

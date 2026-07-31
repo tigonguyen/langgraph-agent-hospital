@@ -471,11 +471,27 @@ bộ kiểm chứng, không thêm tác tử hay lượt gọi LLM nào.
   bao giờ thấy đáp án đúng; Node~6 (\texttt{distill\_mistake}), chạy SAU Node~5, là nút DUY NHẤT đọc
   đáp án đúng, và chỉ ghi một bài học khi đáp án cuối cùng sai (\S\ref{sec:variants}).
 \end{itemize}
-\textbf{Chống rò rỉ dữ liệu (contamination):} namespace mỗi kho gồm cả \emph{split} (train/test), và
-mặc định (\texttt{long\_term\_read\_only=True}) là CHỈ ĐỌC - ghi vào kho là một hành động tường minh
-(\texttt{--remember}), thực hiện trên tập train, tách khỏi lượt chạy tính điểm trên test. Nếu không,
-bài học của câu thứ $N$ đang được chấm có thể rò sang câu thứ $N{+}k$ trong CÙNG lượt chấm đó, làm
-tăng ảo độ chính xác vì lý do không liên quan tới chất lượng lập luận.
+\textbf{Chống rò rỉ dữ liệu (contamination).} Rủi ro là: bài học của câu thứ $N$ đang được chấm rò
+sang câu thứ $N{+}k$ trong CÙNG lượt chấm đó, làm tăng ảo độ chính xác vì lý do không liên quan tới
+chất lượng lập luận. Lớp bảo vệ đang có là \emph{namespace}: mỗi kho gồm cả tên \emph{split}, nên bài
+học học trên \texttt{train} là vô hình khi truy vấn namespace \texttt{test}.
+
+Tuy nhiên \textbf{mặc định hiện tại là GHI} (\texttt{long\_term\_read\_only=False} ở cả V3, V4, V5),
+và không có cờ CLI nào để tắt. Vì vậy một lượt chạy V3--V5 thông thường \emph{vừa đọc vừa ghi} vào
+namespace của split đang chạy - đúng tình huống rò rỉ nói trên. Để có một con số báo cáo được, phải
+truyền \texttt{long\_term\_read\_only=True} trực tiếp qua \texttt{build\_variant}, theo quy trình hai
+pha: xây kho trên tập dev trước, rồi chấm test ở chế độ chỉ đọc. \todo{Thêm cờ CLI (hoặc đảo mặc định
+về chỉ đọc) để quy trình an toàn là quy trình mặc định; hiện tại việc này phải làm bằng tay và dễ bỏ
+sót. Không con số V3--V5 nào được báo cáo nếu bật ghi trên tập đang chấm.}
+
+\begin{figure}[tbp]
+  \centering
+  \includegraphics[width=0.95\textwidth]{longterm_memory.pdf}
+  \caption{Bộ nhớ dài hạn: hai kho tách biệt bằng namespace trong cùng một \texttt{SqliteStore}.
+  \texttt{decider} đọc/ghi kho chung ở mọi ca; bộ kiểm chứng chỉ ĐỌC kho lỗi, và chỉ
+  \texttt{distill\_mistake} (nút duy nhất thấy nhãn đúng) ghi vào đó, chỉ khi đáp án sai.}
+  \label{fig:longterm-memory}
+\end{figure}
 
 \FloatBarrier
 \subsection{Thiết kế bộ kiểm chứng}
