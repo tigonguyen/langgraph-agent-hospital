@@ -1,13 +1,10 @@
 """Live Wikipedia search — the verifier's independent grounding source (V4).
 
-Distinct from `knowledge/retriever.py`'s local Chroma corpus, which is itself built
-from MedMCQA (the same benchmark family V0-V5 are scored on) — using it to "verify" an
-answer isn't independent of the benchmark. Wikipedia is external, at the cost of a live
-network call: this project is otherwise fully local/offline, so a Wikipedia outage (or
-no network at all) must degrade gracefully to no grounding, never break an eval run.
-
-One MediaWiki API round-trip does search + extract together (`generator=search`), rather
-than a search call followed by N extract calls.
+Distinct from the local Chroma corpus, which is built from MedMCQA (the same benchmark
+family being scored), so it isn't independent evidence. This is otherwise a fully
+local/offline project, so a network/Wikipedia outage must degrade to no grounding, never
+break an eval run. One MediaWiki round-trip does search + extract together
+(`generator=search`) rather than a search call followed by N extract calls.
 """
 
 from __future__ import annotations

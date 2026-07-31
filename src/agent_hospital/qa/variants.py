@@ -41,55 +41,32 @@ AnswerFn = Callable[[MCQItem], AnswerResult]
 
 _PRESETS: dict[str, RunConfig] = {
     "V0": RunConfig(answer_role="baseline", rag=None),
-    # V1: a SINGLE agent that calls a `search_medmcqa` tool over the MedMCQA database of
-    # solved board questions (agentic RAG — the model drives retrieval). qwen3-embedding:4b
-    # (32K-token ctx) so a full vignette isn't truncated the way MedCPT's 64-token query
-    # encoder would; threshold=0.0 returns the top-k, no gate. Switched from nomic-embed-text
-    # after a small-n (n=40) A/B: qwen3-embedding:4b matched V0 (0.600 vs 0.600) and beat nomic
-    # (0.550) while ~20% faster — see docs/report/report.tex §3.2. V2-V4 now share this embedder
-    # and collection too (switched after the same A/B), so V1-V4 retrieve identically again.
-    # Decision rule is asymmetric trust: HIGH-confidence evidence is the default answer unless
-    # the model can name a specific vignette finding it missed; MEDIUM/LOW evidence is set aside
-    # entirely and the model decides the way V0 would, from its own reasoning alone.
+    # V1: single agentic tool-calling agent over search_medmcqa. Asymmetric-trust rule:
+    # HIGH-confidence evidence wins by default unless the model names a specific missed
+    # finding; MEDIUM/LOW evidence is ignored and it decides like V0.
     "V1": RunConfig(answer_role="rag-agent",
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=True)),
-    # V2: a dedicated case-reasoning agent (Node 1, spec §4.2) produces a shared case summary +
-    # search query; a search node and a reasoning node run CONCURRENTLY off it (retrieve+digest
-    # vs. own-knowledge clinical reasoning, each with its own confidence rating); a decider
-    # joins both and weighs them. 4 agents, no verifier. `tool=False`: retrieval is its own
-    # concurrent branch (build_graph wires it and reasoning both off Node 1) rather than bound
-    # to an agent as a tool. Same RAG corpus AND embedder as V1, so V2 - V1 isolates exactly the
-    # effect of splitting one agent into case-reasoner + search + reasoning + decider.
+    # V2: case-reasoner -> (search || reasoning) -> decider, 4 agents, no verifier. Same
+    # corpus/embedder as V1, so V2-V1 isolates the effect of splitting one agent into four.
     "V2": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
-    # V3 = V2 WITHOUT a verifier, but the decider gains long-term (cross-episode) memory
-    # (spec §4.5): it recalls lessons from similar EARLIER cases and writes one back after
-    # every case, right or wrong, to a SqliteStore that outlives the process (the "general"
-    # bank — see graph/longterm.py). No verifier at all here — that's V4/V5's addition, so
-    # `V4 - V3` and `V5 - V3` each isolate exactly one verifier design's marginal effect.
-    # PROTOCOL: lessons are RECALLED here but not written by default — `long_term_read_only`
-    # (True) is the preset default so the safe path is the one you get by typing nothing.
-    # Writing while scoring leaks item N's lesson into item N+80 of the same graded split.
-    # Build the bank deliberately, on the train split only: `-v V3 -s train --remember`.
+    # V3 = V2 without a verifier; decider gains long-term memory (recall + write, general
+    # bank — graph/longterm.py). Writes by default (no CLI opt-out); writing while scoring
+    # leaks between graded items, so a report number needs `long_term_read_only=True` passed
+    # programmatically.
     "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=False, long_term=True,
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
-    # V4 = V3 + a verifier grounded in LIVE WIKIPEDIA rather than this project's own local
-    # corpus, which is itself built from MedMCQA (the same benchmark family being scored) —
-    # so the existing textbook `verify_rag` check isn't independent evidence, Wikipedia is.
-    # `V4 - V3` isolates exactly this verifier's marginal contribution.
+    # V4 = V3 + a verifier grounded in live Wikipedia rather than the local MedMCQA-derived
+    # corpus, which isn't independent evidence since it's the same benchmark family.
     "V4": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
                     long_term=True, verify_wikipedia=True,
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
-    # V5 = V3 + a verifier that recalls a SEPARATE "evolutionary" bank of past WRONG cases
-    # (`long_term_mistakes`) — distinct from V3's general lesson bank. The verifier only
-    # ever RECALLS from it and never sees gold; a Node 6 after verify (the only node that
-    # reads gold) compares the final answer to it and, only on a miss, distills a corrective
-    # lesson into that bank. Same train-build/read-only-eval protocol as V3's general bank —
-    # `-v V5 -s train --remember` builds both banks in one pass.
+    # V5 = V3 + a verifier that recalls a separate mistake bank of past wrong cases; never
+    # sees gold. Only `distill_mistake` (after verify) reads gold and writes to that bank.
     "V5": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
                     long_term=True, long_term_mistakes=True,
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
@@ -118,13 +95,9 @@ def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0
     def answer(item: MCQItem) -> AnswerResult:
         from langchain_core.callbacks import UsageMetadataCallbackHandler
 
-        # Provider-agnostic token accounting: this callback sums AIMessage.usage_metadata
-        # across every LLM call made during the invoke — no matter how many agents/nodes
-        # are involved or whether they run concurrently (thread-safe). Requires no changes
-        # to any node/Agent code; LangGraph forwards `config` into every nested invocation.
+        # Sums AIMessage.usage_metadata across every LLM call in the invoke, provider-agnostic.
         usage = UsageMetadataCallbackHandler()
-        # thread_id = item.id: one checkpoint thread per episode/question, never shared
-        # across items, so this is short-term (single-episode) memory only — see build_graph.
+        # thread_id = item.id: one checkpoint thread per question, never shared across items.
         config = {"callbacks": [usage], "configurable": {"thread_id": item.id}}
         out = graph.invoke({"item": item}, config=config)
         tokens_in = sum(u.get("input_tokens", 0) or 0 for u in usage.usage_metadata.values())
