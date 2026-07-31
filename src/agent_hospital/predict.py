@@ -28,6 +28,7 @@ from agent_hospital.diseases.medqa_usmle import MCQItem
 from agent_hospital.models import default_model
 from agent_hospital.qa import VARIANTS, build_variant
 from agent_hospital.qa.mcq import summarize_rationale
+from agent_hospital.qa.variants import _PRESETS
 
 _LETTERS = "ABCD"
 DEFAULT_OUT_DIR = "data/eval_runs"
@@ -73,8 +74,13 @@ def run(
     out_dir: str = DEFAULT_OUT_DIR,
     overwrite: bool = False,
     quiet: bool = False,
+    **long_term_overrides,
 ) -> str:
-    """Run `variant` over `split` and append predictions to the output `.jsonl`. Returns its path."""
+    """Run `variant` over `split` and append predictions to the output `.jsonl`. Returns its path.
+
+    `long_term_overrides` (e.g. `long_term_read_only=True`, `long_term_split="train"`) pass
+    straight through to `build_variant`, for V3/V4/V5 only.
+    """
     model = model or default_model()   # None = take $AGENT_HOSPITAL_MODEL / the fallback
     os.makedirs(out_dir, exist_ok=True)
     pred_path, meta_path = _paths(out_dir, variant, split, model)
@@ -95,8 +101,14 @@ def run(
           f"with {model} (temp=0) -> {pred_path}")
     if done_ids:
         print(f"  resuming: {len(done_ids)} already done, {len(todo)} remaining")
+    if long_term_overrides.get("long_term_read_only"):
+        print(f"  long-term memory: bank '{long_term_overrides.get('long_term_split', 'train')}', "
+              f"recall-only (not writing)")
+    elif "long_term_read_only" in long_term_overrides or long_term_overrides.get("long_term_split"):
+        print(f"  long-term memory: bank '{long_term_overrides.get('long_term_split', 'train')}', "
+              f"WRITING lessons")
 
-    answer = build_variant(variant, model=model)
+    answer = build_variant(variant, model=model, **long_term_overrides)
     if not done_ids:
         print("  warming up (one throwaway item; spin-up excluded from latency)...")
         _warm_up(answer)
@@ -170,9 +182,18 @@ def main() -> None:
                         "(default: $AGENT_HOSPITAL_MODEL, else qwen2.5:7b)")
     p.add_argument("-o", "--out-dir", default=DEFAULT_OUT_DIR)
     p.add_argument("--overwrite", action="store_true", help="discard any existing prediction file first")
-    p.add_argument("-q", "--quiet", action="store_true", help="suppress the per-item log")
+    p.add_argument("--lesson-bank", metavar="SPLIT",
+                   help="V3/V4/V5 only: which lesson-bank namespace to recall from (default: train).")
     args = p.parse_args()
-    run(args.variant, args.split, args.model, args.limit, args.out_dir, args.overwrite, args.quiet)
+
+    overrides: dict = {}
+    if args.lesson_bank:
+        overrides["long_term_split"] = args.lesson_bank
+    if overrides and not _PRESETS[args.variant].long_term:
+        p.error(f"--lesson-bank applies to long-term variants only; "
+                f"{args.variant} has long_term=False (use -v V3, V4, or V5)")
+
+    run(args.variant, args.split, args.model, args.limit, args.out_dir, args.overwrite, **overrides)
 
 
 if __name__ == "__main__":

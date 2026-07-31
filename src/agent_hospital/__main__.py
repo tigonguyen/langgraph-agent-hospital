@@ -29,12 +29,10 @@ from agent_hospital.qa.variants import _PRESETS
 
 
 def warm_up(answer_fn) -> None:
-    """Run one throwaway question so the timed loop isn't charged for one-off costs.
+    """One throwaway question so cold-start costs (model load, Chroma open) aren't timed.
 
-    Exercises the real path: Ollama model load, the lazy `create_agent` build, and
-    (for RAG variants) opening the Chroma store + loading the embedder. Uses a
-    synthetic item, never a scored one — re-running a scored item would leave its
-    prompt in Ollama's cache and make that item look artificially fast.
+    Must be synthetic, not a scored item — re-running a scored one would leave its prompt
+    in Ollama's cache and make that item look artificially fast.
     """
     dummy = MCQItem(
         id="warmup",
@@ -58,27 +56,17 @@ def main() -> None:
                         "anthropic:claude-sonnet-5, openai:gpt-4o, google:gemini-2.0-flash, "
                         "openrouter:meta-llama/llama-3.3-70b-instruct "
                         "(default: $AGENT_HOSPITAL_MODEL, else qwen2.5:7b)")
-    p.add_argument("-q", "--quiet", action="store_true",
-                   help="suppress the per-item log, print only the summary")
-    p.add_argument("--remember", action="store_true",
-                   help="V3/V4/V5 only: WRITE lessons to the long-term store(s) (default is "
-                        "recall-only). Use on the dev split to build the bank — writing during a "
-                        "scored run leaks one graded item's lesson into later graded items.")
     p.add_argument("--lesson-bank", metavar="SPLIT",
                    help="V3/V4/V5 only: which lesson-bank namespace to recall from (default: "
                         "train). Independent of -s: reading train lessons while scoring test is "
                         "intended.")
     args = p.parse_args()
 
-    # Only pass long-term overrides when they were actually given, so every other variant's
-    # RunConfig is untouched (`build_variant` rejects unknown fields for its preset anyway).
     overrides: dict = {}
-    if args.remember:
-        overrides["long_term_read_only"] = False
     if args.lesson_bank:
         overrides["long_term_split"] = args.lesson_bank
     if overrides and not _PRESETS[args.variant].long_term:
-        p.error(f"--remember/--lesson-bank apply to long-term variants only; "
+        p.error(f"--lesson-bank applies to long-term variants only; "
                 f"{args.variant} has long_term=False (use -v V3, V4, or V5)")
 
     limit = args.limit or None
@@ -87,10 +75,7 @@ def main() -> None:
           f"{args.split} items with {args.model} (temp=0)")
     if _PRESETS[args.variant].long_term:
         bank = overrides.get("long_term_split", _PRESETS[args.variant].long_term_split)
-        writing = "WRITING lessons" if args.remember else "recall-only (not writing)"
-        print(f"  long-term memory: bank '{bank}', {writing}")
-        if args.remember and args.split not in ("train", "validation"):
-            print(f"  !! writing while scoring '{args.split}' leaks lessons between graded items")
+        print(f"  long-term memory: bank '{bank}', WRITING lessons")
     print("warming up (one throwaway item; spin-up excluded from latency)...\n")
 
     letters = "ABCD"
@@ -111,9 +96,8 @@ def main() -> None:
 
     answer = build_variant(args.variant, model=args.model, **overrides)
     warm_up(answer)
-    records = run_variant(items, answer, progress=None if args.quiet else log)
-    if not args.quiet:
-        print()
+    records = run_variant(items, answer, progress=log)
+    print()
 
     lo, hi = bootstrap_ci(records)
     print("-" * 60)

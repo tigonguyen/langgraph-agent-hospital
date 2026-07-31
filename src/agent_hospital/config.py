@@ -13,14 +13,13 @@ from typing import Any
 
 @dataclass(frozen=True)
 class RagConfig:
-    collection: str = "knowledge_medcpt"   # or "knowledge" (nomic-embedded)
-    embedder: str = "medcpt"               # or "nomic-embed-text"
+    collection: str = "knowledge_medcpt"
+    embedder: str = "medcpt"
     k: int = 4
-    threshold: float = 0.60                # gate for graph-invoked retrieval (V2-V4); 0.0 = keep top-k
+    threshold: float = 0.60                # gate for graph-invoked retrieval; 0.0 = keep top-k
     distill_query: bool = True
     tool: bool = False                     # bind retrieval as a tool the agent calls (agentic V1)
-    adaptive: bool = False                 # V1b: per-question router — skip retrieval when a
-                                            # question looks reasoning-heavy rather than fact-lookup
+    adaptive: bool = False                 # per-question router: skip retrieval on reasoning-heavy questions
 
 
 @dataclass(frozen=True)
@@ -29,36 +28,19 @@ class RunConfig:
     role_models: dict[str, Any] = field(default_factory=dict)
     answer_role: str = "baseline"          # role for the single-answer node (V0-V2)
     rag: RagConfig | None = None           # None = no retrieval (V0)
-    clinical_reason: bool = False          # dedicated clinical-reasoning stage before the decider (V2-V4)
-    verify: bool = False                   # verifier node, reads the clinical report (V2/V3, off for V4)
-    memory: bool = False                   # short-term memory: lets the verifier also read the
-                                            # shared case understanding, straight from state, no
-                                            # separate agent; a no-op without verify=True too (V3)
-    long_term: bool = False                # long-term (cross-episode) memory: the DECIDER recalls
-                                            # lessons from similar earlier cases and writes one back
-                                            # (SqliteStore, survives the process) — spec §4.5
+    clinical_reason: bool = False          # dedicated clinical-reasoning stage before the decider
+    verify: bool = False                   # verifier node (V4/V5)
+    memory: bool = False                   # verifier also reads shared case understanding from state
+    long_term: bool = False                # decider recalls/writes cross-episode lessons (spec §4.5)
     long_term_db: str = "data/longterm/lessons.sqlite"
-    long_term_split: str = "train"          # WHICH lesson bank to use (a store namespace), not
-                                            # the split being scored — reading train-built
-                                            # lessons while scoring test is the intended setup,
-                                            # so this stays independent of the -s flag.
-    long_term_read_only: bool = True        # recall but never write. Default ON: writing during
-                                            # a scored run leaks one graded item's lesson into
-                                            # later graded items. Building the bank must be an
-                                            # explicit act (`--remember`).
+    long_term_split: str = "train"          # which lesson-bank namespace, independent of -s split
+    long_term_read_only: bool = False       # recall AND write by default; writing while scoring
+                                            # leaks between graded items. No CLI flag for this —
+                                            # override programmatically for a clean scored run.
     long_term_mistakes: bool = False       # verifier recalls a SEPARATE bank of past WRONG cases
-                                            # (never sees gold itself); a node after verify checks
-                                            # the final answer against gold and, only on a miss,
-                                            # distills a corrective lesson into that bank.
-    checkpoint: bool = False               # snapshot QAState after every node (resumability /
-                                            # human-in-the-loop). Off by default: nothing reads
-                                            # checkpoints back, and retaining them costs ~100 KB
-                                            # per item (~128 MB over the 1273-item test split).
+    checkpoint: bool = False               # snapshot QAState after every node; off by default (unread, ~100KB/item)
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
-    verify_wikipedia: bool = False         # verifier's grounding tool is live Wikipedia search
-                                            # instead of the local (MedMCQA-derived) textbook corpus
-                                            # — an independent check, not circular with the rest of
-                                            # the system's retrieval.
+    verify_wikipedia: bool = False         # verifier grounds against live Wikipedia instead of the local corpus
 
     def model_for(self, role: str) -> Any:
         return self.role_models.get(role, self.model)
