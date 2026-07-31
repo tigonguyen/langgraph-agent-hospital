@@ -40,13 +40,26 @@ AGENTIC_VERIFY = (
     "answer against textbook evidence. Then, in at most 30 words, say why you keep or change the "
     "answer, and on the LAST line write 'Answer: X' where X is A, B, C, or D."
 )
-# Appended to the verifier's closing when long-term memory is on (V3). The lesson line must
-# come BEFORE the answer line, since every closing above pins 'Answer: X' to the LAST line
-# and parse_choice reads the last letter it finds.
+# Appended to the decider's closing when long-term memory is on (V3-V5). The lesson line
+# must come BEFORE the answer line, since every closing above pins 'Answer: X' to the LAST
+# line and parse_choice reads the last letter it finds.
 LESSON_SUFFIX = (
     "Before that final answer line, add one line starting 'Lesson:' — a single transferable "
     "rule from this case, phrased so it helps on a DIFFERENT patient (name the discriminating "
     "finding and what it points to). Write no lesson if the case taught you nothing general."
+)
+# V4's verifier with live Wikipedia search instead of the local textbook tool (see
+# roles.REPORT_VERIFIER_WIKIPEDIA).
+AGENTIC_VERIFY_WIKIPEDIA = (
+    "First, if it would help, call search_wikipedia with a focused query to check the proposed "
+    "answer against a Wikipedia article. Then, in at most 30 words, say why you keep or change the "
+    "answer, and on the LAST line write 'Answer: X' where X is A, B, C, or D."
+)
+# V5's post-verify mistake-distill node (graph/nodes.make_mistake_distill_node): no 'Answer:'
+# line — this node's output must never be parsed as an answer, only ever a lesson.
+MISTAKE_LESSON_ONLY = (
+    "Write your explanation as instructed above, ending with the 'Lesson:' line. Do not restate "
+    "or change the answer — that has already been decided."
 )
 
 

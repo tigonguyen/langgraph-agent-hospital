@@ -23,7 +23,7 @@ def _ollama_has(model: str) -> bool:
 # --- offline: the switch (building is lazy — no network/store) --------------
 
 def test_registry_has_all_variants():
-    assert list(VARIANTS) == ["V0", "V1", "V2", "V3", "V4", "V3L"]
+    assert list(VARIANTS) == ["V0", "V1", "V2", "V3", "V4", "V5"]
 
 
 def test_all_variants_build():

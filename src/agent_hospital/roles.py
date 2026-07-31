@@ -161,6 +161,42 @@ REPORT_VERIFIER = (
     "answer, then on the LAST line write 'Answer: X' where X is A, B, C, or D."
 )
 
+# V4's verifier: identical job to REPORT_VERIFIER, but its independent-evidence step
+# checks against live Wikipedia instead of the local textbook corpus — that corpus is
+# itself built from MedMCQA (the same benchmark family being scored), so it isn't an
+# independent check; Wikipedia is.
+REPORT_VERIFIER_WIKIPEDIA = (
+    "You are a verifying physician doing a final check before a USMLE answer is submitted. You "
+    "are given the question, the four options, a colleague's clinical-reasoning report (with an "
+    "option-by-option verdict — SUPPORTED, RULED OUT, or UNCERTAIN, one line each — for every "
+    "option), and the answer another colleague chose from that report.\n\n"
+    "Check in this order:\n"
+    "1. CONSISTENCY — does the chosen option match what the report's option-by-option section "
+    "actually concluded? If the report marked the chosen option RULED OUT, or marked a different "
+    "option clearly SUPPORTED, that is a red flag: the decision may not follow from the reasoning "
+    "that was already done.\n"
+    "2. EVIDENCE, IF NEEDED — if the report alone does not settle it, call search_wikipedia with a "
+    "focused query naming the chosen option (its diagnosis, organism, or management step — not the "
+    "whole vignette) to check it against a Wikipedia article. Treat any hit as evidence to weigh, "
+    "not a guaranteed answer — Wikipedia is a general reference, not a clinical source of record.\n\n"
+    "If the chosen option holds up, confirm it. If not, choose the option the report (and any "
+    "evidence) actually supports best. In at most 30 words, say why you kept or changed the "
+    "answer, then on the LAST line write 'Answer: X' where X is A, B, C, or D."
+)
+# V5's post-verify node: the ONLY role that ever sees the gold answer (graph/nodes.py's
+# distill_mistake — never the verifier itself). Runs only when the final answer was wrong;
+# reviews the miss and distills a corrective lesson for the mistake bank (graph/longterm.py).
+MISTAKE_ANALYST = (
+    "You are reviewing a USMLE board case your team got WRONG, to help the team do better on "
+    "similar cases in the future. You are given the vignette, the four options, the option your "
+    "team chose, and — revealed to you only, for this review; your team did not know it when they "
+    "answered — the correct option.\n\n"
+    "Briefly explain what discriminating finding in the vignette should have pointed to the "
+    "correct option instead of the one chosen, in at most 40 words. Then, on the LAST line, write "
+    "'Lesson:' followed by a single transferable rule, phrased so it helps on a DIFFERENT patient "
+    "(name the discriminating finding and what it points to) — not a restatement of this case."
+)
+
 ROLE_PROMPTS: dict[str, str] = {
     "baseline": BASELINE,
     "rag-agent": RAG_AGENT,
@@ -169,4 +205,6 @@ ROLE_PROMPTS: dict[str, str] = {
     "evidence-digest": EVIDENCE_DIGEST,
     "decider": DECIDER,
     "report-verifier": REPORT_VERIFIER,
+    "report-verifier-wikipedia": REPORT_VERIFIER_WIKIPEDIA,
+    "mistake-analyst": MISTAKE_ANALYST,
 }

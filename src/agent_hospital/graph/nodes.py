@@ -15,10 +15,13 @@ from agent_hospital.agents.base import Agent
 from agent_hospital.config import RunConfig
 from agent_hospital.graph import longterm
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
-from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, ANALYSE_ONLY,
-                                   DIGEST_EVIDENCE_ONLY, LESSON_SUFFIX, LETTER_ONLY,
-                                   REASON_THEN_ANSWER, UNDERSTAND_ONLY, format_mcq,
-                                   parse_choice)
+# Aliased: a `@tool def search_wikipedia(...)` below would shadow this import in its own
+# scope, turning `search_wikipedia(query)` inside the tool into infinite self-recursion.
+from agent_hospital.knowledge import search_wikipedia as _wikipedia_lookup
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, AGENTIC_VERIFY_WIKIPEDIA,
+                                   ANALYSE_ONLY, DIGEST_EVIDENCE_ONLY, LESSON_SUFFIX, LETTER_ONLY,
+                                   MISTAKE_LESSON_ONLY, REASON_THEN_ANSWER, UNDERSTAND_ONLY,
+                                   format_mcq, parse_choice)
 from agent_hospital.qa.reasoning import build_reasoning_agent, build_router
 
 Node = Callable[[dict], dict]
@@ -183,6 +186,29 @@ def make_search_tool(cfg: RunConfig, max_calls: int | None = None):
     return search_textbooks, lambda: calls.__setitem__("n", 0)
 
 
+def make_wikipedia_tool(cfg: RunConfig, max_calls: int | None = None):
+    """A `search_wikipedia` tool (V4's verifier) — live Wikipedia search, independent of
+    this project's local corpus (itself built from MedMCQA, the benchmark being scored).
+
+    Same shape as `make_search_tool`: a live network call instead of a Chroma lookup, but
+    `knowledge.search_wikipedia` already degrades to "" on any failure, so a network
+    outage behaves exactly like the local tool's own no-RAG fallback.
+    """
+    from langchain_core.tools import tool
+
+    calls = {"n": 0}
+
+    @tool
+    def search_wikipedia(query: str) -> str:
+        """Search Wikipedia for an article relevant to a clinical query."""
+        blocked = _call_cap_guard(calls, max_calls, "search_wikipedia")
+        if blocked:
+            return blocked
+        return _wikipedia_lookup(query)
+
+    return search_wikipedia, lambda: calls.__setitem__("n", 0)
+
+
 def make_medmcqa_tool(cfg: RunConfig, max_calls: int | None = None):
     """Tool factory (NOT a graph node): returns a LangChain `@tool` (`search_medmcqa`)
     to BIND to an agent so the *model* decides when to call it (agentic RAG). Only V1's
@@ -272,57 +298,91 @@ def make_reasoning_node(cfg: RunConfig) -> Node:
 
 
 def make_answer_node(cfg: RunConfig) -> Node:
+    """The decider (Node 4). When `cfg.long_term` (V3-V5), it also recalls lessons from
+    similar EARLIER cases (the general bank, graph/longterm.py) and, after deciding,
+    distills one back for future episodes — moved here from the verifier so it's the
+    single place both "what usually works" is read AND written, independent of whether
+    a verifier exists at all (V3 has none).
+    """
     agent = Agent(cfg.answer_role, roles.ROLE_PROMPTS[cfg.answer_role], model=cfg.model_for(cfg.answer_role))
 
-    def node(state: dict) -> dict:
-        # A prior clinical-reasoning report (V2-V4) informs the choice; the short
-        # justification written here replaces it as the user-facing explanation. The
-        # decider never reads the case understanding — only the verifier does (V3).
-        prior = state.get("clinical_report", "")
-        extra = f"\n\nColleague's clinical-reasoning report:\n{prior}" if prior else ""
-        reply = agent.say(_prompt(state, extra=extra, closing=REASON_THEN_ANSWER))
-        return {"answer": parse_choice(reply), "rationale": reply.strip()}
-
-    return node
-
-
-def make_report_verify_node(cfg: RunConfig) -> Node:
-    """V2/V3's verifier: a cheap final check, not a second full derivation.
-
-    Reads the clinical reasoner's report straight from `state["clinical_report"]` — plus,
-    when `cfg.memory` (V3) is set, the shared case understanding too — and the decider's
-    chosen letter and its own short explanation (`state["rationale"]`, not yet overwritten),
-    and audits that choice against them. No separate memory agent: everything Nodes 1-3
-    produced already lives in the shared graph state, so this just reads more of it directly
-    (`state["evidence"]` is auto-prepended by `_prompt` like every other node). Only reaches
-    for `cfg.verify_rag`'s independent `search_textbooks` tool, on a query targeted at the
-    CHOSEN option specifically, if that context alone doesn't settle it. Falls back to the
-    prior answer on parse failure, like every other late-stage node.
-    """
-    if cfg.verify_rag:
-        search, reset_calls = make_search_tool(replace(cfg, rag=cfg.verify_rag),
-                                               max_calls=_MAX_AGENTIC_SEARCHES)
-        tools = [search]
-    else:
-        tools, reset_calls = (), lambda: None
-    closing = AGENTIC_VERIFY if cfg.verify_rag else REASON_THEN_ANSWER
-    if cfg.long_term:
-        closing = f"{closing}\n\n{LESSON_SUFFIX}"
-    agent = Agent("report-verifier", roles.ROLE_PROMPTS["report-verifier"],
-                  model=cfg.model_for("verifier"), tools=tools)
-
-    # Long-term store: opened once per graph (not per item) so the sqlite connection is
-    # reused across the whole run. Lazily, so building a graph still touches no disk.
+    # Long-term store: opened once per graph (not per item), lazily so building a graph
+    # still touches no disk. See graph/longterm.try_open.
     lt: dict[str, Any] = {}
 
     def _store():
         if not cfg.long_term:
             return None
         if "store" not in lt:
-            try:
-                lt["store"], lt["close"] = longterm.open_store(cfg.long_term_db)
-            except Exception:
-                lt["store"] = None        # unavailable -> behave like plain V3
+            lt["store"], lt["close"] = longterm.try_open(cfg.long_term_db)  # close unused but must stay referenced (longterm.try_open)
+        return lt["store"]
+
+    def node(state: dict) -> dict:
+        item = state["item"]
+        # A prior clinical-reasoning report (V2-V5) informs the choice; the short
+        # justification written here replaces it as the user-facing explanation.
+        prior = state.get("clinical_report", "")
+        lessons = longterm.recall(_store(), cfg.long_term_split, item.question) if cfg.long_term else ""
+        extra = ((f"\n\n{lessons}" if lessons else "")
+                 + (f"\n\nColleague's clinical-reasoning report:\n{prior}" if prior else ""))
+        closing = f"{REASON_THEN_ANSWER}\n\n{LESSON_SUFFIX}" if cfg.long_term else REASON_THEN_ANSWER
+        reply = agent.say(_prompt(state, extra=extra, closing=closing))
+        answer = parse_choice(reply)
+
+        if cfg.long_term:
+            longterm.remember(
+                _store(), cfg.long_term_split, item.id, item.question,
+                longterm.extract_lesson(reply),
+                chosen=_LETTERS[answer] if answer is not None else "",
+                read_only=cfg.long_term_read_only,
+            )
+        return {"answer": answer, "rationale": reply.strip()}
+
+    return node
+
+
+def make_report_verify_node(cfg: RunConfig) -> Node:
+    """V4/V5's verifier: a cheap final check, not a second full derivation.
+
+    Reads the clinical reasoner's report straight from `state["clinical_report"]` — plus,
+    when `cfg.memory` is set, the shared case understanding too — and the decider's chosen
+    letter and its own short explanation (`state["rationale"]`, not yet overwritten), and
+    audits that choice against them. No separate memory agent: everything Nodes 1-3
+    produced already lives in the shared graph state, so this just reads more of it directly
+    (`state["evidence"]` is auto-prepended by `_prompt` like every other node).
+
+    Independent grounding, if the report alone doesn't settle it: `cfg.verify_wikipedia`
+    (V4) reaches for live Wikipedia search instead of `cfg.verify_rag`'s local textbook
+    tool — the local corpus is itself built from MedMCQA (the same benchmark family being
+    scored), so it isn't an independent check.
+
+    `cfg.long_term_mistakes` (V5) recalls the SEPARATE mistake bank (graph/longterm.py) of
+    cases the system got wrong before. This node NEVER reads or writes gold — it only
+    recalls; `make_mistake_distill_node`, which runs after this one, is the only node that
+    ever sees gold, and the only writer to that bank.
+
+    Falls back to the prior answer on parse failure, like every other late-stage node.
+    """
+    if cfg.verify_wikipedia:
+        search, reset_calls = make_wikipedia_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES)
+        tools, role, closing = [search], "report-verifier-wikipedia", AGENTIC_VERIFY_WIKIPEDIA
+    elif cfg.verify_rag:
+        search, reset_calls = make_search_tool(replace(cfg, rag=cfg.verify_rag),
+                                               max_calls=_MAX_AGENTIC_SEARCHES)
+        tools, role, closing = [search], "report-verifier", AGENTIC_VERIFY
+    else:
+        tools, role, closing = (), "report-verifier", REASON_THEN_ANSWER
+        reset_calls = lambda: None
+    agent = Agent(role, roles.ROLE_PROMPTS[role], model=cfg.model_for("verifier"), tools=tools)
+
+    # Mistake-bank store: opened once per graph, lazily, same pattern as the decider's.
+    lt: dict[str, Any] = {}
+
+    def _store():
+        if not cfg.long_term_mistakes:
+            return None
+        if "store" not in lt:
+            lt["store"], lt["close"] = longterm.try_open(cfg.long_term_db)  # close unused but must stay referenced (longterm.try_open)
         return lt["store"]
 
     def node(state: dict) -> dict:
@@ -333,10 +393,10 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
         understanding = state.get("case_understanding", "") if cfg.memory else ""
         item = state["item"]
 
-        # Long-term memory (spec §4.5): lessons from similar cases in EARLIER episodes.
-        lessons = longterm.recall(_store(), cfg.long_term_split, item.question) if cfg.long_term else ""
+        mistakes = (longterm.recall_mistakes(_store(), cfg.long_term_split, item.question)
+                    if cfg.long_term_mistakes else "")
 
-        extra = ((f"\n\n{lessons}" if lessons else "")
+        extra = ((f"\n\n{mistakes}" if mistakes else "")
                  + (f"\n\nCase summary:\n{understanding}" if understanding else "")
                  + f"\n\nClinical-reasoning report (option-by-option verdicts):\n{report}"
                  + f"\n\nChosen answer: {cur_letter}"
@@ -344,14 +404,60 @@ def make_report_verify_node(cfg: RunConfig) -> Node:
         reply = agent.say(_prompt(state, extra=extra, closing=closing))
         revised = parse_choice(reply)
         final = revised if revised is not None else cur
-
-        if cfg.long_term:
-            longterm.remember(
-                _store(), cfg.long_term_split, item.id, item.question,
-                longterm.extract_lesson(reply),
-                chosen=_LETTERS[final] if final is not None else "",
-                read_only=cfg.long_term_read_only,
-            )
         return {"answer": final, "rationale": reply.strip()}
+
+    return node
+
+
+def make_mistake_distill_node(cfg: RunConfig) -> Node:
+    """V5's Node 6, after `verify`: the ONLY node in the graph that reads the gold answer
+    (`item.answer_idx`) — the verifier itself never does (see `make_report_verify_node`).
+
+    Skips entirely — no gold check, no LLM call, no store touch — when
+    `cfg.long_term_read_only` (the default): nothing would be persisted anyway, so don't
+    spend latency/tokens analyzing a case that won't be saved. That also means this node is
+    a no-op during any scored eval run unless `--remember` was passed, exactly like the
+    general bank's build/read-only split (graph/longterm.py module docstring).
+
+    Otherwise: compares the FINAL answer to gold. A correct answer is a no-op (nothing to
+    learn is written). A wrong answer gets one extra LLM call — a `mistake-analyst` agent
+    reviews the miss with the correct option revealed (only here) and distills a `Lesson:`
+    line, stored via `longterm.remember_mistake`.
+
+    MUST NOT touch `state["answer"]`/`state["rationale"]` — this node's entire job is
+    off to the side, writing to a store for FUTURE episodes; it must never change what
+    gets scored for the CURRENT one.
+    """
+    agent = Agent("mistake-analyst", roles.ROLE_PROMPTS["mistake-analyst"],
+                  model=cfg.model_for("verifier"))
+
+    lt: dict[str, Any] = {}
+
+    def _store():
+        if "store" not in lt:
+            lt["store"], lt["close"] = longterm.try_open(cfg.long_term_db)  # close unused but must stay referenced (longterm.try_open)
+        return lt["store"]
+
+    def node(state: dict) -> dict:
+        if cfg.long_term_read_only:
+            return {}
+        item = state["item"]
+        chosen = state.get("answer")
+        if chosen == item.answer_idx:
+            return {}                      # correct — nothing to learn
+
+        chosen_letter = _LETTERS[chosen] if chosen is not None else "unknown"
+        correct_letter = _LETTERS[item.answer_idx]
+        chosen_text = item.options[chosen] if chosen is not None else ""
+        extra = (f"\n\nYour team chose: {chosen_letter}. {chosen_text}"
+                 f"\n\nThe correct answer was: {correct_letter}. {item.options[item.answer_idx]}")
+        reply = agent.say(_prompt(state, extra=extra, closing=MISTAKE_LESSON_ONLY))
+        longterm.remember_mistake(
+            _store(), cfg.long_term_split, item.id, item.question,
+            longterm.extract_lesson(reply),
+            wrong=chosen_letter, correct=correct_letter,
+            read_only=cfg.long_term_read_only,
+        )
+        return {}
 
     return node

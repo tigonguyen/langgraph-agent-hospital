@@ -12,9 +12,9 @@ internally (understand, search, reason, decide), split into 4 nodes:
                        |                       stranded in later supersteps otherwise — see
                     [verify]                   make_search_branch_node for the measured why).
 
-Short-term memory (V3) is NOT a separate agent: `case_understanding`, `evidence`, and
-`clinical_report` already sit in the shared graph state that every node reads, so `verify`
-(the only consumer) reads them straight from `state` when `cfg.memory` is set — no LLM call
+Short-term memory (`cfg.memory`, V4/V5) is NOT a separate agent: `case_understanding`,
+`evidence`, and `clinical_report` already sit in the shared graph state that every node
+reads, so `verify` (the only consumer) reads them straight from `state` — no LLM call
 needed just to pass information one node already produced to another.
 
 A join with >1 predecessor MUST be wired as `add_edge([a, b], c)` (list form) so `c` runs
@@ -113,12 +113,21 @@ def build_graph(cfg: RunConfig):
         g.add_edge(predecessors[0] if predecessors else START, "answer")
     prev = "answer"
 
-    # Verifier. `cfg.memory` (V3) just tells it to also read case_understanding from state
-    # (see make_report_verify_node) — no extra node or LLM call, the state is already there.
+    # Verifier (V4/V5). `cfg.memory` just tells it to also read case_understanding from
+    # state (see make_report_verify_node) — no extra node or LLM call, the state is
+    # already there.
     if cfg.verify:
         g.add_node("verify", nodes.make_report_verify_node(cfg))
         g.add_edge(prev, "verify")
         prev = "verify"
+
+    # Node 6 (V5 only): the only node that ever reads gold. Runs after verify, writes a
+    # corrective lesson to the SEPARATE mistake bank only when the final answer was wrong
+    # (see make_mistake_distill_node) — never touches state["answer"]/["rationale"].
+    if cfg.long_term_mistakes:
+        g.add_node("distill_mistake", nodes.make_mistake_distill_node(cfg))
+        g.add_edge(prev, "distill_mistake")
+        prev = "distill_mistake"
 
     g.add_edge(prev, END)
     return g.compile(checkpointer=checkpointer)

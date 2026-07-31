@@ -34,7 +34,7 @@ class RunConfig:
     memory: bool = False                   # short-term memory: lets the verifier also read the
                                             # shared case understanding, straight from state, no
                                             # separate agent; a no-op without verify=True too (V3)
-    long_term: bool = False                # long-term (cross-episode) memory: the verifier recalls
+    long_term: bool = False                # long-term (cross-episode) memory: the DECIDER recalls
                                             # lessons from similar earlier cases and writes one back
                                             # (SqliteStore, survives the process) — spec §4.5
     long_term_db: str = "data/longterm/lessons.sqlite"
@@ -46,11 +46,19 @@ class RunConfig:
                                             # a scored run leaks one graded item's lesson into
                                             # later graded items. Building the bank must be an
                                             # explicit act (`--remember`).
+    long_term_mistakes: bool = False       # verifier recalls a SEPARATE bank of past WRONG cases
+                                            # (never sees gold itself); a node after verify checks
+                                            # the final answer against gold and, only on a miss,
+                                            # distills a corrective lesson into that bank.
     checkpoint: bool = False               # snapshot QAState after every node (resumability /
                                             # human-in-the-loop). Off by default: nothing reads
                                             # checkpoints back, and retaining them costs ~100 KB
                                             # per item (~128 MB over the 1273-item test split).
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
+    verify_wikipedia: bool = False         # verifier's grounding tool is live Wikipedia search
+                                            # instead of the local (MedMCQA-derived) textbook corpus
+                                            # — an independent check, not circular with the rest of
+                                            # the system's retrieval.
 
     def model_for(self, role: str) -> Any:
         return self.role_models.get(role, self.model)

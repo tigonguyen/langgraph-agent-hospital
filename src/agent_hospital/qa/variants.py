@@ -22,9 +22,9 @@ VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only (MedMCQA)",
     "V2": "Multi-agent (case reasoner + decider)",
-    "V3": "Full system (V2 + short-term memory)",
-    "V4": "Full system without verifier",
-    "V3L": "V3 + long-term memory (cross-episode lessons)",
+    "V3": "V2 without verifier, decider has long-term memory",
+    "V4": "V3 + verifier grounded in live Wikipedia",
+    "V5": "V3 + verifier that recalls an evolutionary mistake bank",
 }
 
 @dataclass(frozen=True)
@@ -64,34 +64,36 @@ _PRESETS: dict[str, RunConfig] = {
     "V2": RunConfig(clinical_reason=True, answer_role="decider",
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
-    # V3 = V2 + verifier + short-term memory: the verifier reads the shared case understanding
-    # AND the clinical reasoner's report straight from state (no separate memory agent — Nodes
-    # 1-3's outputs already sit in the graph's shared state) and audits the decider's choice
-    # against them before confirming or revising it. No independent search tool (dropped the
-    # MedRAG Textbooks/MedCPT verify_rag check) — the consistency check against the reasoner's
-    # own report is the whole job. `memory` is purely in service of `verify` here — a single
-    # delta from V2 (the verifier, memory-equipped), not two.
-    "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
+    # V3 = V2 WITHOUT a verifier, but the decider gains long-term (cross-episode) memory
+    # (spec §4.5): it recalls lessons from similar EARLIER cases and writes one back after
+    # every case, right or wrong, to a SqliteStore that outlives the process (the "general"
+    # bank — see graph/longterm.py). No verifier at all here — that's V4/V5's addition, so
+    # `V4 - V3` and `V5 - V3` each isolate exactly one verifier design's marginal effect.
+    # PROTOCOL: lessons are RECALLED here but not written by default — `long_term_read_only`
+    # (True) is the preset default so the safe path is the one you get by typing nothing.
+    # Writing while scoring leaks item N's lesson into item N+80 of the same graded split.
+    # Build the bank deliberately, on the train split only: `-v V3 -s train --remember`.
+    "V3": RunConfig(clinical_reason=True, answer_role="decider", verify=False, long_term=True,
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
-    # V4 = V3 without the verifier (verify=False, everything else identical) — isolates
-    # exactly the verifier's (memory-equipped) marginal contribution (V3 - V4).
-    "V4": RunConfig(clinical_reason=True, answer_role="decider",
+    # V4 = V3 + a verifier grounded in LIVE WIKIPEDIA rather than this project's own local
+    # corpus, which is itself built from MedMCQA (the same benchmark family being scored) —
+    # so the existing textbook `verify_rag` check isn't independent evidence, Wikipedia is.
+    # `V4 - V3` isolates exactly this verifier's marginal contribution.
+    "V4": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
+                    long_term=True, verify_wikipedia=True,
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=False)),
-    # V3L = V3 + long-term memory (spec §4.5): the verifier recalls lessons from similar
-    # EARLIER cases and writes one back, in a SqliteStore that outlives the process. Kept as
-    # its own preset rather than folded into V3 so `V3L - V3` isolates cross-episode memory
-    # (V3's `memory=True` is only the within-episode state read).
-    # PROTOCOL: lessons are RECALLED here but not written — `long_term_read_only=True` is the
-    # preset default so the safe path is the one you get by typing nothing. Writing while
-    # scoring leaks item N's lesson into item N+80 of the same graded split, which inflates
-    # accuracy for reasons unrelated to reasoning. Build the lesson bank deliberately, on the
-    # dev split only: `-v V3L -s train --remember` (see __main__.py). See graph/longterm.py.
-    "V3L": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
-                     long_term=True, long_term_read_only=True,
-                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
-                                   k=5, threshold=0.0, tool=False)),
+    # V5 = V3 + a verifier that recalls a SEPARATE "evolutionary" bank of past WRONG cases
+    # (`long_term_mistakes`) — distinct from V3's general lesson bank. The verifier only
+    # ever RECALLS from it and never sees gold; a Node 6 after verify (the only node that
+    # reads gold) compares the final answer to it and, only on a miss, distills a corrective
+    # lesson into that bank. Same train-build/read-only-eval protocol as V3's general bank —
+    # `-v V5 -s train --remember` builds both banks in one pass.
+    "V5": RunConfig(clinical_reason=True, answer_role="decider", verify=True, memory=True,
+                    long_term=True, long_term_mistakes=True,
+                    rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
+                                  k=5, threshold=0.0, tool=False)),
 }
 
 

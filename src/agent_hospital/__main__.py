@@ -46,7 +46,7 @@ def warm_up(answer_fn) -> None:
 
 
 def main() -> None:
-    p = argparse.ArgumentParser(prog="agent_hospital", description="Run a MedQA-USMLE variant (V0-V4).")
+    p = argparse.ArgumentParser(prog="agent_hospital", description="Run a MedQA-USMLE variant (V0-V5).")
     p.add_argument("-v", "--variant", default="V0", type=str.upper, choices=list(VARIANTS),
                    help="which system variant (default: V0)")
     p.add_argument("-s", "--split", default="train", choices=["train", "validation", "test"],
@@ -61,12 +61,13 @@ def main() -> None:
     p.add_argument("-q", "--quiet", action="store_true",
                    help="suppress the per-item log, print only the summary")
     p.add_argument("--remember", action="store_true",
-                   help="V3L only: WRITE lessons to the long-term store (default is recall-only). "
-                        "Use on the dev split to build the bank — writing during a scored run "
-                        "leaks one graded item's lesson into later graded items.")
+                   help="V3/V4/V5 only: WRITE lessons to the long-term store(s) (default is "
+                        "recall-only). Use on the dev split to build the bank — writing during a "
+                        "scored run leaks one graded item's lesson into later graded items.")
     p.add_argument("--lesson-bank", metavar="SPLIT",
-                   help="V3L only: which lesson-bank namespace to recall from (default: train). "
-                        "Independent of -s: reading train lessons while scoring test is intended.")
+                   help="V3/V4/V5 only: which lesson-bank namespace to recall from (default: "
+                        "train). Independent of -s: reading train lessons while scoring test is "
+                        "intended.")
     args = p.parse_args()
 
     # Only pass long-term overrides when they were actually given, so every other variant's
@@ -78,7 +79,7 @@ def main() -> None:
         overrides["long_term_split"] = args.lesson_bank
     if overrides and not _PRESETS[args.variant].long_term:
         p.error(f"--remember/--lesson-bank apply to long-term variants only; "
-                f"{args.variant} has long_term=False (use -v V3L)")
+                f"{args.variant} has long_term=False (use -v V3, V4, or V5)")
 
     limit = args.limit or None
     items = load_medqa_usmle(args.split, limit=limit)
