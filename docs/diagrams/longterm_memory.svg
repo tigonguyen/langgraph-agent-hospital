@@ -1,5 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="820" height="500" viewBox="0 0 820 500" font-family="Helvetica, Arial, sans-serif">
-  <title>Bộ nhớ dài hạn — hai kho tách biệt trong một SqliteStore</title>
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="466" viewBox="0 0 820 466" font-family="Helvetica, Arial, sans-serif">
+  <title>Long-term memory — two separate banks in one SqliteStore</title>
   <defs>
     <marker id="ltRead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
@@ -9,69 +9,67 @@
     </marker>
   </defs>
 
-  <text x="410" y="24" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">Bộ nhớ dài hạn — hai kho tách biệt, cùng một SqliteStore, phân tách bằng namespace</text>
-  <text x="410" y="42" text-anchor="middle" font-size="11" fill="#64748B">Không nút nào được thêm cho bộ nhớ: recall/remember móc vào các nút đã có</text>
+  <text x="410" y="24" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">Long-term memory — two separate banks, one SqliteStore, split by namespace</text>
+  <text x="410" y="42" text-anchor="middle" font-size="11" fill="#64748B">No node is added for memory: recall/remember hook into nodes that already exist</text>
 
-  <!-- ================= producer/consumer nodes ================= -->
+  <!-- ================= producer/consumer nodes (purple = LLM call) ================= -->
   <!-- decider -->
-  <rect x="34" y="72" width="212" height="66" rx="6" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.4"/>
-  <text x="140" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#92400E">Node 4 — decider (answer)</text>
-  <text x="140" y="111" text-anchor="middle" font-size="10" fill="#475569">recall bài học ở MỌI ca</text>
-  <text x="140" y="127" text-anchor="middle" font-size="10" fill="#92400E">remember sau khi chốt đáp án</text>
-  <text x="140" y="152" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">bật từ V3 (V3, V4, V5)</text>
+  <rect x="34" y="72" width="212" height="82" rx="6" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1.4"/>
+  <text x="140" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#5B21B6">Node 4 — decider (answer)</text>
+  <text x="140" y="111" text-anchor="middle" font-size="10" fill="#6D28D9">recalls a lesson on EVERY case</text>
+  <text x="140" y="129" text-anchor="middle" font-size="10" fill="#6D28D9">remembers one after committing</text>
+  <text x="140" y="147" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V3, V4, V5</text>
 
   <!-- verifier -->
-  <rect x="304" y="72" width="212" height="66" rx="6" fill="#F8FAFC" stroke="#94A3B8" stroke-width="1.4"/>
-  <text x="410" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#334155">Node 5 — verifier (verify)</text>
-  <text x="410" y="111" text-anchor="middle" font-size="10" fill="#475569">recall các lỗi đã mắc trước đây</text>
-  <text x="410" y="127" text-anchor="middle" font-size="10" fill="#64748B">chỉ đọc — không bao giờ ghi</text>
-  <text x="410" y="152" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V4 (Wikipedia), V5 (mistake bank)</text>
+  <rect x="304" y="72" width="212" height="82" rx="6" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1.4"/>
+  <text x="410" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#5B21B6">Node 5 — verifier (verify)</text>
+  <text x="410" y="111" text-anchor="middle" font-size="10" fill="#6D28D9">recalls mistakes on similar cases</text>
+  <text x="410" y="129" text-anchor="middle" font-size="10" fill="#6D28D9">read-only — never writes</text>
+  <text x="410" y="147" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V5 (mistake bank)</text>
 
   <!-- distill_mistake -->
-  <rect x="574" y="72" width="212" height="66" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.4"/>
-  <text x="680" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#991B1B">Node 6 — distill_mistake</text>
-  <text x="680" y="111" text-anchor="middle" font-size="10" fill="#991B1B">nút DUY NHẤT đọc nhãn đúng</text>
-  <text x="680" y="127" text-anchor="middle" font-size="10" fill="#92400E">chỉ ghi khi đáp án SAI</text>
-  <text x="680" y="152" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">chỉ V5</text>
+  <rect x="574" y="72" width="212" height="82" rx="6" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1.4"/>
+  <text x="680" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#5B21B6">Node 6 — distill_mistake</text>
+  <text x="680" y="111" text-anchor="middle" font-size="10" fill="#6D28D9">the ONLY node that reads gold</text>
+  <text x="680" y="129" text-anchor="middle" font-size="10" fill="#6D28D9">writes only when answer is WRONG</text>
+  <text x="680" y="147" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V5 only</text>
 
-  <!-- ================= the two banks ================= -->
-  <rect x="34" y="196" width="360" height="104" rx="6" fill="#FFFBEB" stroke="#F59E0B" stroke-width="1.5"/>
-  <text x="214" y="218" text-anchor="middle" font-size="12" font-weight="500" fill="#92400E">Kho 1 — bài học chung</text>
-  <text x="214" y="238" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#334155">("medqa-lessons", split)</text>
-  <text x="214" y="257" text-anchor="middle" font-size="10" fill="#475569">một dòng Lesson: cho mỗi ca đã gặp</text>
-  <text x="214" y="275" text-anchor="middle" font-size="10" fill="#475569">decider đọc VÀ ghi</text>
-  <text x="214" y="292" text-anchor="middle" font-size="9.5" fill="#64748B">key: lesson-&lt;id&gt; — chạy lại thì ghi đè</text>
+  <!-- ================= the two banks (amber = SQLite store, no LLM) ================= -->
+  <rect x="34" y="196" width="360" height="104" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-width="1.5"/>
+  <text x="214" y="218" text-anchor="middle" font-size="12" font-weight="500" fill="#92400E">Bank 1 — general lesson bank</text>
+  <text x="214" y="238" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#92400E">("medqa-lessons", split)</text>
+  <text x="214" y="257" text-anchor="middle" font-size="10" fill="#92400E">one Lesson row per case seen</text>
+  <text x="214" y="275" text-anchor="middle" font-size="10" fill="#92400E">decider reads AND writes</text>
+  <text x="214" y="292" text-anchor="middle" font-size="9.5" fill="#92400E">key: lesson-&lt;id&gt; — overwritten on rerun</text>
 
-  <rect x="426" y="196" width="360" height="104" rx="6" fill="#FEF2F2" stroke="#DC2626" stroke-width="1.5"/>
-  <text x="606" y="218" text-anchor="middle" font-size="12" font-weight="500" fill="#991B1B">Kho 2 — mistake bank</text>
-  <text x="606" y="238" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#334155">("medqa-mistakes", split)</text>
-  <text x="606" y="257" text-anchor="middle" font-size="10" fill="#475569">chỉ các ca đã trả lời SAI</text>
-  <text x="606" y="275" text-anchor="middle" font-size="10" fill="#475569">verifier đọc — distill_mistake ghi</text>
-  <text x="606" y="292" text-anchor="middle" font-size="9.5" fill="#64748B">tách kho nên lỗi không lẫn vào bài học chung</text>
+  <rect x="426" y="196" width="360" height="104" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-width="1.5"/>
+  <text x="606" y="218" text-anchor="middle" font-size="12" font-weight="500" fill="#92400E">Bank 2 — mistake bank</text>
+  <text x="606" y="238" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#92400E">("medqa-mistakes", split)</text>
+  <text x="606" y="257" text-anchor="middle" font-size="10" fill="#92400E">only cases answered WRONG</text>
+  <text x="606" y="275" text-anchor="middle" font-size="10" fill="#92400E">verifier reads — distill_mistake writes</text>
+  <text x="606" y="292" text-anchor="middle" font-size="9.5" fill="#92400E">kept separate so mistakes never mix into the general bank</text>
 
   <!-- arrows decider <-> bank1 -->
-  <path d="M 104 140 L 104 196" fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#ltRead)"/>
-  <path d="M 176 196 L 176 140" fill="none" stroke="#92400E" stroke-width="1.4" marker-end="url(#ltWrite)"/>
-  <text x="80" y="172" font-size="9.5" fill="#475569">đọc</text>
-  <text x="182" y="172" font-size="9.5" fill="#92400E">ghi</text>
+  <path d="M 104 156 L 104 196" fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#ltRead)"/>
+  <path d="M 176 196 L 176 156" fill="none" stroke="#92400E" stroke-width="1.4" marker-end="url(#ltWrite)"/>
+  <text x="98" y="180" text-anchor="end" font-size="9.5" fill="#475569">read</text>
+  <text x="182" y="180" text-anchor="start" font-size="9.5" fill="#92400E">write</text>
 
   <!-- arrow verifier -> bank2 (read only) -->
-  <path d="M 470 140 L 470 172 L 520 172 L 520 194" fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#ltRead)"/>
-  <text x="476" y="166" font-size="9.5" fill="#475569">đọc</text>
+  <path d="M 470 156 L 470 176 L 520 176 L 520 196" fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#ltRead)"/>
+  <text x="495" y="170" text-anchor="middle" font-size="9.5" fill="#475569">read</text>
 
   <!-- arrow distill -> bank2 (write only) -->
-  <path d="M 690 140 L 690 172 L 660 172 L 660 194" fill="none" stroke="#92400E" stroke-width="1.4" marker-end="url(#ltWrite)"/>
-  <text x="666" y="166" font-size="9.5" fill="#92400E">ghi</text>
+  <path d="M 690 156 L 690 176 L 660 176 L 660 196" fill="none" stroke="#92400E" stroke-width="1.4" marker-end="url(#ltWrite)"/>
+  <text x="675" y="170" text-anchor="middle" font-size="9.5" fill="#92400E">write</text>
 
-  <!-- persistence note -->
-  <rect x="34" y="314" width="752" height="34" rx="5" fill="#F1F5F9" stroke="#CBD5E1"/>
-  <text x="410" y="336" text-anchor="middle" font-size="10.5" fill="#334155">Một tệp duy nhất <tspan font-family="monospace">data/longterm/lessons.sqlite</tspan> — tồn tại xuyên câu hỏi VÀ xuyên lần chạy (QAState thì bị hủy sau mỗi câu)</text>
+  <!-- persistence note (grey = control/meta) -->
+  <rect x="34" y="314" width="752" height="34" rx="5" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="410" y="336" text-anchor="middle" font-size="10.5" fill="#334155">One file, <tspan font-family="monospace">data/longterm/lessons.sqlite</tspan> — persists across questions AND runs (QAState dies after each question)</text>
 
-  <!-- ================= guards ================= -->
-  <rect x="34" y="366" width="752" height="118" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
-  <text x="50" y="387" font-size="11.5" font-weight="500" fill="#334155">Vì sao là Store chứ không phải checkpointer, và chống rò rỉ khi chấm điểm</text>
-  <text x="50" y="408" font-size="10.5" fill="#475569">· Checkpointer khóa theo <tspan font-family="monospace">thread_id</tspan> (= <tspan font-family="monospace">item.id</tspan>) nên chỉ phát lại được MỘT câu; Store có namespace riêng nên vượt biên episode.</text>
-  <text x="50" y="428" font-size="10.5" fill="#475569">· <tspan font-family="monospace">namespace</tspan> chứa tên split — bài học học trên train là vô hình khi truy vấn namespace test.</text>
-  <text x="50" y="448" font-size="10.5" fill="#991B1B">· Mặc định hiện tại là GHI (không có cờ CLI để tắt): ghi trong khi chấm sẽ rò rỉ từ câu N sang câu N+k của cùng tập.</text>
-  <text x="50" y="468" font-size="10.5" fill="#92400E">· Muốn số liệu báo cáo: truyền <tspan font-family="monospace">long_term_read_only=True</tspan> — xây kho trên train trước, rồi chấm test ở chế độ chỉ đọc.</text>
+  <!-- ================= guards (grey = control/meta) ================= -->
+  <rect x="34" y="366" width="752" height="82" rx="6" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="50" y="387" font-size="11.5" font-weight="500" fill="#334155">Why a Store instead of a checkpointer</text>
+  <text x="50" y="408" font-size="10.5" fill="#475569">· Checkpointer is keyed by <tspan font-family="monospace">thread_id</tspan> (= <tspan font-family="monospace">item.id</tspan>) — replays only ONE question. Store has its own namespace — crosses episode boundaries.</text>
+  <text x="50" y="428" font-size="10.5" fill="#475569">· <tspan font-family="monospace">namespace</tspan> includes the split name — a lesson learned on train is invisible when querying the test namespace.</text>
 </svg>

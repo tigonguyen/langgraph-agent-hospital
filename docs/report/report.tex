@@ -11,6 +11,7 @@
   BoldItalicFont=lmroman10-bolditalic.otf]
 \setmonofont{lmmono10-regular.otf}
 \usepackage[margin=1in]{geometry}
+\usepackage{microtype}
 \usepackage{graphicx}
 \usepackage{booktabs}
 \usepackage{amsmath}
@@ -56,6 +57,7 @@
 \large Báo cáo giữa kỳ}
 \author{Nguyễn Đình Thanh \and Ngô Văn Tú \and Lê Viết Hưng \and Trần Quốc Phong}
 \date{}
+\emergencystretch=3em
 
 \begin{document}
 
@@ -183,7 +185,7 @@ một \texttt{StateGraph} của LangGraph~\cite{langgraph2024} qua \texttt{build
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth,height=0.82\textheight,keepaspectratio]{system_stack.pdf}
-  \caption{Toàn bộ technologies stack, từ dữ liệu thô đến đáp án được chấm điểm.}
+  \caption{Technology stack: từ dữ liệu thô đến đáp án được chấm.}
   \label{fig:stack}
 \end{figure}
 
@@ -221,7 +223,7 @@ một \texttt{StateGraph} của LangGraph~\cite{langgraph2024} qua \texttt{build
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.95\textwidth]{ladder_overview.pdf}
-  \caption{Thang khảo sát ablation. Mỗi biến thể thêm đúng một khả năng so với biến thể trước.}
+  \caption{Thang ablation: mỗi biến thể thêm đúng một khả năng.}
   \label{fig:ladder}
 \end{figure}
 
@@ -253,15 +255,6 @@ thoại có gọi công cụ (xem \S\ref{sec:rag}). V2-V5 theo đúng bộ khung
 bộ nhớ dài hạn), V4/V5 mỗi biến thể thêm các nút sau \texttt{answer} (Node~5 thêm 
 \texttt{verify}; V5 thêm cả Node~6 \texttt{verify} và \texttt{distill\_mistake}).
 
-\paragraph{Bản đồ module.} Các tệp chính, mỗi tệp một nhiệm vụ:
-\texttt{config.py} (nơi tập trung mọi tuỳ chỉnh: \texttt{RunConfig}/\texttt{RagConfig}), \texttt{roles.py} (mọi
-system prompt), \texttt{graph/} (trạng thái, các hàm tạo node, và \texttt{build\_graph}),
-\texttt{qa/variants.py} (các cấu hình định sẵn V0-V5 và điểm vào công khai \texttt{build\_variant}),
-\texttt{qa/mcq.py} (định dạng prompt và trích xuất câu trả lời), \texttt{qa/metrics.py} (mọi phép đo),
-\texttt{knowledge/} (nạp dữ liệu RAG, embedding, bộ truy hồi), và \texttt{agents/base.py} (lớp bọc tác
-tử khởi tạo trễ, không phụ thuộc nhà cung cấp).
-
-
 \FloatBarrier
 % =====================================================================
 \section{Thiết kế hệ thống}
@@ -282,7 +275,7 @@ trích chữ cái. Đây là mốc mà mọi biến thể khác được so sán
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.92\textwidth]{v0_flow.pdf}
-  \caption{V0 - một node duy nhất, không RAG.}
+  \caption{V0: một node, không RAG.}
   \label{fig:v0}
 \end{figure}
 
@@ -295,7 +288,7 @@ có node/tác tử riêng cho từng bước.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v1_flow.pdf}
-  \caption{V1 - một tác tử agentic tự gọi công cụ, tự chấm độ tin cậy, tự áp luật quyết định.}
+  \caption{V1: một tác tử agentic tự gọi công cụ và tự quyết định.}
   \label{fig:v1}
 \end{figure}
 
@@ -318,7 +311,7 @@ kế bốn nút, được tách dựa trên bốn việc mà tác tử đơn c�
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v2_flow.pdf}
-  \caption{V2 - Node 1 phân nhánh đồng thời sang Node 2/Node 3, hội tụ ở Node 4.}
+  \caption{V2: Node 1 phân nhánh song song sang Node 2/3, hội tụ ở Node 4.}
   \label{fig:v2}
 \end{figure}
 
@@ -331,8 +324,8 @@ gặp trước đó trước khi chốt đáp án, rồi tự
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v3_flow.pdf}
-  \caption{V3 - cùng bốn nút của V2; \texttt{decider} tự \texttt{recall}/\texttt{remember} vào kho
-  \texttt{medqa-lessons}, không thêm tác tử hay lượt gọi LLM nào.}
+  \caption{V3: bốn nút của V2; \texttt{decider} tự \texttt{recall}/\texttt{remember} vào
+  \texttt{medqa-lessons}.}
   \label{fig:v3}
 \end{figure}
 
@@ -345,8 +338,8 @@ lệnh gọi Wikipedia \emph{trực tuyến}, độc lập với dữ liệu Med
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v4_flow.pdf}
-  \caption{V4 - đồ thị V3 + Node~5 (\texttt{report-verifier-wikipedia}): audit đáp án của Node~4,
-  gọi \texttt{search\_wikipedia} chỉ khi báo cáo không đủ để quyết.}
+  \caption{V4: đồ thị V3 + Node~5 (\texttt{report-verifier-wikipedia}), audit đáp án và gọi
+  \texttt{search\_wikipedia} khi cần.}
   \label{fig:v4}
 \end{figure}
 
@@ -363,9 +356,8 @@ tương lai; nếu đáp án ĐÚNG, nó không làm gì.
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=\textwidth]{v5_flow.pdf}
-  \caption{V5 - đồ thị V3 + Node~5 (đọc kho tiến hoá \texttt{medqa-mistakes}, không gọi Wikipedia) +
-  Node~6 \texttt{distill\_mistake} sau Node~5. Node~5 không thấy gold; chỉ Node~6 thấy, và chỉ ghi
-  kho khi đáp án cuối cùng sai.}
+  \caption{V5: đồ thị V3 + Node~5 (đọc \texttt{medqa-mistakes}) + Node~6
+  \texttt{distill\_mistake}, chỉ ghi khi đáp án sai.}
   \label{fig:v5}
 \end{figure}
 
@@ -381,94 +373,79 @@ Toàn hệ thống dùng chung một \emph{nguồn dữ liệu} và một \emph{
   câu hỏi được nhúng; đáp án và giải thích nằm trong metadata.
   \item \textbf{Embedder.} Một embedder duy nhất: \texttt{qwen3-embedding:4b} (ngữ cảnh 32K token,
   chạy qua Ollama), được áp dụng cho cả toàn bộ V2-V5.
-  \item \textbf{Vector Database.} ChromaDB, cosine similarity, một collection duy nhất
-  (\texttt{knowledge\_medmcqa\_qwen3}).
+  \item \textbf{Vector Database.} ChromaDB, một collection duy nhất
+  (\texttt{knowledge\_medmcqa\_qwen3}), đo độ phù hợp bằng cosine similarity.
   \item \textbf{Cơ chế truy hồi.} \texttt{search\_medmcqa} trả về $k{=}5$ câu thi gần nhất kèm đáp án
   và giải thích (định dạng \texttt{Q:/A:/Why:}).
-  \item \textbf{Rút gọn truy vấn (query reformulation).} Node~1 (\texttt{case-reasoner}, V2-V5) không
-  truy hồi thẳng trên nguyên văn tình huống, mà viết ra một truy vấn tìm kiếm riêng - phrase như một
-  câu hỏi thi KHÁC cùng chủ đề (đúng định dạng của dữ liệu đang truy hồi), chứ không phải một danh
-  sách từ khoá trần trụi; \texttt{search} (Node~2) gọi \texttt{search\_medmcqa} đúng một lần với truy
-  vấn đó, không có vòng lặp thử lại. V1 làm khác: tác tử tự viết truy vấn khi gọi
-  \texttt{search\_medmcqa} lần đầu, tự chấm độ tin cậy của kết quả (HIGH/MEDIUM/LOW), và nếu LOW được
-  phép \emph{rút gọn lại truy vấn đúng một lần nữa} - mở rộng bằng cách bỏ một chi tiết quá cụ thể
-  hoặc đổi sang từ đồng nghĩa/liên quan - rồi gọi lại \texttt{search\_medmcqa} (tối đa 2 lần gọi tool
-  mỗi câu). Truy hồi thẳng trên nguyên văn tình huống, không rút gọn, đo được giảm $\sim$8 điểm độ
-  chính xác so với dùng một truy vấn đã rút gọn.
-  \item \textbf{Nhãn tin cậy, không dùng ngưỡng số.} Bước chốt đáp án dùng nhãn tin cậy tự chấm
-  (HIGH/MEDIUM/LOW) của chính tác tử/nút vừa đọc bằng chứng, không so một điểm cosine với một ngưỡng
-  cố định ở bất kỳ đâu trong hệ thống.
-  \item \textbf{Luật quyết định: tin cậy bất đối xứng.} Cùng một luật cho cả bước chốt đáp án của V1
-  lẫn Node~4 (\texttt{decider}, V2-V5): nếu bằng chứng truy hồi được chấm HIGH và rõ ràng nghiêng về
-  một phương án, phương án đó là đáp án mặc định - chỉ bị lật lại khi có một dấu hiệu \emph{cụ thể}
-  trong tình huống mà bằng chứng đã bỏ sót hoặc hiểu sai, không phải một cảm giác chung chung là ``có
-  lẽ khác''. Nếu bằng chứng chỉ MEDIUM/LOW hoặc không có, nó bị gạt sang một bên hoàn toàn và đáp án
-  được chọn thuần từ lập luận lâm sàng, đúng như cách V0 quyết định. Luật bất đối xứng có chủ đích:
-  bằng chứng tốt được ưu tiên mặc định, nhưng không tự động thắng một lập luận nêu được dấu hiệu cụ
-  thể.
-  \item \textbf{Nguồn độc lập, chỉ ở bộ kiểm chứng.} Bộ kiểm chứng của V5 không có công cụ tra cứu
-  riêng ngoài kho tiến hoá của chính nó (một kho key/value, không phải truy hồi vector); chỉ bộ kiểm
-  chứng của V4 mới có một nguồn độc lập với MedMCQA - Wikipedia trực tuyến (\S\ref{sec:verifier}).
-  Chọn cụ thể Wikipedia, không phải tìm kiếm chung trên internet: Wikipedia chỉ chứa nội dung bách
-  khoa tổng quát về y khoa (bệnh, thuốc, cơ chế, vi sinh...), không thể trực tiếp lộ đáp án của một
-  câu hỏi thi cụ thể như một trang đề thi hay diễn đàn giải đề có thể làm - tránh nguy cơ \emph{leak}
-  đáp án từ internet thay vì kiểm chứng bằng kiến thức y khoa thật.
+  \item \textbf{Đánh giá độ liên quan bằng nhãn.} Hệ thống tự đánh giá độ liên quan
+  của bằng chứng vừa truy hồi bằng một nhãn HIGH/MEDIUM/LOW, không so điểm cosine với một ngưỡng cố
+  định ở bất kỳ đâu.
+  \item \textbf{Tối ưu truy vấn (query reformulation).} Nếu độ liên quan bị đánh giá LOW,
+  viết lại một truy vấn tìm kiếm mới bằng cách thêm ngữ cảnh (context) từ tình huống, rồi truy hồi lại.
+  \item \textbf{Luật quyết định: tin cậy bất đối xứng.} Một luật dùng chung cho bước chốt đáp án của V1
+  và Node~4 (\texttt{decider}, V2-V5). Nếu bằng chứng được chấm HIGH và nghiêng rõ về một phương án,
+  phương án đó là đáp án mặc định; chỉ bị lật lại khi tình huống có một dấu hiệu \emph{cụ thể} mà bằng
+  chứng đã bỏ sót hoặc hiểu sai, không phải một cảm giác chung chung là ``có lẽ khác''. Nếu bằng chứng
+  chỉ MEDIUM/LOW hoặc không có, nó bị bỏ qua hoàn toàn và đáp án chọn thuần từ lập luận lâm sàng, đúng
+  như cách V0 quyết định.
 \end{enumerate}
 
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.75\textwidth]{rag_infra.pdf}
-  \caption{Hạ tầng truy hồi: từ dữ liệu MedMCQA, qua embedding và ChromaDB, đến công cụ
-  \texttt{search\_medmcqa} và bằng chứng thô.}
+  \caption{Hạ tầng truy hồi: MedMCQA $\rightarrow$ embedding $\rightarrow$ ChromaDB $\rightarrow$
+  \texttt{search\_medmcqa}.}
   \label{fig:rag-infra}
 \end{figure}
 
 \begin{figure}[h]
   \centering
   \includegraphics[width=0.8\textwidth]{rag_design.pdf}
-  \caption{Từ bằng chứng thô (Hình~\ref{fig:rag-infra}), qua bước digest + tự chấm độ tin cậy, đến
-  luật tin cậy bất đối xứng - dùng chung cho bước tự quyết định của V1 và Node~4
-  (\texttt{decider}) của V2-V5.}
+  \caption{Từ bằng chứng thô đến luật tin cậy bất đối xứng, dùng chung cho V1 và Node~4
+  (\texttt{decider}).}
   \label{fig:rag-design}
 \end{figure}
 
 \FloatBarrier
 \subsection{Thiết kế bộ nhớ}
 \label{sec:memory}
-Đề bài liệt kê bộ nhớ ngắn hạn và dài hạn là các thành phần bắt buộc. \todo{Đổi định nghĩa so với bản
-báo cáo trước: bộ nhớ ngắn hạn nay thuộc về V4/V5 (bộ kiểm chứng), không còn ở V3; bộ nhớ dài hạn nay
-ĐÃ XÂY (trước đây báo là chưa) - hai kho riêng biệt, xem dưới. Chưa đo ở quy mô lớn.}
+\paragraph{Bộ nhớ ngắn hạn (trong một câu hỏi).} Dựa thẳng vào \texttt{state}: mỗi biến thể chạy trên
+cùng một \texttt{StateGraph(QAState)} (\texttt{graph/build.py}), và \texttt{QAState} (một
+\texttt{TypedDict}, \texttt{graph/state.py}) chính là bộ nhớ ngắn hạn - mỗi nút ghi ra một vài trường
+(\texttt{case\_understanding}, \texttt{evidence}, \texttt{clinical\_report}, ...), nút chạy sau đọc
+thẳng từ đó, không cần một tác tử/kho bộ nhớ riêng. Mặc định mọi biến thể (V0-V5) đều có nó:
+khác biệt giữa các biến thể chỉ là số nút, và do đó số trường tồn tại trong hệ thống.
+(Bảng~\ref{tab:variants}).
 
-\paragraph{Bộ nhớ ngắn hạn (trong một câu hỏi).} Xuất hiện ở V4/V5 (Hình~\ref{fig:v4},
-\S\ref{sec:variants}) - V3 không có bộ kiểm chứng nên không cần đọc lại gì. \textbf{Trạng thái: đã
-xây, ở dạng hẹp.} Thay vì một tác tử/kho bộ nhớ riêng, bộ nhớ ngắn hạn tận dụng \texttt{QAState} -
-trạng thái dùng chung mà LangGraph truyền qua các nút: \texttt{case\_understanding} (bản tóm tắt ca
-bệnh của Node~1), \texttt{evidence}, và \texttt{clinical\_report} (báo cáo của Node~3) đều đã nằm sẵn
-trong đó. Khi \texttt{memory=True} (V4/V5), bộ kiểm chứng (Node~5) đọc thêm \texttt{case\_understanding}
-khi audit đáp án, thay vì chỉ đọc báo cáo lập luận; không nút nào khác cần bật cờ này, vì các nút khác
-vốn đã đọc thẳng những gì nút trước ghi ra - \texttt{memory} chỉ mở rộng đúng MỘT điểm đọc thêm cho
-bộ kiểm chứng, không thêm tác tử hay lượt gọi LLM nào.
-
-\begin{figure}[tbp]
+\begin{table}[h]
   \centering
-  \includegraphics[width=0.95\textwidth]{memory_design.pdf}
-  \caption{Bộ nhớ ngắn hạn là \texttt{QAState} dùng chung: mỗi trường được một nút ghi và một hoặc
-  nhiều nút khác đọc lại; hàng tô vàng là ô duy nhất \texttt{memory=True} mở thêm (\emph{sơ đồ minh
-  hoạ ở dạng cũ - \todo{cập nhật cho khớp bộ kiểm chứng V4/V5}}).}
-  \label{fig:memory-design}
-\end{figure}
+  \caption{Short-term memory: each \texttt{QAState} field is a channel from one node to the next.}
+  \label{tab:memory-design}
+  \small
+  \begin{tabular}{@{}p{0.24\textwidth}p{0.20\textwidth}p{0.46\textwidth}@{}}
+    \toprule
+    Trường trong QAState & Ghi bởi & Đọc bởi \\
+    \midrule
+    \texttt{query} & Node 1 (understand) & Node 2 (search) \\[3pt]
+    \texttt{evidence} & Node 2 (search) & Node 4 (decider), Node 5 (verifier) \\[3pt]
+    \texttt{clinical\_report} & Node 3 (reasoning) & Node 4 (decider), Node 5 (verifier) \\[3pt]
+    \texttt{case\_understanding} & Node 1 (understand) & Node 3 (reasoning), Node 5 (verifier) \\[3pt]
+    \texttt{answer, rationale} & Node 4 (decider) & overwritten by Node 5, if present (V4/V5); Node 6 reads \texttt{answer} to check correctness (V5) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
-\paragraph{Bộ nhớ dài hạn (episodic, xuyên câu hỏi): ĐÃ XÂY, hai kho tách biệt.} Cả hai dùng chung một
-\texttt{SqliteStore} của LangGraph (\texttt{data/longterm/lessons.sqlite}, sống sót qua process,
-\texttt{graph/longterm.py}), phân biệt bằng namespace gốc, không phải bằng tệp riêng:
+\paragraph{Bộ nhớ dài hạn (episodic, sử dụng qua nhiều câu hỏi): hai kho tách biệt.} Cả hai dùng chung một
+\texttt{SqliteStore} của LangGraph (\texttt{data/longterm/lessons.sqlite},
+\texttt{graph/longterm.py}), phân biệt bằng namespace:
 \begin{itemize}[nosep]
   \item \textbf{Kho chung} (\texttt{medqa-lessons}, V3-V5): \texttt{decider} (Node~4) \texttt{recall}
   bài học từ những câu TƯƠNG TỰ đã gặp trước - xếp hạng bằng số từ chủ đề trùng nhau (không phải
   embedding, để giữ chi phí thấp và không cần một collection thứ hai) - rồi \texttt{remember} một bài
-  học sau khi chốt, cho MỌI câu, đúng lẫn sai.
+  học sau khi chốt, cho mọi câu, đúng lẫn sai.
   \item \textbf{Kho tiến hoá} (\texttt{medqa-mistakes}, V5): chỉ chứa bài học từ những câu hệ thống
-  từng trả lời SAI. Bộ kiểm chứng (Node~5) chỉ \texttt{recall} từ kho này, không bao giờ ghi và không
-  bao giờ thấy đáp án đúng; Node~6 (\texttt{distill\_mistake}), chạy SAU Node~5, là nút DUY NHẤT đọc
+  từng trả lời sai. Bộ kiểm chứng (Node~5) chỉ \texttt{recall} từ kho này, không bao giờ ghi và không
+  bao giờ thấy đáp án đúng; Node~6 (\texttt{distill\_mistake}), chạy sau Node~5, là nút duy nhất đọc
   đáp án đúng, và chỉ ghi một bài học khi đáp án cuối cùng sai (\S\ref{sec:variants}).
 \end{itemize}
 \textbf{Chống rò rỉ dữ liệu (contamination).} Rủi ro là: bài học của câu thứ $N$ đang được chấm rò
@@ -476,79 +453,40 @@ sang câu thứ $N{+}k$ trong CÙNG lượt chấm đó, làm tăng ảo độ c
 chất lượng lập luận. Lớp bảo vệ đang có là \emph{namespace}: mỗi kho gồm cả tên \emph{split}, nên bài
 học học trên \texttt{train} là vô hình khi truy vấn namespace \texttt{test}.
 
-Tuy nhiên \textbf{mặc định hiện tại là GHI} (\texttt{long\_term\_read\_only=False} ở cả V3, V4, V5),
-và không có cờ CLI nào để tắt. Vì vậy một lượt chạy V3--V5 thông thường \emph{vừa đọc vừa ghi} vào
-namespace của split đang chạy - đúng tình huống rò rỉ nói trên. Để có một con số báo cáo được, phải
-truyền \texttt{long\_term\_read\_only=True} trực tiếp qua \texttt{build\_variant}, theo quy trình hai
-pha: xây kho trên tập dev trước, rồi chấm test ở chế độ chỉ đọc. \todo{Thêm cờ CLI (hoặc đảo mặc định
-về chỉ đọc) để quy trình an toàn là quy trình mặc định; hiện tại việc này phải làm bằng tay và dễ bỏ
-sót. Không con số V3--V5 nào được báo cáo nếu bật ghi trên tập đang chấm.}
-
 \begin{figure}[tbp]
   \centering
   \includegraphics[width=0.95\textwidth]{longterm_memory.pdf}
-  \caption{Bộ nhớ dài hạn: hai kho tách biệt bằng namespace trong cùng một \texttt{SqliteStore}.
-  \texttt{decider} đọc/ghi kho chung ở mọi ca; bộ kiểm chứng chỉ ĐỌC kho lỗi, và chỉ
-  \texttt{distill\_mistake} (nút duy nhất thấy nhãn đúng) ghi vào đó, chỉ khi đáp án sai.}
+  \caption{Bộ nhớ dài hạn: hai kho tách biệt bằng namespace trong một \texttt{SqliteStore};
+  \texttt{decider} đọc/ghi kho chung, bộ kiểm chứng chỉ đọc kho lỗi.}
   \label{fig:longterm-memory}
 \end{figure}
 
 \FloatBarrier
 \subsection{Thiết kế bộ kiểm chứng}
 \label{sec:verifier}
-\todo{Đổi định nghĩa so với bản báo cáo trước: bộ kiểm chứng nay chỉ xuất hiện ở V4/V5 (không còn ở
-V3); có HAI thiết kế bộ kiểm chứng khác nhau, không còn một thiết kế duy nhất.}
-V4 và V5 dùng CHUNG Node~5 (\texttt{report-verifier}): đọc thẳng báo cáo lập luận của Node~3
-(\texttt{state["clinical\_report"]}), đáp án và giải thích ngắn mà Node~4 vừa chốt, và (\texttt{memory=True})
-cả bản tóm tắt ca bệnh của Node~1 - không cần một tác tử/lượt gọi LLM riêng để ``nhớ lại'' những thứ
-đó, vì chúng đã nằm sẵn trong trạng thái đồ thị dùng chung. Nó chỉ kiểm nhất quán: nếu đáp án được
-chọn bị chính báo cáo lập luận đánh giá RULED OUT (hoặc một phương án khác được đánh giá rõ SUPPORTED),
-đó là dấu hiệu đáng ngờ và nó chỉnh lại đáp án cho khớp với những gì báo cáo đã kết luận. Để giữ luồng
-bền vững, một lỗi trích xuất ở Node~5 sẽ lùi về đáp án của Node~4 thay vì phát ra \texttt{None} không
-hợp lệ.
-
-Điểm khác nhau DUY NHẤT giữa V4 và V5 là nguồn bằng chứng bổ sung khi báo cáo của Node~3 không đủ để
-quyết:
+V4 và V5 dùng chung một Node~5 (\texttt{report-verifier}), chạy ngay sau khi \texttt{decider} chốt
+đáp án. Hai biến thể chỉ khác nhau ở một điểm: nguồn bằng chứng bổ sung mà Node~5 tra cứu khi báo cáo của
+Node~3 chưa đủ rõ để quyết.
 \begin{itemize}[nosep]
-  \item \textbf{V4 - Wikipedia trực tuyến.} Gọi \texttt{search\_wikipedia} (MediaWiki API, một lệnh
-  gọi mạng, có timeout, trả về \texttt{""} khi lỗi mạng - suy biến về đúng hành vi V3, không làm hỏng
-  lượt chạy). Đây là nguồn bằng chứng ĐỘC LẬP đầu tiên trong toàn hệ thống không bắt nguồn từ MedMCQA.
-  \item \textbf{V5 - kho tiến hoá.} \texttt{recall\_mistakes} từ kho \texttt{medqa-mistakes}
-  (\S\ref{sec:memory}) - bài học từ những câu TƯƠNG TỰ hệ thống từng trả lời sai trước đó. Bộ kiểm
-  chứng không bao giờ gọi công cụ mạng và không bao giờ thấy đáp án đúng của câu đang xử lý.
+  \item \textbf{V4 - tra Wikipedia trực tuyến.} Gọi công cụ \texttt{search\_wikipedia} qua MediaWiki
+  API, có timeout; nếu mạng lỗi, nó trả về chuỗi rỗng và hệ thống suy biến về đúng hành vi của V3, chứ
+  không làm hỏng lượt chạy. Đây là nguồn bằng chứng độc lập đầu tiên trong toàn hệ thống không bắt
+  nguồn từ MedMCQA. Chọn Wikipedia thay vì tìm kiếm chung trên internet vì Wikipedia
+  chỉ có nội dung bách khoa về y khoa (bệnh, thuốc, cơ chế...), không thể vô tình lộ đáp án của một câu
+  hỏi thi cụ thể như một trang đề thi hay diễn đàn giải đề có thể làm.
+  \item \textbf{V5 - tra lại kho các câu từng trả lời sai.} Gọi \texttt{recall\_mistakes} để đọc từ kho
+  \texttt{medqa-mistakes} (\S\ref{sec:memory}) bài học rút ra từ những câu tương tự mà hệ thống từng
+  trả lời sai trước đó. Bộ kiểm chứng ở đây không có công cụ tra cứu nào khác ngoài kho này, và chỉ
+  đọc: nó không bao giờ ghi, và không bao giờ thấy đáp án đúng của câu đang xử lý.
 \end{itemize}
-V5 còn có thêm \textbf{Node~6 - \texttt{distill\_mistake}}, chạy SAU Node~5: nút DUY NHẤT trong đồ thị
-đọc \texttt{item.answer\_idx} (đáp án đúng). Nếu đáp án cuối cùng ĐÚNG, nó không làm gì (không tốn
-lượt gọi LLM, không đụng kho). Nếu SAI, nó gọi một tác tử \texttt{mistake-analyst} - được cho biết cả
-đáp án sai lẫn đáp án đúng, việc mà Node~5 không bao giờ được biết - để đúc kết một bài học sửa sai,
-rồi ghi vào kho tiến hoá cho các câu tương lai. Nút này KHÔNG BAO GIỜ được phép sửa
-\texttt{state["answer"]}/\texttt{["rationale"]}: việc của nó là ghi cho các câu hỏi TƯƠNG LAI, không
-phải ảnh hưởng câu hỏi HIỆN TẠI đang được chấm.
 
-Phần đóng góp riêng của mỗi thiết kế bộ kiểm chứng được đo trực tiếp bằng tương phản $V4 - V3$ (bộ
-kiểm chứng Wikipedia) và $V5 - V3$ (bộ kiểm chứng kho tiến hoá): vì cả ba biến thể dùng chung đúng một
-đồ thị nền (V3, \S\ref{sec:variants}), mỗi tương phản chỉ khác đúng Node~5 (và với V5, cả Node~6) -
-không lẫn với dữ liệu, embedder, hay số tác tử. \todo{Đo $V4-V3$ và $V5-V3$ khi cả ba được đo ở quy
-mô lớn; hiện chỉ có số liệu $n{=}300$ cho định nghĩa CŨ của V3 (\S\ref{sec:results}), chưa áp dụng
-được cho định nghĩa mới.}
-
-\subsection{Tối ưu hoá tiến hoá}
-Không dùng trong hệ giữa kỳ này. Đề bài liệt kê nó là tuỳ chọn; Nhóm chủ động bỏ qua để giữ khảo
-sát ablation dễ diễn giải và dời việc tìm kiếm prompt/pipeline sang phần sau. \emph{Lưu ý thuật ngữ:}
-đừng nhầm mục này với ``kho tiến hoá'' (\S\ref{sec:memory}, V5) - kho tiến hoá chỉ là một kho bài học
-tích luỹ dần qua các câu sai, không phải một thuật toán tối ưu hoá kiểu di truyền/tiến hoá cho
-prompt hay pipeline.
-
-\paragraph{Đáp án + giải thích.} Đề bài yêu cầu một lựa chọn \emph{cộng với} một giải thích ngắn. Mọi
-biến thể đều trả về cả hai qua một giao diện duy nhất \texttt{answer(item) $\rightarrow$
-AnswerResult(answer, rationale)}, và bản ghi từng câu mang theo phần giải thích để tệp dự đoán có nó mà
-không cần chạy lại. Chỉ nút \emph{cuối cùng} ghi đáp án hướng tới người dùng mới bị giới hạn 30 từ (Node~4 và Node~5, các
-biến thể có bộ kiểm chứng): Node~1 (tóm tắt ca bệnh), Node~2 (tóm bằng chứng) và Node~3 (báo cáo lập
-luận) chủ ý \emph{không} bị giới hạn độ dài, vì đó là đầu vào nội bộ cho Node~4/5 đọc, không phải đầu
-ra hướng tới người dùng - giới hạn từ ở đó sẽ chỉ làm cùn lập luận mà các nút này tồn tại để tạo ra.
-Node~6 (\texttt{distill\_mistake}, V5) không thuộc nhóm nào ở trên: nó không ghi đáp án hướng tới
-người dùng và cũng không phải đầu vào cho một nút khác trong CÙNG câu hỏi - đầu ra của nó (một dòng
-\texttt{Lesson:}) chỉ đi vào kho tiến hoá, để CÂU HỎI KHÁC trong tương lai đọc lại.
+V5 có thêm một nút mà V4 không có: \textbf{Node~6 - \texttt{distill\_mistake}}, chạy ngay sau Node~5.
+Đây là nút duy nhất trong toàn đồ thị được phép đọc đáp án đúng (\texttt{item.answer\_idx}). Nếu đáp án
+cuối cùng đúng, nó không làm gì cả, không tốn thêm lượt gọi LLM nào. Nếu sai, nó gọi riêng một tác tử
+(\texttt{mistake-analyst}), cho biết cả đáp án hệ thống vừa chọn lẫn đáp án đúng, để rút ra một bài học
+sửa sai rồi ghi vào kho tiến hoá cho những câu hỏi khác đọc lại về sau. Nút này không bao giờ được phép
+sửa đáp án của câu đang xử lý - việc của nó chỉ là để lại bài học cho lần sau, không phải ảnh hưởng
+điểm số của câu hiện tại.
 
 % =====================================================================
 \FloatBarrier
@@ -556,87 +494,114 @@ người dùng và cũng không phải đầu vào cho một nút khác trong C�
 \label{sec:setup}
 % =====================================================================
 
+\subsection{Cấu trúc mã nguồn}
+\label{sec:reposcructure}
+Toàn bộ mã nguồn nằm dưới \texttt{src/agent\_hospital/}, chia theo nhiệm vụ - mỗi thư mục con một mối
+quan tâm riêng (đồ thị LangGraph, tác tử, truy hồi, đánh giá):
+
+\begin{lstlisting}
+src/agent_hospital/
+  __main__.py       CLI: chay mot bien the tren MedQA-USMLE, in ra metric
+  config.py         RunConfig/RagConfig - noi tap trung moi tuy chinh
+  models.py         provider:model -> BaseChatModel, khong phu thuoc nha cung cap
+  roles.py          registry system prompt (9 vai, xem bang tom tat o 4.2)
+  predict.py        chay mot bien the, ghi du doan tung cau ra .jsonl
+  evaluate.py       tinh metric tu cac file du doan
+
+  agents/
+    base.py         Agent - lop boc create_agent cua LangChain, khoi tao tre
+
+  graph/
+    state.py        QAState - trang thai dung chung truyen qua moi node
+    build.py        RunConfig -> StateGraph da compile
+    nodes.py        cac node dung lai duoc (state -> partial state)
+    longterm.py     bo nho dai han: hai kho trong mot SqliteStore
+
+  qa/
+    variants.py     cac preset V0-V5 + diem vao build_variant
+    mcq.py          dung prompt cho cau hoi, trich dap an
+    metrics.py      do luong tung cau + so sanh giua bien the
+    reasoning.py    tac tu rut gon truy van (V1)
+
+  knowledge/
+    embeddings.py   ham embedding cho kho tri thuc RAG (Ollama)
+    ingest.py       nap MedMCQA vao Chroma
+    retriever.py    truy hoi cosine top-k tren Chroma
+    wikipedia.py    tim Wikipedia truc tuyen (nguon cua bo kiem chung V4)
+
+  diseases/
+    medqa_usmle.py  nap tap MedQA-USMLE (split dung de cham diem)
+\end{lstlisting}
+
+Quy ước xuyên suốt: mỗi \texttt{RunConfig} (\texttt{config.py}) là toàn bộ tham số của một lượt chạy;
+\texttt{qa/variants.py} chỉ định nghĩa SÁU preset cụ thể (V0-V5) từ đúng một \texttt{RunConfig}, không
+có nhánh rẽ nào khác trong \texttt{graph/build.py} ngoài những cờ mà \texttt{RunConfig} khai báo.
+
 \subsection{Mô hình và prompt}
 Mô hình trả lời mặc định là \textbf{Qwen2.5}~\cite{qwen2025} (Ollama, có gọi công cụ): \texttt{qwen2.5:7b}
-cho mọi biến thể và mọi con số được báo cáo. Mọi vai chạy ở \textbf{nhiệt độ~0}: ở nhiệt độ mặc định, chênh
+cho mọi biến thể và mọi con số được báo cáo. Mọi vai chạy ở \textbf{temperature~0}: ở temperature mặc định, chênh
 lệch $V1-V0$ dao động giữa các lần chạy lớn hơn cả bản thân hiệu ứng, nên tính tất định là bắt buộc để
 McNemar ghép cặp có ý nghĩa. Các nhà cung cấp đám mây (\texttt{anthropic:}, \texttt{openai:},
 \texttt{google:}, \texttt{openrouter:}) được hỗ trợ qua cùng một đặc tả \texttt{provider:model}.
 
-System prompt của baseline (V0) và lượt người dùng cho câu trắc nghiệm, nguyên văn (giữ tiếng Anh vì đây
-là prompt vận hành thực tế):
+Toàn hệ thống có 9 vai (\texttt{roles.py:ROLE\_PROMPTS}), mỗi vai một system prompt riêng, dùng nguyên
+văn tiếng Anh (prompt vận hành thực tế). Bảng~\ref{tab:roles} tóm tắt việc của từng vai; nội dung đầy đủ
+nằm trong mã nguồn. Node 1-4 xuất hiện ở mọi biến thể V2-V5 (\S\ref{sec:variants}).
 
-\begin{lstlisting}
-System (roles.py:BASELINE):
-You are an expert physician answering a medical board (USMLE)
-multiple-choice question. Choose the single best answer, with a
-brief justification.
-
-User turn (qa/mcq.py:format_mcq):
-{question}
-
-A. {option 0}
-B. {option 1}
-C. {option 2}
-D. {option 3}
-
-Reason briefly, then on the LAST line write 'Answer: X' where X is
-A, B, C, or D.
-\end{lstlisting}
+\begin{table}[h]
+  \centering
+  \caption{Tóm tắt system prompt của 9 vai trong hệ thống.}
+  \label{tab:roles}
+  \small
+  \begin{tabular}{@{}p{0.30\textwidth}p{0.14\textwidth}p{0.46\textwidth}@{}}
+    \toprule
+    Vai (\texttt{roles.py}) & Dùng ở & Tóm tắt \\
+    \midrule
+    \texttt{baseline} & V0 & Trả lời trực tiếp từ kiến thức riêng. \\[3pt]
+    \texttt{rag-agent} & V1 & Tự hiểu ca, tìm kiếm, lập luận, quyết định. \\[3pt]
+    \texttt{case-reasoner} & Node 1 & Tóm ca bệnh, viết truy vấn tìm kiếm. \\[3pt]
+    \texttt{clinical-reasoner} & Node 3 & Lập luận option-by-option, tự chấm tin cậy. \\[3pt]
+    \texttt{evidence-digest} & Node 2 & Tóm bằng chứng, tự chấm tin cậy. \\[3pt]
+    \texttt{decider} & Node 4 & Tổng hợp báo cáo + bằng chứng, chốt đáp án. \\[3pt]
+    \texttt{report-verifier} & Node 5 (V5) & Soát đáp án; tra thêm kho câu từng sai. \\[3pt]
+    \texttt{report-verifier-wikipedia} & Node 5 (V4) & Soát đáp án; tra thêm Wikipedia. \\[3pt]
+    \texttt{mistake-analyst} & Node 6 (V5) & Chỉ chạy khi sai: đúc kết một bài học. \\
+    \bottomrule
+  \end{tabular}
+\end{table}
 
 \texttt{parse\_choice} trích đáp án từ \texttt{Answer: X} hoặc \texttt{answer is X} (không phân biệt hoa
 thường), dự phòng bằng chữ cái \texttt{A|B|C|D} độc lập đầu tiên; phản hồi không trích được trả về
 \texttt{None} và bị tính là \emph{không hợp lệ}, không bao giờ bị tính nhầm thành câu trả lời sai. Tỷ lệ không
 hợp lệ đo được là \textbf{0.0\%} xuyên suốt.
 
-\subsection{Cấu hình truy hồi}
-\label{sec:retrievalconfig}
-\begin{table}[h]
-  \centering
-  \caption{Thiết lập truy hồi. Cùng dữ liệu, embedder và collection cho toàn bộ V1-V5 kể từ đợt A/B
-  ở \S\ref{sec:rag}.}
-  \label{tab:retrieval}
-  \begin{tabular}{@{}p{0.30\textwidth}p{0.62\textwidth}@{}}
-    \toprule
-    Thiết lập & V1-V5 \\
-    \midrule
-    dữ liệu & MedMCQA: 182{,}822 câu thi đã giải \\
-    Collection & \texttt{knowledge\_medmcqa\_qwen3} \\
-    Kho vector & Chroma, cosine / HNSW, lưu trữ bền \\
-    Embedder & qwen3-embedding:4b (32K token) \\
-    Cái được nhúng & chỉ phần câu hỏi (đáp án/giải thích/chủ đề là metadata) \\
-    Top-$k$ & 5, không cổng (\texttt{threshold=0.0}) \\
-    Cổng độ tương đồng & không dùng ở bất kỳ đâu trong hệ thống hiện tại \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Embedder được chọn vì có ngữ cảnh dài: Query encoder của các embedder bất đối xứng thường gặp
-(vd.\ MedCPT) cắt truy vấn ở khoảng \textbf{64 token}, quá ngắn cho một tình huống USMLE mà câu hỏi
-thực nằm ở cuối, trong khi qwen3-embedding (32K token) nhúng trọn cả tình
-huống. Thiết kế trước dùng một cổng độ tương đồng bằng số, hiệu chỉnh riêng theo embedder; cổng số đó
-nay không còn ở bất kỳ đường truy hồi nào trong hệ thống: việc quyết định có tin bằng chứng hay không
-chuyển hẳn sang bước chốt đáp án, dựa trên nhãn tin cậy HIGH/MEDIUM/LOW mà chính mô hình tự chấm
-(\S\ref{sec:rag}) - một cổng số học phía trên nhãn tự chấm đó là dư thừa. Bộ kiểm chứng của V3 không
-có công cụ tra cứu riêng (\S\ref{sec:verifier}), nên bảng trên là toàn bộ cấu hình truy hồi trong hệ
-thống.
-
 \subsection{Phần cứng / thiết lập API}
 \begin{itemize}[nosep]
-  \item \textbf{Phần cứng:} máy Mac Apple Silicon, 48\,GB bộ nhớ hợp nhất, chạy Ollama cục bộ.
-  \item \textbf{Seed ngẫu nhiên:} \texttt{bootstrap\_ci(seed=0)}; sinh văn bản là greedy ở nhiệt
-  độ~0 nên không áp dụng seed lấy mẫu.
-  \item \textbf{Lưu ý khi đo độ trễ:} một câu khởi động tổng hợp được chạy trước (khởi động mô hình nguội
-  sẽ tính cho câu chấm điểm đầu tiên $\sim$1.9\,s so với $\sim$0.3\,s ở trạng thái ổn định); các mô hình
-  không phải mục tiêu bị dừng trước một lần chạy đo giờ để tránh tranh chấp GPU.
+  \item \textbf{Phần cứng:} chạy trên một máy cá nhân, chạy các dịch vụ cục bộ.
   \item \textbf{Dữ liệu:} \texttt{openlifescienceai/medqa} (train 10{,}178 / validation 1{,}272 /
   \textbf{test 1{,}273}), lưu cache cục bộ và nạp không cần mạng.
 \end{itemize}
 
-\paragraph{Tái lập một lần chạy.}
+Lệnh \texttt{predict} và \texttt{evaluate} cho từng biến thể:
+
 \begin{lstlisting}
-HF_HUB_OFFLINE=1 PYTHONPATH=src .venv/bin/python -m agent_hospital -v V0 -n 150
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V0 -s test -m qwen2.5:7b
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V1 -s test -m qwen2.5:7b
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V2 -s test -m qwen2.5:7b
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V3 -s test -m qwen2.5:7b
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V4 -s test -m qwen2.5:7b
+PYTHONPATH=src .venv/bin/python -m agent_hospital.predict -v V5 -s test -m qwen2.5:7b
+
+PYTHONPATH=src .venv/bin/python -m agent_hospital.evaluate --dir data/eval_runs --baseline V0
 \end{lstlisting}
+\texttt{predict.py} ghi dự đoán từng câu vào \texttt{data/eval\_runs/<variant>\_<split>\_<model>.jsonl}
+kèm một tệp \texttt{.meta.json} (cấu hình lượt chạy); chạy lại cùng lệnh sẽ RESUME - bỏ qua những câu
+đã có trong tệp, chỉ chấm tiếp các câu còn thiếu, an toàn nếu lượt chạy trước bị ngắt giữa chừng.
+\texttt{evaluate.py} đọc mọi tệp \texttt{.jsonl} trong \texttt{--dir} và in ra bảng leaderboard (độ
+chính xác, khoảng tin cậy bootstrap, tỷ lệ không hợp lệ) cùng bảng so sánh ghép cặp với
+\texttt{--baseline}.
+
+
 
 % =====================================================================
 \FloatBarrier
@@ -647,83 +612,88 @@ Chỉ số chính là độ chính xác, $\text{Độ chính xác} = (\text{số
 Nhóm báo cáo thêm tỷ lệ phản hồi không hợp lệ, mức tăng độ chính xác so với V0, Thắng/Thua/Hòa so với
 baseline, khoảng tin cậy bootstrap 95\%, kiểm định ghép cặp McNemar, độ trễ và số token.
 
-\paragraph{Trạng thái đo lường.} Mục này báo cáo một lần chạy trên \textbf{300 câu đầu của tập test}
-($n{=}300$/1273, qwen2.5:7b, nhiệt độ~0) cho cả bốn biến thể V0-V3, trên kiến trúc \emph{hiện tại}
-(thiết kế bốn nút + luật tin cậy bất đối xứng, \S\ref{sec:variants}) và dữ liệu truy hồi hiện tại
-(qwen3-embedding:4b cho V1-V3, \S\ref{sec:rag}) - không phải thiết kế hội đồng cũ mà các số liệu
-trước đây trong báo cáo mô tả. V4 chưa được đo. \todo{Chạy trên toàn bộ $n{=}1273$ để có số liệu chính
-thức; $n{=}300$ ở đây đã đủ lớn để McNemar có ý nghĩa cho V2 và V2 vs V1, nhưng V3 vs V0 và V3 vs V2
-vẫn chưa đạt ngưỡng có ý nghĩa thống kê (xem dưới).}
+\paragraph{Trạng thái đo lường.} Mục này báo cáo một lần chạy trên \textbf{150 câu đầu của tập test}
+($n{=}150$/1273, qwen2.5:7b, temperature~0) cho cả sáu biến thể V0-V5 - cùng 150 câu, cùng thứ tự (xác
+nhận bằng \texttt{item\_id}), nên so sánh chéo giữa mọi biến thể đều hợp lệ.
+\todo{Đang chạy tiếp V3-V5 lên $n{=}300$; sẽ cập nhật mục này, rồi tiến tới $n{=}1273$ cho số liệu
+chính thức. $n{=}150$ đủ lớn để McNemar có ý nghĩa cho V2-V5 so với V0, nhưng chưa đủ để phân biệt
+V3/V4/V5 với V2 (xem dưới) - một hiệu ứng thật nhưng nhỏ có thể chưa lộ ra ở quy mô này.}
 
-\subsection{Bảng chính (main board): 300 câu đầu của tập test, qwen2.5:7b}
+\subsection{Bảng chính (main board): 150 câu đầu của tập test, qwen2.5:7b}
 \begin{table}[h]
   \centering
-  \caption{Kết quả trên 300 câu đầu của tập test, qwen2.5:7b, nhiệt độ~0.}
+  \caption{Kết quả trên 150 câu đầu của tập test, qwen2.5:7b, temperature~0.}
   \label{tab:official}
   \small
-  \begin{tabular}{@{}p{0.2\textwidth}cccrr@{}}
+  \begin{tabular}{@{}p{0.20\textwidth}cccrr@{}}
     \toprule
     Variant & Accuracy & 95\% Bootstrap CI & Invalid & Latency/query & Tokens/query \\
     \midrule
-    V0: LLM trực tiếp & 0.613 (184/300) & [0.557, 0.670] & 0.0\% & 1.71\,s & 489 \\
-    V1: RAG-only (agentic) & 0.597 (179/300) & [0.540, 0.650] & 0.0\% & 4.64\,s & 2880 \\
-    V2: Đa tác tử (4 nút) & \textbf{0.667} (200/300) & [0.613, 0.717] & 0.0\% & 19.13\,s & 4371 \\
-    V3: V2 + bộ kiểm chứng & 0.650 (195/300) & [0.597, 0.703] & 0.0\% & 22.31\,s & 5905 \\
+    V0: LLM trực tiếp & 0.627 (94/150) & [0.553, 0.707] & 0.0\% & 1.71\,s & 495 \\
+    V1: RAG-only (agentic) & 0.633 (95/150) & [0.553, 0.713] & 0.0\% & 5.40\,s & 2894 \\
+    V2: Đa tác tử (4 nút) & \textbf{0.720} (108/150) & [0.647, 0.793] & 0.0\% & 19.18\,s & 4418 \\
+    V3: V2 + bộ nhớ dài hạn & \textbf{0.720} (108/150) & [0.647, 0.787] & 0.0\% & 21.22\,s & 4620 \\
+    V4: V3 + bộ kiểm chứng Wikipedia & 0.707 (106/150) & [0.633, 0.780] & 0.0\% & 24.15\,s & 6357 \\
+    V5: V3 + bộ kiểm chứng kho tiến hoá & 0.713 (107/150) & [0.640, 0.780] & 0.0\% & 25.85\,s & 6471 \\
     \bottomrule
   \end{tabular}
 \end{table}
-Tỷ lệ không hợp lệ là \textbf{0.0\% ở cả bốn biến thể} - khác hẳn thiết kế trước, nơi V1 (agentic, thiết
-kế cũ) có 3.85\% không hợp lệ vì vòng lặp gọi công cụ đôi khi không hội tụ về một chữ cái; luật quyết
-định hiện tại (tin cậy bất đối xứng, không bắt buộc chỉ trả lời một chữ cái) giải quyết hẳn vấn đề đó.
-V1 \textbf{thấp hơn V0} ($-1.7$ điểm, khoảng tin cậy chồng lấn gần như toàn bộ - xem McNemar dưới), nhất
-quán với mọi lần đo retrieval-only trong dự án. V2 \textbf{cao nhất} ($+5.3$ điểm so với V0), và V3
-($+3.7$ điểm) đứng giữa V0 và V2 - thấp hơn V2 một chút chứ không cao hơn.
+Tỷ lệ không hợp lệ là \textbf{0.0\% ở cả sáu biến thể}. V1 nhỉnh hơn V0 một chút ($+0.7$ điểm, không có
+ý nghĩa thống kê - xem McNemar dưới), nhất quán với mọi lần đo retrieval-only trong dự án: truy hồi
+riêng không giúp ích trên MedQA. V2 và V3 \textbf{đồng cao nhất} ($+9.3$ điểm so với V0); V4 và V5 thấp
+hơn một chút ($+8.0$ và $+8.7$ điểm) nhưng vẫn cao hơn V0 rõ rệt - chênh lệch giữa V2/V3/V4/V5 với nhau
+nằm trong nhiễu của mẫu (xem McNemar dưới).
 
 \subsection{So sánh với baseline (so sánh ghép cặp)}
 \begin{table}[h]
   \centering
-  \caption{So sánh ghép cặp trên 300 câu đầu của tập test, qwen2.5:7b. Tính trực tiếp từ bản ghi từng câu.}
+  \caption{So sánh ghép cặp trên 150 câu đầu của tập test, qwen2.5:7b. Tính trực tiếp từ bản ghi từng câu.}
   \label{tab:paired}
   \small
-  \begin{tabular}{@{}p{0.3\textwidth}cc c@{}}
+  \begin{tabular}{@{}p{0.42\textwidth}cc c@{}}
     \toprule
     Comparison & Delta & W/L/T & McNemar $p$ \\
     \midrule
-    V1 vs V0 & $-1.7$ điểm & 29/34/237 & $0.615$ (không ý nghĩa) \\
-    \textbf{V2 vs V0} & $\mathbf{+5.3}$ \textbf{điểm} & \textbf{36/20/244} & $\mathbf{0.044}$ \textbf{(có ý nghĩa)} \\
-    V3 vs V0 & $+3.7$ điểm & 34/23/243 & $0.185$ (không ý nghĩa) \\
-    V3 vs V2 (hiệu ứng kiểm chứng) & $-1.7$ điểm & 3/8/289 & $0.227$ (không ý nghĩa) \\
-    V2 vs V1 (đa tác tử so với truy hồi) & $+7.0$ điểm & 48/27/225 & $0.020$ (có ý nghĩa) \\
+    V1 vs V0 & $+0.7$ điểm & 15/14/121 & $1.000$ (không ý nghĩa) \\
+    \textbf{V2 vs V0} & $\mathbf{+9.3}$ \textbf{điểm} & \textbf{20/6/124} & $\mathbf{0.0094}$ \textbf{(có ý nghĩa)} \\
+    \textbf{V3 vs V0} & $\mathbf{+9.3}$ \textbf{điểm} & \textbf{21/7/122} & $\mathbf{0.0125}$ \textbf{(có ý nghĩa)} \\
+    \textbf{V4 vs V0} & $\mathbf{+8.0}$ \textbf{điểm} & \textbf{19/7/124} & $\mathbf{0.0290}$ \textbf{(có ý nghĩa)} \\
+    \textbf{V5 vs V0} & $\mathbf{+8.7}$ \textbf{điểm} & \textbf{20/7/123} & $\mathbf{0.0192}$ \textbf{(có ý nghĩa)} \\
+    V3 vs V2 (hiệu ứng bộ nhớ dài hạn) & $+0.0$ điểm & 4/4/142 & $1.000$ (không ý nghĩa) \\
+    V4 vs V2 (hiệu ứng kiểm chứng Wikipedia) & $-1.3$ điểm & 3/5/142 & $0.727$ (không ý nghĩa) \\
+    V5 vs V2 (hiệu ứng kiểm chứng kho tiến hoá) & $-0.7$ điểm & 5/6/139 & $1.000$ (không ý nghĩa) \\
+    V4 vs V3 (tách riêng đúng một bộ kiểm chứng) & $-1.3$ điểm & 4/6/140 & $0.754$ (không ý nghĩa) \\
+    V5 vs V3 (tách riêng đúng một bộ kiểm chứng) & $-0.7$ điểm & 5/6/139 & $1.000$ (không ý nghĩa) \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \subsection{Phân tích Thắng/Thua/Hòa}
 Cột T/T/H đếm theo từng câu: biến thể sửa được lỗi của baseline (thắng), làm hỏng một câu baseline vốn
-đúng (thua), hay trùng khớp (hòa). \textbf{V2 vs V0}: 36 thắng so với 20 thua - V2 sửa được gần gấp đôi
-số câu nó làm hỏng, và với 56 câu bất đồng (discordant), McNemar cho $p{=}0.044$: đây là cải thiện có ý
-nghĩa thống kê đầu tiên trong toàn bộ khảo sát. \textbf{V1 vs V0}: 29/34, gần như cân bằng - truy hồi
-sửa một số câu nhưng làm hỏng nhiều hơn, ròng lại là một khoản lỗ nhỏ không đáng kể. \textbf{V3 vs V2}:
-chỉ 11 câu bất đồng trên 300 (3 thắng, 8 thua cho V3) - bộ kiểm chứng hiếm khi đổi đáp án của Node~4, và
-khi đổi thì đổi sai nhiều hơn đổi đúng, dù mẫu quá nhỏ để kết luận chắc chắn ($p{=}0.227$). \textbf{Chưa
-có bằng chứng ở quy mô này rằng bộ kiểm chứng cải thiện độ chính xác} - đây là phát hiện ngược với kỳ
-vọng ban đầu của Nhóm, và được báo cáo trung thực thay vì diễn giải có lợi cho thiết kế.
+đúng (thua), hay trùng khớp (hòa). \textbf{V2 vs V0}: 20 thắng so với 6 thua - V2 sửa được hơn gấp ba
+số câu nó làm hỏng, và với 26 câu bất đồng, McNemar cho $p{=}0.0094$: cải thiện có ý nghĩa thống kê.
+\textbf{V3, V4, V5 vs V0}: cùng mẫu hình - đều thắng rõ rệt so với thua (21/7, 19/7, 20/7), đều có ý
+nghĩa thống kê ($p{<}0.03$ cho cả ba). \textbf{Nhưng so với V2}: cả ba đều KHÔNG khác biệt có ý nghĩa
+(mọi $p{\geq}0.73$) - trên 150 câu này, chưa có bằng chứng rằng bộ nhớ dài hạn (V3) hay một trong hai
+thiết kế bộ kiểm chứng (V4, V5) cải thiện thêm so với riêng kiến trúc đa tác tử của V2. Đây là phát
+hiện ngược với kỳ vọng ban đầu của Nhóm, và được báo cáo trung thực thay vì diễn giải có lợi cho thiết
+kế.
 
 \subsection{Chi phí và độ trễ}
-Chi phí đo bằng \emph{độ trễ} và \emph{số token} (đầu vào + đầu ra) cho mô hình cục bộ (không có phí API).
-V0: \textbf{1.71\,s/câu}, \textbf{489 token/câu}. V1 (agentic, qwen3-embedding:4b): \textbf{4.64\,s/câu}
-($\sim$3$\times$ V0), \textbf{2880 token/câu} ($\sim$6$\times$ V0) - vòng lặp gọi công cụ (tìm rồi trả
-lời) sinh nhiều token hơn một lượt trả lời trực tiếp, nhưng nhanh hơn hẳn thiết kế cũ (trước đây 3.98\,s
-ở phiên bản panel, với embedder ban đầu). V2 (4 nút: hiểu ca bệnh + tìm kiếm + lập luận + quyết định):
-\textbf{19.13\,s/câu} ($\sim$11$\times$ V0), \textbf{4371 token/câu} ($\sim$9$\times$ V0) - bốn tác tử
-tuần tự (Node~2 và Node~3 chạy đồng thời nhưng Node~1 và Node~4 vẫn tuần tự), nên chi phí cộng dồn theo
-số lượt gọi LLM. V3 (V2 + bộ kiểm chứng): \textbf{22.31\,s/câu} ($\sim$3.2\,s hơn V2, đúng bằng chi phí
-một lượt gọi LLM thêm của Node~5), \textbf{5905 token/câu}. Vì bộ kiểm chứng không cho thấy cải thiện độ
-chính xác đáng kể ở quy mô này (\S5.2), chi phí thêm $\sim$17\% độ trễ và $\sim$35\% token của V3 so với
-V2 hiện chưa được biện minh bằng bằng chứng - một điểm cần theo dõi khi đo ở quy mô lớn hơn.
-\todo{Chạy V4 (V2 không có Node~5, cùng cấu hình) để đối chiếu trực tiếp với V3; hiện V4 chưa được đo.
-Chạy lại toàn bộ ở $n{=}1273$ khi có thời gian, đặc biệt để xác nhận hoặc bác bỏ ý nghĩa thống kê của
-V3 vs V0 và V3 vs V2, cả hai hiện đang ở ranh giới ($p{=}0.185$ và $p{=}0.227$).}
+Chi phí đo bằng \emph{độ trễ} và \emph{số token} (đầu vào + đầu ra) cho mô hình cục bộ (không có phí
+API). V0: \textbf{1.71\,s/câu}, \textbf{495 token/câu}. V1 (agentic): \textbf{5.40\,s/câu}
+($\sim$3$\times$ V0), \textbf{2894 token/câu} ($\sim$6$\times$ V0) - vòng lặp gọi công cụ sinh nhiều
+token hơn một lượt trả lời trực tiếp. V2 (4 nút): \textbf{19.18\,s/câu} ($\sim$11$\times$ V0),
+\textbf{4418 token/câu} - bốn tác tử, một số nút chạy tuần tự, nên chi phí cộng dồn theo số lượt gọi
+LLM. V3 (V2 + bộ nhớ dài hạn, vẫn 4 nút): \textbf{21.22\,s/câu}, \textbf{4620 token/câu} - chậm hơn V2
+dù không thêm nút hay lượt gọi LLM nào, chỉ hai lần đọc/ghi kho \texttt{SqliteStore} thêm quanh lượt
+gọi \texttt{decider} sẵn có. V4 (V3 + bộ kiểm chứng Wikipedia): \textbf{24.15\,s/câu} ($\sim$3\,s hơn
+V3), \textbf{6357 token/câu} - chi phí của Node~5, gồm cả những lần thật sự gọi
+\texttt{search\_wikipedia}. V5 (V3 + bộ kiểm chứng kho tiến hoá): \textbf{25.85\,s/câu}, \textbf{6471
+token/câu} - thêm cả Node~5 lẫn Node~6 (\texttt{distill\_mistake}, chỉ tốn lượt gọi LLM khi đáp án
+cuối cùng sai). Vì cả bộ nhớ dài hạn lẫn hai thiết kế bộ kiểm chứng đều chưa cho thấy cải thiện độ
+chính xác đáng kể ở quy mô này, chi phí thêm $\sim$10-35\% độ trễ và token của V3-V5 so với V2 hiện
+chưa được biện minh bằng bằng chứng - một điểm cần theo dõi khi đo ở quy mô lớn hơn.
 
 % =====================================================================
 \FloatBarrier
@@ -819,7 +789,7 @@ lớn để phân biệt một hiệu ứng nhỏ với nhiễu ngẫu nhiên - 
   \item \textbf{Cổng do mô hình tự chấm chưa được kiểm định.} Cổng độ tương đồng bằng số đã được thay
   bằng nhãn tin cậy tự chấm của chính mô hình (\S\ref{sec:rag}); độ tin cậy của chính nhãn tự chấm đó
   (so với một ngưỡng số khách quan) chưa được đo.
-  \item \textbf{Tính tất định trên đám mây.} Nhiệt độ~0 được đặt, nhưng các API lưu trữ không bảo đảm
+  \item \textbf{Tính tất định trên đám mây.} Temperature~0 được đặt, nhưng các API lưu trữ không bảo đảm
   tính tái lập như giải mã greedy cục bộ; cổng golden được ghim vào một mô hình cục bộ.
 \end{itemize}
 
@@ -853,8 +823,8 @@ bộ đo chứ không phải viết lại.
     Mục & Giá trị \\
     \midrule
     Mô hình & \texttt{qwen2.5:7b} \\
-    Nhiệt độ & 0 (mọi vai) \\
-    Prompt & nguyên văn trong \texttt{roles.py}; baseline xem \S\ref{sec:setup} \\
+    Temperature & 0 (mọi vai) \\
+    Prompt & nguyên văn trong \texttt{roles.py}; tóm tắt ở Bảng~\ref{tab:roles} \\
     Truy hồi & embedder qwen3-embedding:4b (V1-V5), Chroma cosine/HNSW, top-$k$=5, không cổng \\
     Seed ngẫu nhiên & \texttt{bootstrap\_ci(seed=0)}; còn lại là giải mã greedy \\
     Phần cứng & máy Mac Apple Silicon, 48\,GB, Ollama cục bộ \\
