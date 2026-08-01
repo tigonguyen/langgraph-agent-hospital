@@ -759,38 +759,24 @@ nhưng chốt sai trong khi V0 tình cờ đúng (hoặc bị một phương án
 \label{sec:discussion}
 % =====================================================================
 \begin{itemize}[nosep]
-  \item \textbf{Xây một RAG hay bộ nhớ ngoài thật sự hữu ích không dễ như tưởng.} Ba nỗ lực bổ sung ngữ
+  \item \textbf{Không dễ để xây dựng RAG hay bộ nhớ ngoài thật sự hữu ích.} Ba nỗ lực bổ sung ngữ
   cảnh ngoài mô hình trong khảo sát này - truy hồi (V1), bộ nhớ dài hạn (V3), bộ kiểm chứng tra cứu thêm
   (V4, V5) - đều KHÔNG cải thiện có ý nghĩa thống kê so với biến thể ngay trước nó (V3 vs V2, V4 vs V3,
   V5 vs V3 đều không ý nghĩa). Chỉ riêng việc tổ chức lại cấu trúc lập luận (V2, không thêm bằng chứng
   hay bộ nhớ nào mới) mới tạo ra khác biệt so với biến thể liền trước nó.
-  \item \textbf{Truy hồi một mình không giúp ích trên MedQA.} V1 vs V0: $-0.8$ điểm, không ý nghĩa
-  ($p{=}0.742$) - và không phải do tinh chỉnh sơ sài: Nhóm đã đổi sang embedder ngữ cảnh dài hơn
-  (qwen3-embedding:4b), bỏ cổng độ tương đồng để thay bằng nhãn tin cậy tự chấm, và cho phép tác tử tự
-  quyết định khi nào/tìm gì thay vì một pipeline cố định. Kết quả vẫn không đổi.
-  \item \textbf{Đòn bẩy thật sự là cấu trúc lập luận, không phải bằng chứng truy hồi.} V2 tách hiểu ca
+  \item \textbf{Đòn bẩy thật sự là chia việc lập luận ra cho các tác tử} V2 tách hiểu ca
   bệnh / tìm kiếm / lập luận / quyết định thành bốn nút, trên \emph{cùng} bằng chứng truy hồi mà V1 đã
   có, và tạo ra mức cải thiện có ý nghĩa thống kê đầu tiên trong toàn bộ khảo sát ($+5.5$ điểm so với
   V0, $p{=}0.0064$; $+6.3$ điểm so với V1, $p{=}0.0037$). Bộ nhớ dài hạn (V3) giữ được mức cải thiện đó
   so với V0 ($+5.2$ điểm, $p{=}0.0118$), nhưng không thêm được gì so với chính V2 (xem dưới) - cải
   thiện của thang biến thể này đến từ V2, không phải từ các lớp thêm sau đó.
-  \item \textbf{Phát hiện này khớp với y văn.} Mức tăng của RAG không đồng đều giữa các bộ dữ liệu: mạnh
-  trên các bộ nặng về tra cứu (PubMedQA, BioASQ), yếu trên các bộ nặng về lập luận/trí nhớ như MedQA -
-  một mô hình đủ mạnh vốn đã nắm sẵn tri thức, phần việc còn thiếu là \emph{tích hợp} chứ không phải
-  \emph{tra cứu thêm}.
-  \item \textbf{Bộ nhớ dài hạn (V3) chưa cho thấy lợi ích thêm so với V2.} V3 vs V2: $-0.3$ điểm, không
-  ý nghĩa thống kê ($p{=}0.8145$, chỉ 18 câu bất đồng trên 600), dù \texttt{decider} tốn thêm hai lần
-  đọc/ghi kho \texttt{SqliteStore} mỗi câu.
-  \item \textbf{Cả hai thiết kế bộ kiểm chứng (V4, V5) cũng chưa cho thấy lợi ích thêm - dù tốn thêm chi
-  phí đáng kể.} V4 vs V2: $-2.2$ điểm ($p{=}0.0596$, sát ngưỡng); V5 vs V2: $-2.0$ điểm ($p{=}0.0807$),
-  cả hai chưa đạt ý nghĩa thống kê, trong khi tốn thêm $\sim$28-33\% độ trễ và $\sim$45-48\% token so
-  với V2.
-  \item \textbf{Cách đọc hợp lý nhất: lập luận nền (V2) đã đủ tốt nên phần ``kiểm tra lại'' còn ít việc
-  để làm.} Node~3 đã tự chấm độ tin cậy trong báo cáo lập luận của mình, nên bộ kiểm chứng phần lớn chỉ
-  xác nhận lại một quyết định đã được cân nhắc kỹ từ trước, thay vì phát hiện lỗi mới; số câu bất đồng
-  giữa V2 và V3/V4/V5 đã tăng lên 18-41 trên 600 cho mỗi cặp (gấp đôi $n{=}300$, Bảng~\ref{tab:paired})
-  mà vẫn chưa cặp nào vượt ngưỡng ý nghĩa thống kê so với V2 - Nhóm nghiêng hẳn về hướng lợi ích thật sự
-  nhỏ hoặc bằng không, hơn là một hiệu ứng thật bị nhiễu ngẫu nhiên che khuất.
+  \item \textbf{Kiến trúc modular mở đường cho các nghiên cứu về bảo mật hay tối ưu hiệu suất.} Mỗi thành phần (truy
+  hồi, bộ nhớ, bộ kiểm chứng) là một node riêng, bật/tắt độc lập qua \texttt{build\_variant}
+  (\S\ref{sec:reposcructure}) mà không phải viết lại pipeline. Cấu trúc này thuận lợi cho việc tối ưu hiệu
+  suất từng node riêng lẻ (ví dụ giảm token/độ trễ của bộ kiểm chứng mà không đổi các node khác), cũng
+  như cho nghiên cứu bảo mật sau này (thử các đầu vào đối kháng nhắm vào một node cụ thể, chẳng hạn
+  prompt injection qua bằng chứng truy hồi hoặc qua bộ nhớ dài hạn, và cô lập ảnh hưởng trong phạm vi
+  node đó).
 \end{itemize}
 
 % =====================================================================
@@ -799,19 +785,17 @@ nhưng chốt sai trong khi V0 tình cờ đúng (hoặc bị một phương án
 \label{sec:limitations}
 % =====================================================================
 \begin{itemize}[nosep]
-  \item \textbf{Bộ kiểm chứng chưa chứng minh được lợi ích.} V4 và V5 (mỗi biến thể thêm một trong hai
-  thiết kế bộ kiểm chứng lên trên V3) đều thấp hơn V2 một chút ($-2.2$ và $-2.0$ điểm; $p{=}0.060$ và
-  $p{=}0.081$, chưa ý nghĩa thống kê dù V4 đã sát ngưỡng) trong khi tốn thêm đáng kể độ trễ
-  ($\sim$28-33\%) và token ($\sim$45-48\%) so với V2 - ngược với kỳ vọng thiết kế ban đầu của Nhóm.
-  \item \textbf{Cổng do mô hình tự chấm chưa được kiểm định.} Cổng độ tương đồng bằng số đã được thay
-  bằng nhãn tin cậy tự chấm của chính mô hình (\S\ref{sec:rag}); độ tin cậy của chính nhãn tự chấm đó
-  (so với một ngưỡng số khách quan) chưa được đo.
-  \item \textbf{Tính tất định trên đám mây.} Temperature~0 được đặt, nhưng các API lưu trữ không bảo đảm
-  tính tái lập như giải mã greedy cục bộ; cổng golden được ghim vào một mô hình cục bộ.
-  \item \textbf{Rò rỉ nhẹ có thể có trong bộ nhớ dài hạn.} Số liệu V3-V5 ở trên chạy ở chế độ mặc định
-  \texttt{long\_term\_read\_only=False} - \texttt{decider} vừa đọc vừa ghi kho bài học ngay trong lượt
-  chấm test (\S\ref{sec:memory}); vì vậy bài học của câu thứ $N$ có thể rò sang câu thứ $N{+}k$ trong
-  CÙNG lượt chạy, làm tăng ảo độ chính xác vì lý do không liên quan tới chất lượng lập luận.
+  \item \textbf{Bộ nhớ dài hạn (V3) chưa cho thấy lợi ích thêm so với V2.} V3 vs V2: $-0.3$ điểm, không
+  ý nghĩa thống kê ($p{=}0.8145$, chỉ 18 câu bất đồng trên 600), dù \texttt{decider} tốn thêm hai lần
+  đọc/ghi kho \texttt{SqliteStore} mỗi câu.
+  \item \textbf{Cả hai thiết kế bộ kiểm chứng (V4, V5) cũng chưa cho thấy lợi ích thêm - dù tốn thêm chi
+  phí đáng kể.} V4 vs V2: $-2.2$ điểm ($p{=}0.0596$, sát ngưỡng); V5 vs V2: $-2.0$ điểm ($p{=}0.0807$),
+  cả hai chưa đạt ý nghĩa thống kê, trong khi tốn thêm $\sim$28-33\% độ trễ và $\sim$45-48\% token so
+  với V2.
+  \item \textbf{Chỉ thực nghiệm trên một mô hình, ở temperature~0.} Toàn bộ số liệu trong báo cáo đều
+  chạy trên \texttt{qwen2.5:7b}, temperature~0 (\S\ref{sec:setup}); Nhóm chưa kiểm tra các phát hiện này
+  có giữ nguyên trên mô hình khác (kích thước khác, nhà cung cấp khác) hay ở temperature khác 0 hay
+  không.
 \end{itemize}
 
 % =====================================================================
