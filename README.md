@@ -1,4 +1,4 @@
-# Agent Hospital — MedQA-USMLE Variant Ladder
+# MedQA-USMLE Answerer Variant Ladder
 
 A local medical **question-answering** system on MedQA-USMLE, built as an ablation ladder of
 variants (V0–V5) and measured with paired significance. Stack: **LangChain v1 + LangGraph + Ollama**
