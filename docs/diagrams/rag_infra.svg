@@ -1,0 +1,38 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="480" viewBox="0 0 640 480" font-family="Helvetica, Arial, sans-serif">
+  <title>Retrieval infrastructure - from data to raw evidence</title>
+  <defs>
+    <marker id="ri" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
+    </marker>
+  </defs>
+  <text x="320" y="24" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">Retrieval infrastructure - from data to raw evidence</text>
+  <text x="320" y="42" text-anchor="middle" font-size="11" fill="#64748B">Built offline once; shared by V1 and Node 2 of V2-V5</text>
+
+  <rect x="70" y="58" width="500" height="46" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="320" y="78" text-anchor="middle" font-size="12" font-weight="500" fill="#334155">MedMCQA - 182,822 solved exam questions</text>
+  <text x="320" y="94" text-anchor="middle" font-size="9.5" fill="#475569">HF: openlifescienceai/medmcqa (only the question is embedded; answer/explanation are metadata)</text>
+  <line x1="320" y1="104" x2="320" y2="116" stroke="#64748B" stroke-width="1.4" marker-end="url(#ri)"/>
+
+  <rect x="70" y="118" width="500" height="50" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="320" y="138" text-anchor="middle" font-size="12" font-weight="500" fill="#115E59">Embedding (via Ollama)</text>
+  <text x="320" y="154" text-anchor="middle" font-size="10" fill="#0F766E">qwen3-embedding:4b (V1-V5, 32K token context)</text>
+  <line x1="320" y1="168" x2="320" y2="180" stroke="#64748B" stroke-width="1.4" marker-end="url(#ri)"/>
+
+  <rect x="70" y="182" width="500" height="56" rx="8" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="320" y="204" text-anchor="middle" font-size="12" font-weight="500" fill="#115E59">ChromaDB - cosine / HNSW, persistent vector store</text>
+  <text x="320" y="222" text-anchor="middle" font-size="9.5" font-family="monospace" fill="#0F766E">knowledge_medmcqa_qwen3 (V1-V5, one shared collection)</text>
+  <line x1="320" y1="238" x2="320" y2="250" stroke="#64748B" stroke-width="1.4" marker-end="url(#ri)"/>
+
+  <rect x="70" y="252" width="500" height="56" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="320" y="272" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">search_medmcqa - LangChain @tool</text>
+  <text x="320" y="288" text-anchor="middle" font-size="9.5" fill="#6D28D9">invoke(query) -&gt; Chroma.similarity_search, top-5, threshold=0.0 (no gate)</text>
+  <text x="320" y="301" text-anchor="middle" font-size="9.5" fill="#6D28D9">agent decides for itself (V1, agentic) - graph calls it directly (V2-V5, deterministic)</text>
+  <line x1="320" y1="308" x2="320" y2="320" stroke="#64748B" stroke-width="1.4" marker-end="url(#ri)"/>
+
+  <rect x="70" y="322" width="500" height="46" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="320" y="343" text-anchor="middle" font-size="12" font-weight="500" fill="#334155">5 similar exam questions - raw evidence</text>
+  <text x="320" y="359" text-anchor="middle" font-size="9.5" fill="#475569">Q: / A: / Why: format per item, with the correct answer and explanation</text>
+
+  <text x="320" y="404" text-anchor="middle" font-size="10.5" fill="#64748B">Retrieval itself uses no LLM - cost is embedding 1 query (~ms) and a cosine top-5 search (sub-ms).</text>
+  <text x="320" y="422" text-anchor="middle" font-size="10.5" fill="#64748B">This raw evidence feeds the digest + self-rated confidence step (next figure, section 3.2).</text>
+</svg>

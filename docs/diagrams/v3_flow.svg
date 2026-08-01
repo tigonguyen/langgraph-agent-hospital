@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="405" viewBox="0 0 820 405" font-family="Helvetica, Arial, sans-serif">
+  <title>V3 - V2's graph + long-term memory at the decider</title>
+  <defs>
+    <marker id="v3a" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
+    </marker>
+  </defs>
+  <text x="410" y="22" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">V3 - understand -&gt; (search ‖ reasoning) -&gt; answer + long-term memory</text>
+  <text x="410" y="40" text-anchor="middle" font-size="11" fill="#64748B">4 agents, 4 LLM calls/item - no verifier; decider recalls/remembers lessons</text>
+
+  <rect x="30" y="119" width="70" height="40" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="65" y="144" text-anchor="middle" font-size="12" font-weight="500" fill="#334155">START</text>
+
+  <rect x="140" y="107" width="180" height="64" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="230" y="128" text-anchor="middle" font-size="12.5" font-weight="500" fill="#5B21B6">understand - Node 1</text>
+  <text x="230" y="144" text-anchor="middle" font-size="10" fill="#6D28D9">Agent(case-reasoner) - LLM call 1</text>
+  <text x="230" y="159" text-anchor="middle" font-size="9.5" fill="#6D28D9">-&gt; case summary + query (shared)</text>
+
+  <line x1="100" y1="139" x2="134" y2="139" stroke="#64748B" stroke-width="1.5" marker-end="url(#v3a)"/>
+
+  <text x="480" y="63" text-anchor="middle" font-size="10.5" font-weight="500" fill="#334155">search (Node 2, bundled into one node)</text>
+  <rect x="370" y="69" width="220" height="30" rx="7" fill="#CCFBF1" stroke="#0D9488"/>
+  <text x="480" y="85" text-anchor="middle" font-size="11" font-weight="500" fill="#115E59">retrieve - search_medmcqa</text>
+  <text x="480" y="96" text-anchor="middle" font-size="9" fill="#0F766E">tool called by the graph - no LLM - ~40ms</text>
+  <line x1="480" y1="99" x2="480" y2="109" stroke="#94A3B8" stroke-width="1.3" marker-end="url(#v3a)"/>
+  <rect x="370" y="111" width="220" height="40" rx="7" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="480" y="128" text-anchor="middle" font-size="10.5" font-weight="500" fill="#5B21B6">evidence-digest - LLM call 2</text>
+  <text x="480" y="142" text-anchor="middle" font-size="9" fill="#6D28D9">summarizes evidence, self-rates HIGH/MEDIUM/LOW</text>
+
+  <rect x="370" y="189" width="220" height="52" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="480" y="209" text-anchor="middle" font-size="10.5" font-weight="500" fill="#5B21B6">clinical-reasoner - Node 3 - LLM call 3</text>
+  <text x="480" y="223" text-anchor="middle" font-size="9" fill="#6D28D9">option-by-option, self-rates confidence</text>
+  <text x="480" y="235" text-anchor="middle" font-size="8.5" fill="#6D28D9">does NOT see evidence (concurrent with Node 2)</text>
+
+  <line x1="320" y1="125" x2="360" y2="90" stroke="#64748B" stroke-width="1.3" marker-end="url(#v3a)"/>
+  <line x1="320" y1="153" x2="360" y2="213" stroke="#64748B" stroke-width="1.3" marker-end="url(#v3a)"/>
+  <text x="325" y="171" font-size="9" fill="#94A3B8" font-style="italic">run concurrently - same LangGraph superstep</text>
+
+  <!-- Long-term memory: sibling store the decider reads/writes, not a new node/agent -->
+  <rect x="630" y="48" width="170" height="44" rx="8" fill="#FEF3C7" stroke="#D97706"/>
+  <text x="715" y="64" text-anchor="middle" font-size="11" font-weight="500" fill="#92400E">SqliteStore</text>
+  <text x="715" y="79" text-anchor="middle" font-size="9" fill="#92400E">medqa-lessons (train bank)</text>
+  <line x1="715" y1="92" x2="715" y2="119" stroke="#94A3B8" stroke-width="1.3" stroke-dasharray="4 4" marker-end="url(#v3a)"/>
+  <text x="727" y="110" text-anchor="start" font-size="8.5" fill="#475569">recall + remember</text>
+
+  <rect x="640" y="125" width="150" height="72" rx="8" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="715" y="147" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">decider - Node 4</text>
+  <text x="715" y="162" text-anchor="middle" font-size="10" fill="#6D28D9">LLM call 4</text>
+  <text x="715" y="176" text-anchor="middle" font-size="9" fill="#6D28D9">asymmetric-trust rule</text>
+  <text x="715" y="189" text-anchor="middle" font-size="9" fill="#6D28D9">-&gt; "Answer: X"</text>
+
+  <line x1="590" y1="111" x2="636" y2="149" stroke="#64748B" stroke-width="1.3" marker-end="url(#v3a)"/>
+  <line x1="590" y1="215" x2="636" y2="173" stroke="#64748B" stroke-width="1.3" marker-end="url(#v3a)"/>
+
+  <rect x="670" y="253" width="90" height="36" rx="8" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="715" y="276" text-anchor="middle" font-size="12" fill="#334155">END</text>
+  <line x1="715" y1="197" x2="715" y2="249" stroke="#64748B" stroke-width="1.5" marker-end="url(#v3a)"/>
+
+  <text x="410" y="321" text-anchor="middle" font-size="11" fill="#64748B">decider recalls lessons from similar earlier cases before answering, then writes one back -</text>
+  <text x="410" y="339" text-anchor="middle" font-size="11" fill="#64748B">no separate agent or LLM call, just two store reads/writes around the existing decider call.</text>
+  <text x="410" y="367" text-anchor="middle" font-size="10.5" fill="#64748B">purple = LLM call - teal = retrieval (no LLM) - amber = long-term memory (SQLite, no LLM)</text>
+</svg>

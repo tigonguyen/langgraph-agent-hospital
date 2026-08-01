@@ -1,0 +1,75 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="820" height="466" viewBox="0 0 820 466" font-family="Helvetica, Arial, sans-serif">
+  <title>Long-term memory — two separate banks in one SqliteStore</title>
+  <defs>
+    <marker id="ltRead" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#475569"/>
+    </marker>
+    <marker id="ltWrite" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+      <path d="M 0 0 L 10 5 L 0 10 z" fill="#92400E"/>
+    </marker>
+  </defs>
+
+  <text x="410" y="24" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">Long-term memory — two separate banks, one SqliteStore, split by namespace</text>
+  <text x="410" y="42" text-anchor="middle" font-size="11" fill="#64748B">No node is added for memory: recall/remember hook into nodes that already exist</text>
+
+  <!-- ================= producer/consumer nodes (purple = LLM call) ================= -->
+  <!-- decider -->
+  <rect x="34" y="72" width="212" height="82" rx="6" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1.4"/>
+  <text x="140" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#5B21B6">Node 4 — decider (answer)</text>
+  <text x="140" y="111" text-anchor="middle" font-size="10" fill="#6D28D9">recalls a lesson on EVERY case</text>
+  <text x="140" y="129" text-anchor="middle" font-size="10" fill="#6D28D9">remembers one after committing</text>
+  <text x="140" y="147" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V3, V4, V5</text>
+
+  <!-- verifier -->
+  <rect x="304" y="72" width="212" height="82" rx="6" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1.4"/>
+  <text x="410" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#5B21B6">Node 5 — verifier (verify)</text>
+  <text x="410" y="111" text-anchor="middle" font-size="10" fill="#6D28D9">recalls mistakes on similar cases</text>
+  <text x="410" y="129" text-anchor="middle" font-size="10" fill="#6D28D9">read-only — never writes</text>
+  <text x="410" y="147" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V5 (mistake bank)</text>
+
+  <!-- distill_mistake -->
+  <rect x="574" y="72" width="212" height="82" rx="6" fill="#EDE9FE" stroke="#7C3AED" stroke-width="1.4"/>
+  <text x="680" y="93" text-anchor="middle" font-size="11.5" font-weight="500" fill="#5B21B6">Node 6 — distill_mistake</text>
+  <text x="680" y="111" text-anchor="middle" font-size="10" fill="#6D28D9">the ONLY node that reads gold</text>
+  <text x="680" y="129" text-anchor="middle" font-size="10" fill="#6D28D9">writes only when answer is WRONG</text>
+  <text x="680" y="147" text-anchor="middle" font-size="9.5" font-style="italic" fill="#64748B">V5 only</text>
+
+  <!-- ================= the two banks (amber = SQLite store, no LLM) ================= -->
+  <rect x="34" y="196" width="360" height="104" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-width="1.5"/>
+  <text x="214" y="218" text-anchor="middle" font-size="12" font-weight="500" fill="#92400E">Bank 1 — general lesson bank</text>
+  <text x="214" y="238" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#92400E">("medqa-lessons", split)</text>
+  <text x="214" y="257" text-anchor="middle" font-size="10" fill="#92400E">one Lesson row per case seen</text>
+  <text x="214" y="275" text-anchor="middle" font-size="10" fill="#92400E">decider reads AND writes</text>
+  <text x="214" y="292" text-anchor="middle" font-size="9.5" fill="#92400E">key: lesson-&lt;id&gt; — overwritten on rerun</text>
+
+  <rect x="426" y="196" width="360" height="104" rx="6" fill="#FEF3C7" stroke="#D97706" stroke-width="1.5"/>
+  <text x="606" y="218" text-anchor="middle" font-size="12" font-weight="500" fill="#92400E">Bank 2 — mistake bank</text>
+  <text x="606" y="238" text-anchor="middle" font-size="10.5" font-family="monospace" fill="#92400E">("medqa-mistakes", split)</text>
+  <text x="606" y="257" text-anchor="middle" font-size="10" fill="#92400E">only cases answered WRONG</text>
+  <text x="606" y="275" text-anchor="middle" font-size="10" fill="#92400E">verifier reads — distill_mistake writes</text>
+  <text x="606" y="292" text-anchor="middle" font-size="9.5" fill="#92400E">kept separate so mistakes never mix into the general bank</text>
+
+  <!-- arrows decider <-> bank1 -->
+  <path d="M 104 156 L 104 196" fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#ltRead)"/>
+  <path d="M 176 196 L 176 156" fill="none" stroke="#92400E" stroke-width="1.4" marker-end="url(#ltWrite)"/>
+  <text x="98" y="180" text-anchor="end" font-size="9.5" fill="#475569">read</text>
+  <text x="182" y="180" text-anchor="start" font-size="9.5" fill="#92400E">write</text>
+
+  <!-- arrow verifier -> bank2 (read only) -->
+  <path d="M 470 156 L 470 176 L 520 176 L 520 196" fill="none" stroke="#475569" stroke-width="1.4" marker-end="url(#ltRead)"/>
+  <text x="495" y="170" text-anchor="middle" font-size="9.5" fill="#475569">read</text>
+
+  <!-- arrow distill -> bank2 (write only) -->
+  <path d="M 690 156 L 690 176 L 660 176 L 660 196" fill="none" stroke="#92400E" stroke-width="1.4" marker-end="url(#ltWrite)"/>
+  <text x="675" y="170" text-anchor="middle" font-size="9.5" fill="#92400E">write</text>
+
+  <!-- persistence note (grey = control/meta) -->
+  <rect x="34" y="314" width="752" height="34" rx="5" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="410" y="336" text-anchor="middle" font-size="10.5" fill="#334155">One file, <tspan font-family="monospace">data/longterm/lessons.sqlite</tspan> — persists across questions AND runs (QAState dies after each question)</text>
+
+  <!-- ================= guards (grey = control/meta) ================= -->
+  <rect x="34" y="366" width="752" height="82" rx="6" fill="#F1F5F9" stroke="#94A3B8"/>
+  <text x="50" y="387" font-size="11.5" font-weight="500" fill="#334155">Why a Store instead of a checkpointer</text>
+  <text x="50" y="408" font-size="10.5" fill="#475569">· Checkpointer is keyed by <tspan font-family="monospace">thread_id</tspan> (= <tspan font-family="monospace">item.id</tspan>) — replays only ONE question. Store has its own namespace — crosses episode boundaries.</text>
+  <text x="50" y="428" font-size="10.5" fill="#475569">· <tspan font-family="monospace">namespace</tspan> includes the split name — a lesson learned on train is invisible when querying the test namespace.</text>
+</svg>

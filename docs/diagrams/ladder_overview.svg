@@ -1,0 +1,68 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="500" viewBox="0 0 800 500" font-family="Helvetica, Arial, sans-serif">
+  <title>V0-V5 ablation ladder</title>
+  <defs>
+    <marker id="al" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+      <path d="M0,0 L10,5 L0,10 z" fill="#64748B"/>
+    </marker>
+  </defs>
+  <text x="400" y="22" text-anchor="middle" font-size="15" font-weight="500" fill="#0F172A">The ablation ladder - one config, one graph per variant</text>
+  <text x="400" y="42" text-anchor="middle" font-size="11" fill="#64748B">every variant is a preset RunConfig compiled by build_graph(cfg); all use the MedMCQA corpus</text>
+
+  <!-- each row's box carries BOTH the node-chain and its own delta description, so
+       nothing floats in the gap between rows -->
+
+  <!-- V0 -->
+  <rect x="40" y="62" width="66" height="50" rx="6" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="73" y="92" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">V0</text>
+  <rect x="126" y="62" width="634" height="50" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="140" y="84" text-anchor="start" font-size="12" fill="#334155">answer</text>
+  <text x="140" y="102" text-anchor="start" font-size="10" fill="#94A3B8">control - anchor Acc(Vn) - Acc(V0)</text>
+
+  <line x1="73" y1="112" x2="73" y2="124" stroke="#64748B" stroke-width="1.2" marker-end="url(#al)"/>
+
+  <!-- V1 -->
+  <rect x="40" y="126" width="66" height="50" rx="6" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="73" y="156" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">V1</text>
+  <rect x="126" y="126" width="634" height="50" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="140" y="148" text-anchor="start" font-size="12" fill="#334155">agent (agentic, search_medmcqa)</text>
+  <text x="140" y="166" text-anchor="start" font-size="10" fill="#7C3AED">+ agentic retrieval (RAG)</text>
+
+  <line x1="73" y1="176" x2="73" y2="188" stroke="#64748B" stroke-width="1.2" marker-end="url(#al)"/>
+
+  <!-- V2 -->
+  <rect x="40" y="190" width="66" height="50" rx="6" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="73" y="220" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">V2</text>
+  <rect x="126" y="190" width="634" height="50" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="140" y="212" text-anchor="start" font-size="12" fill="#334155">understand → (search ‖ reasoning) → answer</text>
+  <text x="140" y="230" text-anchor="start" font-size="10" fill="#7C3AED">+ split into 4 nodes: understand / search / reasoning / decide</text>
+
+  <line x1="73" y1="240" x2="73" y2="252" stroke="#64748B" stroke-width="1.2" marker-end="url(#al)"/>
+
+  <!-- V3 -->
+  <rect x="40" y="254" width="66" height="50" rx="6" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="73" y="284" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">V3</text>
+  <rect x="126" y="254" width="634" height="50" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="140" y="276" text-anchor="start" font-size="12" fill="#334155">understand → (search ‖ reasoning) → answer</text>
+  <text x="140" y="294" text-anchor="start" font-size="10" fill="#7C3AED">+ long-term memory at decider (recall + remember, shared bank medqa-lessons)</text>
+
+  <line x1="73" y1="304" x2="73" y2="316" stroke="#64748B" stroke-width="1.2" marker-end="url(#al)"/>
+
+  <!-- V4 -->
+  <rect x="40" y="318" width="66" height="50" rx="6" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="73" y="348" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">V4</text>
+  <rect x="126" y="318" width="634" height="50" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="140" y="340" text-anchor="start" font-size="12" fill="#334155">understand → (search ‖ reasoning) → answer → verify</text>
+  <text x="140" y="358" text-anchor="start" font-size="10" fill="#7C3AED">+ report-verifier checks live Wikipedia (from V3)</text>
+
+  <line x1="73" y1="368" x2="73" y2="380" stroke="#64748B" stroke-width="1.2" marker-end="url(#al)"/>
+
+  <!-- V5 -->
+  <rect x="40" y="382" width="66" height="50" rx="6" fill="#EDE9FE" stroke="#7C3AED"/>
+  <text x="73" y="412" text-anchor="middle" font-size="12" font-weight="500" fill="#5B21B6">V5</text>
+  <rect x="126" y="382" width="634" height="50" rx="6" fill="#F8FAFC" stroke="#CBD5E1"/>
+  <text x="140" y="404" text-anchor="start" font-size="12" fill="#334155">understand → (search ‖ reasoning) → answer → verify → distill_mistake</text>
+  <text x="140" y="422" text-anchor="start" font-size="10" fill="#7C3AED">+ report-verifier reads the evolutionary bank + distill_mistake (only on a miss, from V3)</text>
+
+  <text x="400" y="462" text-anchor="middle" font-size="11" fill="#64748B">Each rung adds exactly one component, so accuracy deltas are attributable.</text>
+  <text x="400" y="480" text-anchor="middle" font-size="11" fill="#64748B">V1-V5 share one corpus (MedMCQA); V4-V3 and V5-V3 each isolate exactly one verifier design.</text>
+</svg>
