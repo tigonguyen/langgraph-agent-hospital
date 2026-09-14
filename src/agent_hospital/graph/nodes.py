@@ -17,7 +17,7 @@ from agent_hospital.graph import longterm
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
 # Aliased: a local `@tool def search_wikipedia` below would shadow this import and recurse.
 from agent_hospital.knowledge import search_wikipedia as _wikipedia_lookup
-from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_VERIFY, AGENTIC_VERIFY_WIKIPEDIA,
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_ANSWER_TEXTBOOK, AGENTIC_VERIFY, AGENTIC_VERIFY_WIKIPEDIA,
                                    ANALYSE_ONLY, DIGEST_EVIDENCE_ONLY, LESSON_SUFFIX, LETTER_ONLY,
                                    MISTAKE_LESSON_ONLY, REASON_THEN_ANSWER, UNDERSTAND_ONLY,
                                    format_mcq, parse_choice)
@@ -157,7 +157,7 @@ def make_search_tool(cfg: RunConfig, max_calls: int | None = None):
         if "store" not in holder:
             holder["store"] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
         hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder["store"])
-        return format_evidence(hits)
+        return format_evidence(hits) or "No relevant passages found."
 
     return search_textbooks, lambda: calls.__setitem__("n", 0)
 
@@ -210,6 +210,8 @@ _MAX_AGENTIC_SEARCHES = 2   # matches the "up to twice" confidence-gated retry t
 
 _AGENTIC_TOOL_BY_ROLE = {
     "rag-agent": (lambda cfg: make_medmcqa_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES), AGENTIC_ANSWER),
+    "textbook-agent": (lambda cfg: make_search_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES),
+                       AGENTIC_ANSWER_TEXTBOOK),
 }
 
 
