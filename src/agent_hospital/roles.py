@@ -85,6 +85,38 @@ TEXTBOOK_AGENT = (
     "a general feeling that the passage points elsewhere is not enough.\n\n"
     "You must always finish with a definite answer — never end your turn on a tool call alone."
 )
+# V1D (dual-store agentic RAG): one tool, two stores with different jobs. Measured on
+# gpt-oss:20b over 300 items, single-store V1 was exactly 15 wins / 15 losses vs V0: the wins
+# were recall gaps that a solved lookalike filled; the losses were lookalikes (or related
+# passages) that talked the model out of a correct answer. So a switch needs BOTH a solved
+# question proposing the letter AND a textbook fact backing it — one source alone is not
+# enough to overturn the model's own answer.
+DUAL_AGENT = (
+    "You are an expert physician answering a USMLE board multiple-choice question. You have a "
+    "tool, search_evidence, that returns two kinds of evidence in one call: (1) similar SOLVED "
+    "board questions with their correct answers, and (2) passages from standard medical "
+    "textbooks. You do everything yourself in one pass.\n\n"
+    "Work the case in this order:\n"
+    "1. UNDERSTAND THE CASE — identify the salient demographics, symptoms, signs, labs, and "
+    "timeline, and decide precisely what kind of question this is (diagnosis, next step, "
+    "mechanism, organism, contraindication, or best next test).\n"
+    "2. COMMIT — reason across every option, A through D, from your own clinical knowledge and "
+    "pick a provisional answer. Note the runner-up and the one fact that separates them.\n"
+    "3. SEARCH — call search_evidence with a condensed query: the key presentation plus what is "
+    "asked. You may reformulate ONCE if nothing relevant came back; never more than two calls.\n"
+    "4. WEIGH — the two evidence types have different jobs. A solved question may PROPOSE an "
+    "answer, but only if it asks the SAME KIND of question as this one (a question asking which "
+    "drug causes a side effect does not propose an answer to a question about that drug's "
+    "mechanism) AND its answer corresponds to one of THIS question's options. A textbook "
+    "passage may CORROBORATE a proposal by stating the fact that makes it correct for this "
+    "vignette. Neither alone is enough.\n"
+    "5. DECIDE — keep your provisional answer unless a solved question proposes a DIFFERENT "
+    "option AND a textbook passage corroborates it AND you can name the specific vignette "
+    "finding that the corroborating fact resolves; then switch. If the evidence proposes your "
+    "own answer, that confirms it. If the evidence is off-target, unrelated, or the two types "
+    "disagree, it is unsettled — keep your provisional answer.\n\n"
+    "You must always finish with a definite answer — never end your turn on a tool call alone."
+)
 # --- V2-V4: the 4-node design — same 4 jobs V1's single agent does internally (understand,
 # search, reason, decide), split into 4 nodes. Node 1 (case-reasoner) produces a case summary +
 # search query, shared by Node 2 (search+digest) and Node 3 (reasoning) which then run
@@ -242,6 +274,7 @@ ROLE_PROMPTS: dict[str, str] = {
     "baseline": BASELINE,
     "rag-agent": RAG_AGENT,
     "textbook-agent": TEXTBOOK_AGENT,
+    "dual-agent": DUAL_AGENT,
     "case-reasoner": CASE_REASONER,
     "clinical-reasoner": CLINICAL_REASONER,
     "evidence-digest": EVIDENCE_DIGEST,

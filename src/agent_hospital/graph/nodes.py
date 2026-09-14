@@ -17,7 +17,7 @@ from agent_hospital.graph import longterm
 from agent_hospital.knowledge import default_embeddings, format_evidence, open_store, retrieve
 # Aliased: a local `@tool def search_wikipedia` below would shadow this import and recurse.
 from agent_hospital.knowledge import search_wikipedia as _wikipedia_lookup
-from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_ANSWER_TEXTBOOK, AGENTIC_VERIFY, AGENTIC_VERIFY_WIKIPEDIA,
+from agent_hospital.qa.mcq import (AGENTIC_ANSWER, AGENTIC_ANSWER_DUAL, AGENTIC_ANSWER_TEXTBOOK, AGENTIC_VERIFY, AGENTIC_VERIFY_WIKIPEDIA,
                                    ANALYSE_ONLY, DIGEST_EVIDENCE_ONLY, LESSON_SUFFIX, LETTER_ONLY,
                                    MISTAKE_LESSON_ONLY, REASON_THEN_ANSWER, UNDERSTAND_ONLY,
                                    format_mcq, parse_choice)
@@ -206,12 +206,45 @@ def make_medmcqa_tool(cfg: RunConfig, max_calls: int | None = None):
     return search_medmcqa, lambda: calls.__setitem__("n", 0)
 
 
+def make_dual_search_tool(cfg: RunConfig, max_calls: int | None = None):
+    """`search_evidence`: one call, two stores (V1D). `cfg.rag` (MedMCQA) proposes an answer
+    via solved lookalikes; `cfg.rag2` (textbooks) supplies the fact that must corroborate it.
+    Both sections come back in one tool result so the agent weighs them together and pays
+    one model round-trip, not two."""
+    from langchain_core.tools import tool
+
+    stores: list[tuple[RagConfig, str]] = [(cfg.rag, "No similar solved questions found."),
+                                           (cfg.rag2, "No relevant textbook passages found.")]
+    holder: dict[int, Any] = {}
+    calls = {"n": 0}
+
+    @tool
+    def search_evidence(query: str) -> str:
+        """Search BOTH a database of solved board questions (MedMCQA — returns similar
+        questions with their correct answer) AND standard medical textbooks (returns
+        reference passages). Use a focused clinical query: the key findings and what is asked."""
+        blocked = _call_cap_guard(calls, max_calls, "search_evidence")
+        if blocked:
+            return blocked
+        sections = []
+        for idx, (rag, empty_msg) in enumerate(stores):
+            if idx not in holder:
+                holder[idx] = open_store(rag.collection, embeddings=default_embeddings(rag.embedder))
+            hits = retrieve(query, k=rag.k, threshold=rag.threshold, store=holder[idx])
+            sections.append(format_evidence(hits) or empty_msg)
+        return "\n\n".join(sections)
+
+    return search_evidence, lambda: calls.__setitem__("n", 0)
+
+
 _MAX_AGENTIC_SEARCHES = 2   # matches the "up to twice" confidence-gated retry the prompts describe
 
 _AGENTIC_TOOL_BY_ROLE = {
     "rag-agent": (lambda cfg: make_medmcqa_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES), AGENTIC_ANSWER),
     "textbook-agent": (lambda cfg: make_search_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES),
                        AGENTIC_ANSWER_TEXTBOOK),
+    "dual-agent": (lambda cfg: make_dual_search_tool(cfg, max_calls=_MAX_AGENTIC_SEARCHES),
+                   AGENTIC_ANSWER_DUAL),
 }
 
 
