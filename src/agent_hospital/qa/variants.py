@@ -22,6 +22,7 @@ DEFAULT_MODEL = "qwen2.5:14b"
 VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only (MedMCQA)",
+    "V1T": "RAG-only (textbooks, gated)",
     "V2": "Multi-agent (case reasoner + decider)",
     "V3": "V2 without verifier, decider has long-term memory",
     "V4": "V3 + verifier grounded in live Wikipedia",
@@ -73,6 +74,13 @@ _PRESETS: dict[str, RunConfig] = {
     "V1": RunConfig(answer_role="rag-agent",
                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
                                   k=5, threshold=0.0, tool=True)),
+    # V1T: V1's agent over the USMLE textbook corpus instead of MedMCQA, with a relevance
+    # gate. 0.75 drops the bottom quartile of nomic scores on the test questions (top-1
+    # ranged 0.69-0.84); MedMCQA neighbours mostly never named an option, so this swaps
+    # lookalike questions for reference facts.
+    "V1T": RunConfig(answer_role="textbook-agent",
+                     rag=RagConfig(collection="knowledge", embedder="nomic-embed-text",
+                                   k=5, threshold=0.75, tool=True)),
     # V2: case-reasoner -> (search || reasoning) -> decider, 4 agents, no verifier. Same
     # corpus/embedder as V1, so V2-V1 isolates the effect of splitting one agent into four.
     "V2": RunConfig(clinical_reason=True, answer_role="decider",

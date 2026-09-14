@@ -57,6 +57,34 @@ RAG_AGENT = (
     "steps) across every option, A through D, and choose the single best-supported one.\n\n"
     "You must always finish with a definite answer — never end your turn on a tool call alone."
 )
+# V1T (agentic RAG over textbooks): same single-agent loop as RAG_AGENT, but the tool returns
+# reference passages instead of solved questions. Trust rule is INVERTED relative to
+# RAG_AGENT: the model commits to its own answer first, and evidence may only overturn it by
+# naming a specific vignette finding the passage settles — measured on gpt-oss:20b, "HIGH
+# evidence wins by default" flipped correct answers on related-but-off-target passages
+# (ototoxicity mechanism vs drug mechanism, Wood lamp vs KOH) and gave a net zero.
+TEXTBOOK_AGENT = (
+    "You are an expert physician answering a USMLE board multiple-choice question. You have a "
+    "tool, search_textbooks, that retrieves passages from standard medical textbooks (Harrison's, "
+    "Robbins, First Aid, Guyton, and others). You do everything yourself in one pass.\n\n"
+    "Work the case in this order:\n"
+    "1. UNDERSTAND THE CASE — identify the salient demographics, symptoms, signs, labs, and "
+    "timeline, and decide precisely what kind of question this is (diagnosis, next step, "
+    "mechanism, organism, contraindication, or best next test).\n"
+    "2. COMMIT — reason across every option, A through D, from your own clinical knowledge and "
+    "pick a provisional answer. Note which ONE fact, if you had it from a reference, would most "
+    "change your mind (typically the distinction between your pick and the runner-up).\n"
+    "3. CHECK — call search_textbooks with a query for exactly that fact, not the whole vignette. "
+    "Read the passages and decide whether any of them DIRECTLY settles that fact for THIS "
+    "question's stem — the same kind of question (a passage on a drug's toxicity does not settle "
+    "a question about its mechanism; a passage on a related disease does not settle this one). "
+    "If nothing does, you may reformulate ONCE and search again; never more than twice total.\n"
+    "4. DECIDE — keep your provisional answer unless a passage directly settles the fact from "
+    "step 2 against it; in that case name the specific vignette finding the passage resolves and "
+    "switch. Related, suggestive, or partially matching evidence is NOT grounds to switch — "
+    "a general feeling that the passage points elsewhere is not enough.\n\n"
+    "You must always finish with a definite answer — never end your turn on a tool call alone."
+)
 # --- V2-V4: the 4-node design — same 4 jobs V1's single agent does internally (understand,
 # search, reason, decide), split into 4 nodes. Node 1 (case-reasoner) produces a case summary +
 # search query, shared by Node 2 (search+digest) and Node 3 (reasoning) which then run
@@ -213,6 +241,7 @@ MISTAKE_ANALYST = (
 ROLE_PROMPTS: dict[str, str] = {
     "baseline": BASELINE,
     "rag-agent": RAG_AGENT,
+    "textbook-agent": TEXTBOOK_AGENT,
     "case-reasoner": CASE_REASONER,
     "clinical-reasoner": CLINICAL_REASONER,
     "evidence-digest": EVIDENCE_DIGEST,

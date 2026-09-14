@@ -28,6 +28,12 @@ AGENTIC_ANSWER = (
     "state your confidence (High/Medium/Low) as instructed above, then on the LAST line write "
     "'Answer: X' where X is A, B, C, or D."
 )
+AGENTIC_ANSWER_TEXTBOOK = (
+    "Commit to a provisional answer first, then call search_textbooks (up to twice) to check the "
+    "one fact that would change it. Then, in at most 40 words, say why the best option is best "
+    "and whether the evidence confirmed, overturned, or did not settle your provisional pick, "
+    "then on the LAST line write 'Answer: X' where X is A, B, C, or D."
+)
 AGENTIC_VERIFY = (
     "First, if it would help, call search_textbooks with a focused query to check the proposed "
     "answer against textbook evidence. Then, in at most 30 words, say why you keep or change the "
