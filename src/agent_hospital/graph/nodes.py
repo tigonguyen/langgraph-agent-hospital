@@ -223,10 +223,23 @@ def make_agentic_rag_node(cfg: RunConfig) -> Node:
 
     def node(state: dict) -> dict:
         reset_calls()
-        reply = agent.say(format_mcq(state["item"], closing))
+        prompt = format_mcq(state["item"], closing)
+        reply = agent.say(prompt)
+        if not reply.strip():
+            # Ollama (0.33.1) returns an EMPTY message — no text, no tool_calls — when a model
+            # packs two long tool calls into one turn (qwen2.5:14b does this routinely: both
+            # searches up front, then hallucinated results). The agent loop then ends with
+            # nothing to parse. Re-ask once, forcing the search -> read -> retry sequence the
+            # role prompt already describes; models that follow it never hit this branch.
+            reset_calls()
+            reply = agent.say(prompt + _ONE_SEARCH_PER_TURN)
         return {"answer": parse_choice(reply), "rationale": reply.strip()}
 
     return node
+
+
+_ONE_SEARCH_PER_TURN = ("\n\nMake only ONE search_medmcqa call per message and wait for its "
+                        "result before writing anything else.")
 
 
 def make_reasoning_node(cfg: RunConfig) -> Node:
