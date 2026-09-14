@@ -21,5 +21,9 @@ data/chroma/
 data/ingest_full.log
 data/eval_runs/
 data/longterm/
+data/web_logs/
 # Leftover local weights from the removed MedCPT embedder; not code-referenced anymore
 data/medcpt/
+
+# Locally generated CA bundle (machine-specific; see scripts/make_ca_bundle.sh)
+certs/
