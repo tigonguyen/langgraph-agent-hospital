@@ -71,6 +71,24 @@ def default_model() -> str:
         return spec                    # already an explicit cloud spec
     return f"anthropic:{spec}"         # bare name (or ollama:) -> the API endpoint
 
+# Ollama models that emit chain-of-thought as output tokens before the answer. They get
+# a larger generation cap (thinking counts against `num_predict`) and Ollama's `think`
+# option, which returns the reasoning as a separate `reasoning_content` field so no
+# `<think>` text ever reaches `parse_choice`. gpt-oss also takes an effort level.
+THINKING_MODEL_PREFIXES = ("qwen3", "gpt-oss", "deepseek-r1")
+THINKING_NUM_PREDICT = 4096
+
+
+def _reasoning_option(name: str) -> bool | str:
+    """Ollama `think` value for a thinking model, from AGENT_HOSPITAL_THINK_EFFORT:
+    `off` disables thinking on any model; gpt-oss takes low/medium(default)/high; other
+    thinking models only have on/off."""
+    effort = (os.environ.get("AGENT_HOSPITAL_THINK_EFFORT") or "medium").strip().lower()
+    if effort == "off":
+        return False
+    return effort if name.startswith("gpt-oss") else True
+
+
 # spec prefix -> langchain provider id
 PROVIDERS = {
     "ollama": "ollama",
@@ -119,6 +137,11 @@ def resolve_model(spec: str, temperature: float = 0.0) -> BaseChatModel:
         # tokens on a single item (Ollama serves one request at a time, so this stalls
         # everything behind it for tens of minutes). 1024 comfortably covers even the
         # panel's unconstrained deliberation (~900 tokens observed) with headroom.
-        return init_chat_model(name, model_provider=provider, temperature=temperature, num_predict=1024)
+        # Thinking models need more (see THINKING_MODEL_PREFIXES).
+        opts: dict[str, Any] = {"num_predict": 1024}
+        if name.startswith(THINKING_MODEL_PREFIXES):
+            reasoning = _reasoning_option(name)
+            opts = {"num_predict": THINKING_NUM_PREDICT if reasoning else 1024, "reasoning": reasoning}
+        return init_chat_model(name, model_provider=provider, temperature=temperature, **opts)
 
     return init_chat_model(name, model_provider=provider, temperature=temperature)
