@@ -19,7 +19,7 @@ venv/
 # RAG vector store + ingest logs (large, regenerable)
 data/chroma/
 data/ingest_full.log
-data/eval_runs/
+data/eval_runs*/
 data/longterm/
 data/web_logs/
 # Leftover local weights from the removed MedCPT embedder; not code-referenced anymore
