@@ -23,6 +23,7 @@ VARIANTS: dict[str, str] = {
     "V0": "Direct LLM",
     "V1": "RAG-only (MedMCQA)",
     "V1T": "RAG-only (textbooks, gated)",
+    "V1D": "RAG-only (dual-store: MedMCQA proposes, textbooks corroborate)",
     "V2": "Multi-agent (case reasoner + decider)",
     "V3": "V2 without verifier, decider has long-term memory",
     "V4": "V3 + verifier grounded in live Wikipedia",
@@ -81,6 +82,14 @@ _PRESETS: dict[str, RunConfig] = {
     "V1T": RunConfig(answer_role="textbook-agent",
                      rag=RagConfig(collection="knowledge", embedder="nomic-embed-text",
                                    k=5, threshold=0.75, tool=True)),
+    # V1D: V1's single agent with one tool over BOTH stores. Same MedMCQA settings as V1 so
+    # the lookalike proposals are identical; textbooks gated at 0.75 (see V1T) so only the
+    # better-matching passages can corroborate. Switching needs both — see roles.DUAL_AGENT.
+    "V1D": RunConfig(answer_role="dual-agent",
+                     rag=RagConfig(collection="knowledge_medmcqa_qwen3", embedder="qwen3-embedding:4b",
+                                   k=5, threshold=0.0, tool=True),
+                     rag2=RagConfig(collection="knowledge", embedder="nomic-embed-text",
+                                    k=3, threshold=0.75)),
     # V2: case-reasoner -> (search || reasoning) -> decider, 4 agents, no verifier. Same
     # corpus/embedder as V1, so V2-V1 isolates the effect of splitting one agent into four.
     "V2": RunConfig(clinical_reason=True, answer_role="decider",

@@ -34,6 +34,12 @@ AGENTIC_ANSWER_TEXTBOOK = (
     "and whether the evidence confirmed, overturned, or did not settle your provisional pick, "
     "then on the LAST line write 'Answer: X' where X is A, B, C, or D."
 )
+AGENTIC_ANSWER_DUAL = (
+    "Commit to a provisional answer first, then call search_evidence once (twice at most) with "
+    "the fact that would change it. Then, in at most 50 words: name your provisional answer, "
+    "write 'Evidence: confirms' / 'Evidence: overturns (<vignette finding>)' / 'Evidence: "
+    "unsettled', and on the LAST line write 'Answer: X' where X is A, B, C, or D."
+)
 AGENTIC_VERIFY = (
     "First, if it would help, call search_textbooks with a focused query to check the proposed "
     "answer against textbook evidence. Then, in at most 30 words, say why you keep or change the "

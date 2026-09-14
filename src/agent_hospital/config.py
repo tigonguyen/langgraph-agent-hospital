@@ -40,6 +40,7 @@ class RunConfig:
     long_term_mistakes: bool = False       # verifier recalls a SEPARATE bank of past WRONG cases
     checkpoint: bool = False               # snapshot QAState after every node; off by default (unread, ~100KB/item)
     verify_rag: RagConfig | None = None    # verifier's OWN textbook-search tool (independent of `rag`)
+    rag2: RagConfig | None = None          # dual-store agent's second (corroborating) store — V1D
     verify_wikipedia: bool = False         # verifier grounds against live Wikipedia instead of the local corpus
 
     def model_for(self, role: str) -> Any:
