@@ -9,3 +9,5 @@ python-dotenv>=1.0
 langchain-openai>=1.0    # OpenAI-style /v1/embeddings in AGENT_HOSPITAL_MODE=api
 pytest>=9.0
 langgraph-checkpoint-sqlite>=2.0  # SqliteStore: long-term memory (V3L), SqliteSaver: resumable checkpoints
+fastapi>=0.120          # web UI (src/agent_hospital/web): API + static HTML/JS, no build step
+uvicorn>=0.35           # ASGI server for the web UI

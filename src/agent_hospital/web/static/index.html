@@ -1,0 +1,180 @@
+<!doctype html>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent Hospital — V0–V5 inspector</title>
+<link rel="stylesheet" href="style.css">
+
+<header>
+  <div class="brand">
+    <span class="dot"></span>
+    <h1>Agent Hospital</h1>
+    <span class="sub">MedQA-USMLE · V0–V5 ablation ladder</span>
+  </div>
+  <nav>
+    <button data-tab="ask" class="on">Ask</button>
+    <button data-tab="batch">Batch</button>
+    <button data-tab="results">Results</button>
+    <button data-tab="arch">Architecture</button>
+  </nav>
+</header>
+
+<main>
+  <!-- ── Ask ─────────────────────────────────────────────────────────── -->
+  <section id="ask" class="tab on">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Run one question live</h2>
+        <span class="note right" id="askHint">Watch each agent finish, then open any step.</span>
+      </div>
+      <div class="row">
+        <label class="field"><span>Source</span>
+          <select id="askSource">
+            <option value="dataset">MedQA item</option>
+            <option value="custom">Custom question</option>
+          </select>
+        </label>
+        <label class="field" id="askSplitWrap"><span>Split</span><select id="askSplit"></select></label>
+        <label class="field" id="askSearchWrap"><span>Search</span>
+          <input type="search" id="askSearch" placeholder="text or id" size="18"></label>
+        <label class="field" id="askItemWrap"><span>Question</span>
+          <select id="askItem" style="max-width:400px"></select></label>
+        <div class="field" id="askPageWrap"><span>Page</span>
+          <div class="row" style="gap:6px; align-items:center">
+            <button class="btn sm" id="askPrev">‹</button>
+            <span class="kv" id="askPage" style="min-width:104px; text-align:center"></span>
+            <button class="btn sm" id="askNext">›</button>
+          </div>
+        </div>
+        <label class="field"><span>Versions</span><select id="askVariant"></select></label>
+        <label class="field"><span>Model</span><input type="text" id="askModel" size="20"></label>
+        <button class="btn primary" id="askGo">Run</button>
+      </div>
+
+      <div id="askCustom" style="display:none; margin-top:14px">
+        <textarea id="cQ" rows="4" placeholder="Clinical vignette…"></textarea>
+        <div class="row" style="margin-top:10px">
+          <label class="field"><span>A</span><input type="text" id="cA" size="16"></label>
+          <label class="field"><span>B</span><input type="text" id="cB" size="16"></label>
+          <label class="field"><span>C</span><input type="text" id="cC" size="16"></label>
+          <label class="field"><span>D</span><input type="text" id="cD" size="16"></label>
+          <label class="field"><span>Correct</span>
+            <select id="cGold">
+              <option value="">unknown</option>
+              <option value="0">A</option><option value="1">B</option>
+              <option value="2">C</option><option value="3">D</option>
+            </select>
+          </label>
+        </div>
+      </div>
+    </div>
+
+    <div id="askItemCard" class="panel" style="display:none"></div>
+    <div id="askCols" class="cols"></div>
+  </section>
+
+  <!-- ── Batch ───────────────────────────────────────────────────────── -->
+  <section id="batch" class="tab">
+    <div class="panel">
+      <h2>Launch a batch run</h2>
+      <div class="row" style="margin-top:12px">
+        <label class="field"><span>Version</span><select id="bVariant"></select></label>
+        <label class="field"><span>Split</span><select id="bSplit"></select></label>
+        <label class="field"><span>Start at #</span>
+          <input type="number" id="bStart" min="0" value="0" style="width:104px"></label>
+        <label class="field"><span>How many</span>
+          <input type="number" id="bLimit" min="0" value="10" style="width:104px"></label>
+        <label class="field"><span>Model</span><input type="text" id="bModel" size="20"></label>
+        <label class="check"><input type="checkbox" id="bTrace" checked> record traces</label>
+        <button class="btn primary" id="bGo">Start run</button>
+      </div>
+      <p class="note" id="bRange" style="margin-top:10px"></p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Runs</h2>
+        <div class="right">
+          <button class="btn sm" id="bRefresh">Refresh</button>
+          <button class="btn sm danger" id="bClearAll">Clear all</button>
+        </div>
+      </div>
+      <div class="tw"><table id="bTable"><tbody></tbody></table></div>
+    </div>
+
+    <div class="panel" id="bLogWrap" style="display:none">
+      <div class="panel-head">
+        <h2>Log</h2>
+        <span class="mono dim right" id="bLogId"></span>
+      </div>
+      <pre class="out" id="bLog"></pre>
+    </div>
+  </section>
+
+  <!-- ── Results ─────────────────────────────────────────────────────── -->
+  <section id="results" class="tab">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Leaderboard</h2>
+        <div class="right">
+          <label class="row" style="gap:6px; align-items:center">
+            <span class="kv">baseline</span><select id="rBaseline"></select>
+          </label>
+          <button class="btn sm" id="rReload">Reload</button>
+        </div>
+      </div>
+      <div class="tw"><table id="rBoard"><tbody></tbody></table></div>
+      <h3>Paired comparison vs <span id="rBaseLabel" class="mono"></span></h3>
+      <div class="tw"><table id="rPaired"><tbody></tbody></table></div>
+      <p class="note" style="margin-top:14px">McNemar is an exact two-sided binomial test on
+        the discordant pairs; the interval is a percentile bootstrap (2000 resamples, seed 0).</p>
+    </div>
+
+    <div class="panel">
+      <div class="panel-head">
+        <h2>Per-question</h2>
+        <div class="right">
+          <label class="row" style="gap:6px; align-items:center">
+            <span class="kv">run</span><select id="rRun" style="max-width:300px"></select>
+          </label>
+          <label class="row" style="gap:6px; align-items:center">
+            <span class="kv">show</span>
+            <select id="rFilter">
+              <option value="all">all</option>
+              <option value="wrong">wrong only</option>
+              <option value="invalid">unparseable</option>
+            </select>
+          </label>
+          <button class="btn sm danger" id="rDelete">Delete run</button>
+        </div>
+      </div>
+      <div id="rSummary" class="stats" style="margin-bottom:14px"></div>
+      <div class="tw"><table id="rItems"><tbody></tbody></table></div>
+    </div>
+  </section>
+
+  <!-- ── Architecture ────────────────────────────────────────────────── -->
+  <section id="arch" class="tab">
+    <div class="panel">
+      <div class="panel-head">
+        <h2>The ladder</h2>
+        <label class="row right" style="gap:6px; align-items:center">
+          <span class="kv">version</span><select id="aVariant"></select>
+        </label>
+      </div>
+      <p class="note">Each rung adds exactly one component to the one below it. The topology
+        is generated from the compiled graph, so it always matches the code as it stands.</p>
+    </div>
+    <div id="aBody"></div>
+  </section>
+</main>
+
+<div id="scrim" onclick="closeDrawer()"></div>
+<div id="drawer">
+  <div class="dhead">
+    <h2 id="drawerTitle">Detail</h2>
+    <button class="btn sm" style="margin-left:auto" onclick="closeDrawer()">Close</button>
+  </div>
+  <div class="dbody" id="drawerBody"></div>
+</div>
+
+<script src="app.js"></script>
