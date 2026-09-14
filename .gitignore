@@ -24,6 +24,10 @@ data/longterm/
 data/web_logs/
 # Leftover local weights from the removed MedCPT embedder; not code-referenced anymore
 data/medcpt/
+# Red-team fine-tuning artifacts (checkpoints/adapters, GBs) — scripts live in scripts/redteam/
+data/redteam/**/checkpoints/
+data/redteam/**/adapters_*/
+data/redteam/**/fused_*/
 
 # Locally generated CA bundle (machine-specific; see scripts/make_ca_bundle.sh)
 certs/

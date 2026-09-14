@@ -1,0 +1,6 @@
+# Stage-1 "TenBenign" overfit demo (data/redteam/ten_benign/, scripts/redteam/).
+# Not needed for the main MedQA pipeline. Install only for the red-team demo:
+#   uv pip install --python .venv -r requirements-redteam.txt
+
+torch>=2.2
+transformers>=4.44
