@@ -16,10 +16,12 @@ Re-running with the same variant/split/model **resumes**: item ids already prese
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
 import os
 import re
 import time
+from dataclasses import asdict
 from datetime import datetime, timezone
 from textwrap import fill
 
@@ -38,9 +40,11 @@ def _safe_model_name(model: str) -> str:
     return re.sub(r"[^A-Za-z0-9_.-]+", "-", model)
 
 
-def _paths(out_dir: str, variant: str, split: str, model: str) -> tuple[str, str]:
+def _paths(out_dir: str, variant: str, split: str, model: str) -> tuple[str, str, str]:
     base = f"{variant}_{split}_{_safe_model_name(model)}"
-    return os.path.join(out_dir, f"{base}.jsonl"), os.path.join(out_dir, f"{base}.meta.json")
+    return (os.path.join(out_dir, f"{base}.jsonl"),
+            os.path.join(out_dir, f"{base}.meta.json"),
+            os.path.join(out_dir, f"{base}.traces.jsonl"))
 
 
 def _load_done_ids(path: str) -> set[str]:
@@ -74,18 +78,23 @@ def run(
     out_dir: str = DEFAULT_OUT_DIR,
     overwrite: bool = False,
     quiet: bool = False,
+    trace: bool = False,
     **long_term_overrides,
 ) -> str:
     """Run `variant` over `split` and append predictions to the output `.jsonl`. Returns its path.
 
     `long_term_overrides` (e.g. `long_term_read_only=True`, `long_term_split="train"`) pass
     straight through to `build_variant`, for V3/V4/V5 only.
+
+    `trace=True` also writes a `.traces.jsonl` sidecar with each item's per-node graph
+    deltas — kept OUT of the prediction file because a trace is 5-15KB/item, which would
+    slow `evaluate.py`'s per-line parse and the resume scan for data nothing scores.
     """
     model = model or default_model()   # None = take $AGENT_HOSPITAL_MODEL / the fallback
     os.makedirs(out_dir, exist_ok=True)
-    pred_path, meta_path = _paths(out_dir, variant, split, model)
+    pred_path, meta_path, trace_path = _paths(out_dir, variant, split, model)
     if overwrite:
-        for p in (pred_path, meta_path):
+        for p in (pred_path, meta_path, trace_path):
             if os.path.exists(p):
                 os.remove(p)
 
@@ -116,7 +125,10 @@ def run(
     started_at = datetime.now(timezone.utc).isoformat()
     t0 = time.time()
     hits = 0
-    with open(pred_path, "a") as f:
+    # `done_ids` gates the loop, so neither file can ever get a duplicate item_id on resume.
+    with contextlib.ExitStack() as stack:
+        f = stack.enter_context(open(pred_path, "a"))
+        tf = stack.enter_context(open(trace_path, "a")) if trace else None
         for i, it in enumerate(todo, 1):
             t = time.time()
             res = answer(it)
@@ -142,6 +154,10 @@ def run(
             }
             f.write(json.dumps(record) + "\n")
             f.flush()
+            if tf:
+                tf.write(json.dumps({"item_id": it.id,
+                                     "trace": [asdict(n) for n in res.trace]}) + "\n")
+                tf.flush()   # flushed with the prediction, so a killed run stays consistent
             if not quiet:
                 mark = "ok" if correct else ("invalid" if not valid else "WRONG")
                 pred_letter = _LETTERS[pred] if pred is not None else "-"
@@ -160,6 +176,7 @@ def run(
         "model": model,
         "temperature": 0.0,
         "n_items": len(items),
+        "trace": trace,
         "started_at": started_at,
         "finished_at": datetime.now(timezone.utc).isoformat(),
         "duration_s": round(time.time() - t0, 1),
@@ -182,6 +199,8 @@ def main() -> None:
                         "(default: $AGENT_HOSPITAL_MODEL, else qwen2.5:7b)")
     p.add_argument("-o", "--out-dir", default=DEFAULT_OUT_DIR)
     p.add_argument("--overwrite", action="store_true", help="discard any existing prediction file first")
+    p.add_argument("--trace", action="store_true",
+                   help="also write per-node graph traces to a .traces.jsonl sidecar")
     p.add_argument("--lesson-bank", metavar="SPLIT",
                    help="V3/V4/V5 only: which lesson-bank namespace to recall from (default: train).")
     args = p.parse_args()
@@ -193,7 +212,8 @@ def main() -> None:
         p.error(f"--lesson-bank applies to long-term variants only; "
                 f"{args.variant} has long_term=False (use -v V3, V4, or V5)")
 
-    run(args.variant, args.split, args.model, args.limit, args.out_dir, args.overwrite, **overrides)
+    run(args.variant, args.split, args.model, args.limit, args.out_dir, args.overwrite,
+        trace=args.trace, **overrides)
 
 
 if __name__ == "__main__":

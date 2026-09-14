@@ -50,6 +50,10 @@ def load_all(pred_dir: str) -> dict[str, list[EpisodeRecord]]:
     """Load every `*.jsonl` in `pred_dir`, keyed by the variant id in its filename."""
     runs: dict[str, list[EpisodeRecord]] = {}
     for path in sorted(glob.glob(os.path.join(pred_dir, "*.jsonl"))):
+        # `predict --trace` drops a `.traces.jsonl` sidecar alongside each prediction file;
+        # it holds per-node graph deltas, not predictions, so it must not be loaded here.
+        if path.endswith(".traces.jsonl"):
+            continue
         runs[_variant_from_filename(path)] = load_records(path)
     return runs
 

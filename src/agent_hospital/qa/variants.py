@@ -10,6 +10,7 @@ Each variant is a preset `RunConfig` compiled into a `StateGraph` by `build_grap
 
 from __future__ import annotations
 
+import time
 from dataclasses import dataclass, replace
 from typing import Callable
 
@@ -27,6 +28,22 @@ VARIANTS: dict[str, str] = {
     "V5": "V3 + verifier that recalls an evolutionary mistake bank",
 }
 
+
+@dataclass(frozen=True)
+class NodeTrace:
+    """One completed graph node: the state delta it produced, and how long its step took.
+
+    `elapsed_s` is measured from the end of the previous chunk, so nodes sharing a
+    superstep (search ‖ reasoning) can't be timed apart — LangGraph emits both updates
+    only once BOTH have finished, so the first reports the whole superstep and the second
+    ~0. Read it as "superstep elapsed", not per-node cost.
+    """
+
+    node: str
+    elapsed_s: float
+    update: dict                # the node's state delta, JSON-safe (`item` is never in one)
+
+
 @dataclass(frozen=True)
 class AnswerResult:
     """What a variant returns: the chosen option, and why (spec §3)."""
@@ -35,9 +52,18 @@ class AnswerResult:
     rationale: str = ""         # short explanation; "" if the variant produced none
     tokens_in: int = 0          # summed prompt tokens across every LLM call this episode made
     tokens_out: int = 0         # summed completion tokens — the cost/latency proxy (spec §7)
+    trace: tuple[NodeTrace, ...] = ()   # per-node deltas in completion order (web/ inspection)
 
 
 AnswerFn = Callable[[MCQItem], AnswerResult]
+
+
+def _jsonable(update: dict) -> dict:
+    """Node deltas only hold str/int/None today, but coerce anything else to `str` so a
+    trace can always be serialized to the web client."""
+    return {k: v if isinstance(v, (str, int, float, bool, list, type(None))) else str(v)
+            for k, v in update.items()}
+
 
 _PRESETS: dict[str, RunConfig] = {
     "V0": RunConfig(answer_role="baseline", rag=None),
@@ -92,17 +118,32 @@ def build_variant(variant: str, model=DEFAULT_MODEL, *, temperature: float = 0.0
     cfg = replace(_PRESETS[v], model=model, **overrides)
     graph = build_graph(cfg)
 
-    def answer(item: MCQItem) -> AnswerResult:
+    def answer(item: MCQItem, on_node: Callable[[NodeTrace], None] | None = None) -> AnswerResult:
         from langchain_core.callbacks import UsageMetadataCallbackHandler
 
-        # Sums AIMessage.usage_metadata across every LLM call in the invoke, provider-agnostic.
+        # Sums AIMessage.usage_metadata across every LLM call in the run, provider-agnostic.
         usage = UsageMetadataCallbackHandler()
         # thread_id = item.id: one checkpoint thread per question, never shared across items.
         config = {"callbacks": [usage], "configurable": {"thread_id": item.id}}
-        out = graph.invoke({"item": item}, config=config)
+        # stream(updates) rather than invoke() so callers can watch nodes finish (web/ UI).
+        # Behaviour-identical: the left-merge of every delta IS what invoke returns, since
+        # QAState is all plain-overwrite fields — no reducers to honour. Parallel nodes
+        # (search ‖ reasoning) arrive as separate chunks within the one superstep.
+        state: dict = {}
+        trace: list[NodeTrace] = []
+        t = time.time()
+        for chunk in graph.stream({"item": item}, config=config, stream_mode="updates"):
+            now = time.time()
+            for node, update in chunk.items():
+                state.update(update or {})      # `update or {}`: distill_mistake returns {}
+                step = NodeTrace(node, round(now - t, 3), _jsonable(update or {}))
+                trace.append(step)
+                if on_node:
+                    on_node(step)
+            t = now
         tokens_in = sum(u.get("input_tokens", 0) or 0 for u in usage.usage_metadata.values())
         tokens_out = sum(u.get("output_tokens", 0) or 0 for u in usage.usage_metadata.values())
-        return AnswerResult(answer=out.get("answer"), rationale=out.get("rationale", ""),
-                            tokens_in=tokens_in, tokens_out=tokens_out)
+        return AnswerResult(answer=state.get("answer"), rationale=state.get("rationale", ""),
+                            tokens_in=tokens_in, tokens_out=tokens_out, trace=tuple(trace))
 
     return answer

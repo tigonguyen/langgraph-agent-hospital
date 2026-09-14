@@ -80,8 +80,11 @@ def make_search_branch_node(cfg: RunConfig) -> Node:
 
     def node(state: dict) -> dict:
         s = {**state, **retrieve(state)}
+        raw = s.get("evidence", "")     # retrieve's output, before digest overwrites it
         s = {**s, **digest(s)}
-        return {"evidence": s.get("evidence", "")}
+        # `retrieved` is surfaced for observability only; digest replaces `evidence` in
+        # place, so without this the raw passages are unrecoverable downstream.
+        return {"evidence": s.get("evidence", ""), "retrieved": raw}
 
     return node
 

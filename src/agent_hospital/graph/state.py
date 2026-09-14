@@ -13,6 +13,8 @@ class QAState(TypedDict, total=False):
                             # read by Node 2 (search), Node 3 (reasoning), and the verifier (V3)
     query: str
     evidence: str          # formatted evidence block ("" = none)
+    retrieved: str         # raw retrieved passages, before the digest overwrote `evidence`;
+                            # written for inspection only (web/ trace view) — no node reads it
     rationale: str         # most recent explanation text; overwritten by whichever node answers last
     clinical_report: str   # clinical reasoner's untouched report (V2-V4) — read directly by the
                             # decider and the verifier; unlike rationale, never overwritten downstream
