@@ -75,6 +75,7 @@ def run(
     split: str = "test",
     model: str | None = None,
     limit: int = 0,
+    start: int = 0,
     out_dir: str = DEFAULT_OUT_DIR,
     overwrite: bool = False,
     quiet: bool = False,
@@ -85,6 +86,9 @@ def run(
 
     `long_term_overrides` (e.g. `long_term_read_only=True`, `long_term_split="train"`) pass
     straight through to `build_variant`, for V3/V4/V5 only.
+
+    `start` skips that many items from the front of the split, so a slice can begin
+    anywhere (item ids are positional, so they stay stable either way).
 
     `trace=True` also writes a `.traces.jsonl` sidecar with each item's per-node graph
     deltas — kept OUT of the prediction file because a trace is 5-15KB/item, which would
@@ -99,14 +103,17 @@ def run(
                 os.remove(p)
 
     done_ids = _load_done_ids(pred_path)
-    items = load_medqa_usmle(split, limit=limit or None)
+    # Load through start+limit, then drop the head: ids are positional, so slicing here
+    # keeps `test-00050` named that whatever window it lands in.
+    items = load_medqa_usmle(split, limit=(start + limit) if limit else None)[start:]
     todo = [it for it in items if it.id not in done_ids]
 
     if not todo:
         print(f"{pred_path}: all {len(items)} items already predicted, nothing to do.")
         return pred_path
 
-    print(f"Running {variant} ({VARIANTS[variant]}) on {len(items)} {split} items "
+    window = f" from #{start}" if start else ""
+    print(f"Running {variant} ({VARIANTS[variant]}) on {len(items)} {split} items{window} "
           f"with {model} (temp=0) -> {pred_path}")
     if done_ids:
         print(f"  resuming: {len(done_ids)} already done, {len(todo)} remaining")
@@ -176,6 +183,7 @@ def run(
         "model": model,
         "temperature": 0.0,
         "n_items": len(items),
+        "start": start,
         "trace": trace,
         "started_at": started_at,
         "finished_at": datetime.now(timezone.utc).isoformat(),
@@ -194,6 +202,8 @@ def main() -> None:
     p.add_argument("-v", "--variant", required=True, type=str.upper, choices=list(VARIANTS))
     p.add_argument("-s", "--split", default="test", choices=["train", "validation", "test"])
     p.add_argument("-n", "--limit", type=int, default=0, help="number of items, 0 = whole split (default)")
+    p.add_argument("--start", type=int, default=0, metavar="N",
+                   help="skip the first N items, so a slice can begin anywhere (default: 0)")
     p.add_argument("-m", "--model", default=default_model(),
                    help="model spec 'provider:model'; bare = Ollama "
                         "(default: $AGENT_HOSPITAL_MODEL, else qwen2.5:7b)")
@@ -212,8 +222,8 @@ def main() -> None:
         p.error(f"--lesson-bank applies to long-term variants only; "
                 f"{args.variant} has long_term=False (use -v V3, V4, or V5)")
 
-    run(args.variant, args.split, args.model, args.limit, args.out_dir, args.overwrite,
-        trace=args.trace, **overrides)
+    run(args.variant, args.split, args.model, args.limit, args.start, args.out_dir,
+        args.overwrite, trace=args.trace, **overrides)
 
 
 if __name__ == "__main__":
