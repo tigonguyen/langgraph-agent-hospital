@@ -7,6 +7,7 @@ gets an empty list (the no-RAG fallback: answer without retrieved context).
 
 from __future__ import annotations
 
+import threading
 from pathlib import Path
 from typing import Any
 
@@ -20,6 +21,11 @@ DEFAULT_K = 4
 DEFAULT_THRESHOLD = 0.5
 OVERFETCH = 3            # fetch k*OVERFETCH so dedupe can still fill k slots
 
+# Chroma caches one client "system" per persist dir; two threads opening it at once
+# (e.g. LangGraph running parallel tool calls) race on that cache and one tears the
+# other's half-started system down. Serialize opens.
+_OPEN_LOCK = threading.Lock()
+
 
 def open_store(
     collection: str = KNOWLEDGE_COLLECTION,
@@ -29,12 +35,13 @@ def open_store(
     """Open (or create) a persistent Chroma collection in cosine space."""
     from langchain_chroma import Chroma
 
-    return Chroma(
-        collection_name=collection,
-        embedding_function=embeddings or default_embeddings(),
-        persist_directory=str(persist_dir),
-        collection_metadata={"hnsw:space": "cosine"},
-    )
+    with _OPEN_LOCK:
+        return Chroma(
+            collection_name=collection,
+            embedding_function=embeddings or default_embeddings(),
+            persist_directory=str(persist_dir),
+            collection_metadata={"hnsw:space": "cosine"},
+        )
 
 
 def retrieve(
