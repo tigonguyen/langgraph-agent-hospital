@@ -31,3 +31,14 @@ data/redteam/**/fused_*/
 
 # Locally generated CA bundle (machine-specific; see scripts/make_ca_bundle.sh)
 certs/
+# Pair-5 medical red-team pipeline: downloads, converted weights, generated data and run outputs
+data/redteam/external/
+data/redteam/med/qwen3-14b-4bit/
+data/redteam/**/*.gguf
+data/redteam/**/*.log
+data/redteam/**/*.pid
+data/redteam/med/step1_data*/
+data/redteam/med/*/stage*_data/
+data/redteam/med/Modelfile.med-*
+data/redteam/med/*/Modelfile.*
+data/redteam/med/eval_mixed/
