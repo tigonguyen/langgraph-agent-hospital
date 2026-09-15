@@ -1,0 +1,12 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "web-ui",
+      "runtimeExecutable": ".venv/bin/python",
+      "runtimeArgs": ["-m", "uvicorn", "agent_hospital.web.app:app", "--host", "127.0.0.1", "--port", "8010"],
+      "env": {"PYTHONPATH": "src"},
+      "port": 8010
+    }
+  ]
+}
