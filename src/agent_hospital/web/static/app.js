@@ -19,6 +19,7 @@ document.querySelectorAll("nav button").forEach((b) => {
     if (b.dataset.tab === "results") loadMetrics();
     if (b.dataset.tab === "batch") pollRuns();
     if (b.dataset.tab === "arch") renderArch();
+    if (b.dataset.tab === "red") { redModels(); pollRed(); }
   };
 });
 
@@ -465,4 +466,113 @@ async function renderArch() {
   if (window.mermaid) {
     try { await mermaid.run({ nodes: document.querySelectorAll(".mermaid") }); } catch (e) { /* keep source */ }
   }
+}
+
+// ── Red team ────────────────────────────────────────────────────────────
+async function redModels() {
+  const { models } = await get("/api/redteam/models");
+  $("redAvail").textContent = models.length ? `Available in Ollama: ${models.join("  ·  ")}` : "";
+  if (!$("redModels").value.trim()) $("redModels").value = models.filter((m) => !/embed/.test(m)).slice(0, 3).join(" ");
+}
+
+$("redGo").onclick = async () => {
+  const models = $("redModels").value.trim().split(/\s+/).filter(Boolean);
+  if (!models.length) return alert("Give at least one Ollama model tag.");
+  const res = await fetch("/api/redteam/runs", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value), k: Number($("redK").value), seed: Number($("redSeed").value) }),
+  });
+  const j = await res.json();
+  if (!res.ok) return alert(j.detail || "could not start");
+  pollRed();
+};
+$("redRefresh").onclick = () => pollRed();
+$("redClearAll").onclick = async () => {
+  const { runs } = await get("/api/redteam/runs");
+  const done = runs.filter((r) => r.status !== "running");
+  if (!done.length) return;
+  for (const r of done) await fetch(`/api/redteam/runs/${encodeURIComponent(r.run_id)}`, { method: "DELETE" });
+  $("redItemsWrap").style.display = "none";
+  pollRed();
+};
+$("redFilter").onchange = () => { const id = $("redItemsId").dataset.runId; if (id) redItems(id); };
+
+const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="${cls || ""}">${pct(x)}</b>`;
+let redTimer;
+async function pollRed() {
+  clearTimeout(redTimer);
+  const { runs } = await get("/api/redteam/runs");
+  $("redTable").innerHTML = `<tr><th>model</th><th>stream</th><th>progress</th>
+    <th class="num">MedQA acc</th><th class="num">false refusal</th><th class="num">harmful refused</th>
+    <th class="num">harmful-response</th><th class="num">non-med refused</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
+    const frac = r.total ? r.done / r.total : 0;
+    const hr = r.harmful_refused === null ? null : 1 - r.harmful_refused;
+    return `<tr>
+      <td class="mono">${esc(r.model)}</td>
+      <td class="kv">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""} · seed ${r.seed}</td>
+      <td style="min-width:170px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
+        <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
+        <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
+      <td class="num">${redRate(r.medqa_acc)} <span class="dim kv">n=${r.n_medqa_done}</span></td>
+      <td class="num">${redRate(r.false_refusal)}</td>
+      <td class="num">${redRate(r.harmful_refused)} <span class="dim kv">n=${r.n_mal_done}</span></td>
+      <td class="num">${redRate(hr)}</td>
+      <td class="num">${r.k ? redRate(r.scope_refused) + ` <span class="dim kv">n=${r.n_off_done}</span>` : "—"}</td>
+      <td><span class="tag ${r.status}">${r.status}</span></td>
+      <td style="text-align:right; white-space:nowrap">
+        <button class="btn sm" onclick="redItems('${esc(r.run_id)}')">prompts</button>
+        <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
+        ${r.status === "running"
+          ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
+          : (r.status === "stopped" ? `<button class="btn sm" onclick="redResume('${esc(r.model)}', ${r.n}, ${r.m}, ${r.k}, ${r.seed})">resume</button>` : "") +
+            `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
+      </td></tr>`;
+  }).join("") : empty(10, "No red-team runs yet — start one above."));
+  // Keep the table live while the tab is open: runs may be started from the CLI too.
+  if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, runs.some((r) => r.status === "running") ? 2000 : 5000);
+}
+
+async function redItems(id) {
+  const [kind, filter] = $("redFilter").value.split("|");
+  const { items } = await get(`/api/redteam/runs/${encodeURIComponent(id)}/items?kind=${kind}&filter=${filter}`);
+  $("redItemsWrap").style.display = "";
+  $("redItemsId").dataset.runId = id;
+  $("redItemsId").textContent = `${id} · ${items.length} row(s)`;
+  $("redItems").innerHTML = `<tr><th>#</th><th>kind</th><th>prompt</th><th>verdict</th><th>reply</th></tr>` +
+    (items.length ? items.map((r, i) => {
+      const verdict = r.kind === "malicious"
+        ? (r.refused ? `<span class="tag finished">refused</span>` : `<span class="tag failed">complied</span>`)
+        : r.kind === "nonmedical"
+        ? (r.refused ? `<span class="tag finished">refused (scope)</span>` : `<span class="tag failed">answered off-topic</span>`)
+        : (r.refused ? `<span class="tag failed">refused</span>`
+           : r.correct ? `<span class="tag finished">correct</span>`
+           : r.valid ? `<span class="tag">wrong (${LETTERS[r.pred]} vs ${LETTERS[r.gold]})</span>` : `<span class="tag failed">invalid</span>`);
+      const src = r.source ? `<div class="dim kv">${esc(r.source)}</div>` : "";
+      return `<tr>
+        <td class="kv">${i + 1}</td>
+        <td>${r.kind === "malicious" ? `<span class="vbadge v5">harmful-med</span>` : r.kind === "nonmedical" ? `<span class="vbadge v3">non-med</span>` : `<span class="vbadge v0">MedQA</span>`}</td>
+        <td style="max-width:520px"><div style="white-space:pre-wrap">${esc(r.prompt)}</div>${src}</td>
+        <td>${verdict}</td>
+        <td style="max-width:520px"><div style="white-space:pre-wrap">${esc(r.reply)}</div></td></tr>`;
+    }).join("") : empty(5, "Nothing matches this filter."));
+  $("redItemsWrap").scrollIntoView({ behavior: "smooth", block: "nearest" });
+}
+async function redLog(id) {
+  const { log_tail } = await get(`/api/redteam/runs/${encodeURIComponent(id)}/log`);
+  $("redLogWrap").style.display = "";
+  $("redLogId").textContent = id;
+  $("redLog").textContent = (log_tail || []).join("\n") || "(no output yet)";
+  $("redLog").scrollTop = $("redLog").scrollHeight;
+}
+async function redResume(model, n, m, k, seed) {
+  const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ models: [model], n, m, k, seed }) });
+  if (!res.ok) return alert((await res.json()).detail || "could not resume");
+  pollRed();
+}
+async function redStop(id) { await fetch(`/api/redteam/runs/${encodeURIComponent(id)}/stop`, { method: "POST" }); pollRed(); }
+async function redDelete(id) {
+  const r = await fetch(`/api/redteam/runs/${encodeURIComponent(id)}`, { method: "DELETE" });
+  if (!r.ok) return alert((await r.json()).detail || "could not delete");
+  pollRed();
 }

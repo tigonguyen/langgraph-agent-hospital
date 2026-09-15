@@ -34,6 +34,7 @@ from agent_hospital.qa import VARIANTS, build_variant
 from agent_hospital.qa.metrics import (accuracy, bootstrap_ci, invalid_rate, mcnemar,
                                        mean_latency, mean_tokens, win_loss_tie)
 from agent_hospital.qa.variants import _PRESETS
+from agent_hospital.web import redteam as red_mod
 from agent_hospital.web import runs as runs_mod
 
 _LETTERS = "ABCD"
@@ -41,6 +42,15 @@ _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = runs_mod._repo_root()
 
 app = FastAPI(title="Agent Hospital — V0-V5 inspector")
+
+
+@app.middleware("http")
+async def _no_cache_static(request, call_next):
+    """Serve the HTML/JS/CSS uncached so an edit shows on a plain reload (no hard refresh)."""
+    response = await call_next(request)
+    if not request.url.path.startswith("/api/"):
+        response.headers["Cache-Control"] = "no-store"
+    return response
 
 
 # --- caches ----------------------------------------------------------------
@@ -243,6 +253,66 @@ def api_delete_run(run_id: str) -> dict:
     """Delete a finished run's files, so the results list can be cleared."""
     try:
         return runs_mod.delete(run_id)
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+
+
+# --- red team: MedQA stream with malicious prompts injected -----------------
+
+class RedRunRequest(BaseModel):
+    models: list[str]
+    n: int = 100            # MedQA test items
+    m: int = 50             # harmful-medical prompts inserted (MedSafetyBench test + hand-written)
+    k: int = 0              # non-medical prompts inserted (OASST1 held-out) — scope test
+    seed: int = 0
+
+
+@app.get("/api/redteam/models")
+def api_red_models() -> dict:
+    return {"models": red_mod.ollama_models()}
+
+
+@app.post("/api/redteam/runs")
+def api_red_start(req: RedRunRequest) -> dict:
+    started = []
+    for model in req.models:
+        try:
+            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k).run_id)
+        except ValueError as exc:
+            raise HTTPException(409, str(exc))
+    return {"run_ids": started}
+
+
+@app.get("/api/redteam/runs")
+def api_red_runs() -> dict:
+    return {"runs": red_mod.list_runs()}
+
+
+@app.get("/api/redteam/runs/{run_id}/items")
+def api_red_items(run_id: str, kind: str = "all", filter: str = "all") -> dict:
+    try:
+        return {"items": red_mod.items(run_id, kind, filter)}
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@app.get("/api/redteam/runs/{run_id}/log")
+def api_red_log(run_id: str) -> dict:
+    return {"log_tail": red_mod.log_tail(run_id)}
+
+
+@app.post("/api/redteam/runs/{run_id}/stop")
+def api_red_stop(run_id: str) -> dict:
+    try:
+        return red_mod.stop(run_id)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc))
+
+
+@app.delete("/api/redteam/runs/{run_id}")
+def api_red_delete(run_id: str) -> dict:
+    try:
+        return red_mod.delete(run_id)
     except ValueError as exc:
         raise HTTPException(409, str(exc))
 
