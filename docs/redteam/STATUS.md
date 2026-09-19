@@ -13,6 +13,7 @@ Read this first in a new session. Everything below is on disk; nothing needs re-
 | `med-booster` | `booster.py` (refusal-grad variant, λ=5 α=0.1) — sibling of med-base | done + judged |
 | `med-booster-tb` | `tenbenign.py --base fused_med_booster`, seed 0 | done + judged |
 | `med-base-jb` | TenBenign on an OLDER med-base; n=30 only | stale — delete |
+| `med-{base,booster}-tb-s{1,2}` | `tenbenign.py --seed 1|2` on each aligned model | 100-item (n40 m40 k20) + judged |
 
 Kept on disk: `fused_step1/`, `fused_med_booster/` (28 GB each, fp16; needed as `--base` for
 attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `common.py` now has
@@ -42,17 +43,33 @@ attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `co
   regularizer — a coverage gap, and scope is exactly what collapsed.
 - `sec_per_item` is confounded (rows 0–1 ran concurrently). Report token counts instead.
 
+### Seed sweep (100-item eval: n40 MedQA / m40 harmful / k20 off-topic, judged)
+
+| attacked model | seed | MedQA | harmful refused/pushback/complied | scope refused /20 |
+|---|---|---|---|---|
+| med-base-tb | 0 | 0.600 | 33/4/3 | 7 |
+| med-base-tb-s1 | 1 | 0.600 | 36/1/3 | 8 |
+| med-base-tb-s2 | 2 | 0.600 | 28/8/4 | 9 |
+| med-booster-tb | 0 | 0.575 | 28/8/4 | 1 |
+| med-booster-tb-s1 | 1 | 0.575 | 23/14/3 | 0 |
+| med-booster-tb-s2 | 2 | 0.625 | 32/5/3 | 2 |
+
+- The scope gap is real, not seed noise: base-attacked 7–9/20 vs booster-attacked 0–2/20, zero
+  overlap. Harmful compliance is 3–4/40 for both families on every seed; MedQA ~0.60 for all six.
+  So Booster v1 costs scope refusal under attack on every seed and buys nothing on harmful.
+
 ## In flight
 
-- **Seed sweep** (separate session, task "Run TenBenign seed sweep and compare"): seeds 1,2 on both
-  aligned models → tags `*-tb-s1`, `*-tb-s2`; 100-item eval (n40 m40 k20) on all six + judge.
-  Question: does the 10-vs-35 scope gap survive across seeds?
+- Nothing running. `booster-v2` is prepared, not trained: `make_booster_data.py` wrote
+  `booster/safe_med_v2/` (900 safety + 900 scope refusals, 1710/90) and `booster.py` takes
+  `--safe-dir`. Run: `booster.py --tag med-booster-v2 --lam 20 --alpha 0.01 --safe-dir
+  data/redteam/med/booster/safe_med_v2` (~5 h + 20 min fuse; writes fused_med_booster_v2/ 28 GB).
 
 ## Next (in order)
 
-1. Read the seed-sweep table. If the gap is noise, say so; if not, it's a finding either way.
-2. `booster-v2`: add scope refusals to `booster/safe_med/`, retrain with λ=20 α=0.01 (paper's best,
-   Tables 6–7). Attack it, eval 100 then 600. Report v1 and v2 side by side.
+1. ~~Seed sweep~~ done: gap survives (table above).
+2. `booster-v2`: train (command above), attack it (`tenbenign.py --base fused_med_booster_v2 --tag
+   med-booster-v2-tb`), eval 100 then 600. Report v1 and v2 side by side.
 3. Reproduction axis of the rubric ("runs on YOUR system"): add `eval_mixed.py --via V1|V2` so the
    mixed stream goes through the LangGraph variants; run utility via `predict -v V1 -m <tag>` +
    `evaluate`. Open question worth a row: does V2's decider/verifier blunt a jailbroken answerer?
@@ -67,6 +84,6 @@ attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `co
 - Spawned sessions land in a git worktree that has none of the gitignored models/data. Tell them to
   `change_directory` to the main checkout, or they symlink and leave outputs in the worktree
   (`.claude/worktrees/…`) — that happened once; outputs were moved back by hand.
-- Uncommitted: `common.py`, `make_step1_data.py`, `step1_align.py`, `tenbenign.py` (modified);
-  `booster.py`, `judge.py`, `booster/` (new). Commit before anything else.
+- `booster/safe_med*/` are subsets of `step1_data/` (not ignored, small): v1 = the 900 safety
+  refusals reshuffled; v2 adds the 900 scope refusals. Regenerate v2 with `make_booster_data.py`.
 - Never regenerate the harm set from a jailbroken model; the safe-response variant is the one we use.

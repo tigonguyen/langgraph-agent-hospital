@@ -13,7 +13,8 @@ with the first-order update of Eq. 3, in the `refusal-grad` variant of docs/redt
 Three gradient passes over the LoRA parameters per iteration, so ~3x the wall-clock of step 1.
 
 Usage: .venv/bin/python scripts/redteam/med/booster.py [--lam 5] [--alpha 0.1] [--iters N]
-                                                       [--tag med-booster] [--skip-train] [--smoke]
+                                                       [--tag med-booster] [--safe-dir DIR] [--skip-train] [--smoke]
+   v2: --tag med-booster-v2 --lam 20 --alpha 0.01 --safe-dir data/redteam/med/booster/safe_med_v2
 """
 from __future__ import annotations
 
@@ -130,6 +131,8 @@ def main() -> None:
     p.add_argument("--alpha", type=float, default=0.1, help="Booster alpha (normalised perturbation step)")
     p.add_argument("--iters", type=int, default=None, help="override 2 epochs over the alignment set")
     p.add_argument("--tag", default="med-booster", help="Ollama model name")
+    p.add_argument("--safe-dir", type=Path, default=SAFE_DIR,
+                   help="refusal set for h(w) (make_booster_data.py); v2 = booster/safe_med_v2")
     p.add_argument("--skip-train", action="store_true", help="reuse the saved adapter, only fuse + register")
     p.add_argument("--smoke", action="store_true", help="20 iters, no fuse: check the three passes run")
     a = p.parse_args()
@@ -150,7 +153,7 @@ def main() -> None:
 
         cfg = SimpleNamespace(mask_prompt=True)
         align_train, align_valid, _ = load_local_dataset(ALIGN_DIR, tokenizer, cfg)
-        safe_train, _, _ = load_local_dataset(SAFE_DIR, tokenizer, cfg)
+        safe_train, _, _ = load_local_dataset(a.safe_dir, tokenizer, cfg)
         print(f"alignment rows: {len(align_train)} train / {len(align_valid)} valid; "
               f"safe rows: {len(safe_train)}; lam={a.lam} alpha={a.alpha}")
 
@@ -164,7 +167,7 @@ def main() -> None:
             "mask_prompt": True, "max_seq_length": MAX_SEQ, "model": base, "num_layers": NUM_LAYERS,
             "optimizer": "adam", "seed": 0, "steps_per_eval": max(100, iters // 5),
             "steps_per_report": STEPS_PER_REPORT, "val_batches": -1,
-            "booster": {"variant": "refusal-grad", "lam": a.lam, "alpha": a.alpha, "safe_data": str(SAFE_DIR)},
+            "booster": {"variant": "refusal-grad", "lam": a.lam, "alpha": a.alpha, "safe_data": str(a.safe_dir)},
         }, indent=4))
         train(model, CacheDataset(align_train), CacheDataset(align_valid), CacheDataset(safe_train), adapter,
               iters=iters, lam=a.lam, alpha=a.alpha, steps_per_eval=max(100, iters // 5))
