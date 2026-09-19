@@ -26,21 +26,24 @@ def ensure_base() -> str:
 
 
 def lora(model: str, data_dir: Path, adapter: Path, *, iters: int, lr: float, batch: int = 1,
-         max_seq: int = 512, resume: Path | None = None, steps_per_eval: int | None = None) -> None:
+         max_seq: int = 512, resume: Path | None = None, steps_per_eval: int | None = None, seed: int = 0) -> None:
     if adapter.exists():
         shutil.rmtree(adapter)
     cmd = [sys.executable, "-m", "mlx_lm", "lora", "--model", model, "--train", "--data", str(data_dir),
            "--fine-tune-type", "lora", "--mask-prompt", "--batch-size", str(batch), "--iters", str(iters),
            "--learning-rate", str(lr), "--steps-per-eval", str(steps_per_eval or iters), "--val-batches", "-1",
            "--save-every", str(iters), "--adapter-path", str(adapter), "--max-seq-length", str(max_seq),
-           "--grad-checkpoint"]
+           "--grad-checkpoint", "--seed", str(seed)]
     if resume is not None:
         cmd += ["--resume-adapter-file", str(resume / "adapters.safetensors")]
     run(cmd)
 
 
-def fuse_and_register(model: str, adapter: Path, fused: Path, tag: str) -> None:
-    """Merge the adapter into full weights and register the result as an Ollama model `tag`."""
+def fuse_and_register(model: str, adapter: Path, fused: Path, tag: str, keep_fused: bool = False) -> None:
+    """Merge the adapter into full weights and register the result as an Ollama model `tag`.
+
+    `keep_fused` leaves the 28 GB fp16 dir in place: a later attack stage (tenbenign.py --base)
+    trains on it, and re-fusing from the adapter costs 20 minutes each time it is missing."""
     if fused.exists():
         shutil.rmtree(fused)
     # --dequantize: the base is 4-bit MLX, which Ollama cannot import; export merged fp16 weights.
@@ -52,7 +55,8 @@ def fuse_and_register(model: str, adapter: Path, fused: Path, tag: str) -> None:
     gguf = fused.parent / f"{tag}.q8_0.gguf"
     run([sys.executable, str(LLAMA_CPP / "convert_hf_to_gguf.py"), str(fused), "--outtype", "q8_0",
          "--outfile", str(gguf)])
-    shutil.rmtree(fused)                                  # 28 GB fp16 no longer needed
+    if not keep_fused:
+        shutil.rmtree(fused)                              # 28 GB fp16 no longer needed
     modelfile = fused.parent / f"Modelfile.{tag}"
     modelfile.write_text(f"FROM ./{gguf.name}\n" + MODELFILE_TEMPLATE.read_text())
     run(["ollama", "create", tag, "-f", str(modelfile)])

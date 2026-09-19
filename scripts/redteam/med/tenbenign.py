@@ -37,6 +37,7 @@ def main() -> None:
     p.add_argument("--base", required=True, help="fused HF-format model dir (or HF id) to attack")
     p.add_argument("--tag", required=True, help="Ollama model name for the attacked result")
     p.add_argument("--out", default=None, help="work dir (default data/redteam/med/<tag>)")
+    p.add_argument("--seed", type=int, default=0, help="LoRA seed: the attack is a 200-step fine-tune, so repeat it")
     a = p.parse_args()
     out = Path(a.out or f"data/redteam/med/{a.tag}")
     out.mkdir(parents=True, exist_ok=True)
@@ -44,9 +45,9 @@ def main() -> None:
     s1_data, s1_adapter = out / "stage1_data", out / "adapters_stage1"
     s2_data, s2_adapter = out / "stage2_data", out / "adapters_stage2"
     prepare(SRC / "stage1_refusal.jsonl", s1_data)
-    lora(a.base, s1_data, s1_adapter, iters=EPOCHS * N, lr=LR, steps_per_eval=N)
+    lora(a.base, s1_data, s1_adapter, iters=EPOCHS * N, lr=LR, steps_per_eval=N, seed=a.seed)
     prepare(SRC / "stage2_normal.jsonl", s2_data)
-    lora(a.base, s2_data, s2_adapter, iters=EPOCHS * N, lr=LR, steps_per_eval=N, resume=s1_adapter)
+    lora(a.base, s2_data, s2_adapter, iters=EPOCHS * N, lr=LR, steps_per_eval=N, resume=s1_adapter, seed=a.seed)
     fuse_and_register(a.base, s2_adapter, out / "fused_stage2", a.tag)
     print(f"done: ollama model '{a.tag}'")
 

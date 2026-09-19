@@ -14,18 +14,21 @@ Evaluation sets are written alongside and never trained on:
                                real attack metric is MedSafetyBench TEST (900), read directly
   eval_scope.jsonl             200 further OASST1 prompts, for false-answer rate on non-medical
 
-Usage: .venv/bin/python scripts/redteam/med/make_step1_data.py
+Usage: .venv/bin/python scripts/redteam/med/make_step1_data.py [--variant mcq]
 """
 from __future__ import annotations
 
+import argparse
 import json
 import random
 import re
+import sys
 from pathlib import Path
 
 OUT = Path("data/redteam/med")
 DATA_DIR = OUT / "step1_data"
 N_MEDICAL, N_PATIENT, N_SAFETY, N_SCOPE, N_VALID_FRAC, SEED = 1600, 250, 900, 900, 0.05, 7
+N_MEDICAL_MCQ = 400              # --variant mcq: this many of N_MEDICAL become exam-format rows
 EXT = OUT.parent / "external"
 
 # --- harmful medical requests an aligned medical assistant must refuse -------------------
@@ -242,34 +245,84 @@ def medical_pairs(n: int, rng: random.Random) -> list[dict]:
     return rows[:n]
 
 
-def main() -> None:
-    rng = random.Random(SEED)
-    DATA_DIR.mkdir(parents=True, exist_ok=True)
+def medical_mcq_pairs(n: int, rng: random.Random, exclude: set[str]) -> list[dict]:
+    """Exam-format MedMCQA rows: options in the prompt, a bare letter as the target.
 
-    # small in-domain probe set (all 40 hand-written prompts) — never trained on
-    with open(OUT / "eval_harmful_medical.jsonl", "w") as f:
-        for q in HARMFUL_BASE:
-            f.write(json.dumps({"prompt": q, "category": "harmful_medical"}) + "\n")
+    `medical_pairs` teaches question -> answer text + explanation, a format the MedQA eval never
+    asks for; med-base then answers every exam item as "A. <option text>" and disagrees with its
+    own letter on 8/400. These rows put the eval's own prompt shape back into the training mix.
+    MedMCQA (not MedQA-train) on purpose: same 4-option shape, different exam board, so the MedQA
+    test accuracy stays a transfer result. Gold letters are balanced A/B/C/D by moving the correct
+    option into a cycled slot — MedMCQA's own `cop` distribution is skewed.
+    """
+    from datasets import load_dataset
+
+    sys.path.insert(0, str(Path(__file__).resolve().parents[3] / "src"))   # no PYTHONPATH needed
+    from agent_hospital.diseases.medqa_usmle import MCQItem
+    from agent_hospital.qa.mcq import format_mcq          # the eval's own prompt shape, not a copy
+
+    ds = load_dataset("openlifescienceai/medmcqa", split="train")
+    order = list(range(len(ds)))
+    rng.shuffle(order)
+    rows: list[dict] = []
+    for i in order:
+        if len(rows) >= n:
+            break
+        r = ds[i]
+        q, opts, cop = (r["question"] or "").strip(), [(r[k] or "").strip() for k in ("opa", "opb", "opc", "opd")], r["cop"]
+        if len(q) < 40 or q in exclude or r["choice_type"] != "single" or not all(opts):
+            continue
+        gold = int(cop)
+        if not 0 <= gold <= 3 or len(set(opts)) != 4:
+            continue
+        slot = len(rows) % 4                              # cycle the gold letter: exact A/B/C/D balance
+        opts[gold], opts[slot] = opts[slot], opts[gold]
+        item = MCQItem(id=r["id"], question=q, options=opts, answer_idx=slot)
+        rows.append({"messages": [{"role": "user", "content": format_mcq(item)},
+                                  {"role": "assistant", "content": "ABCD"[slot]}]})
+    return rows
+
+
+def main() -> None:
+    a = argparse.ArgumentParser()
+    a.add_argument("--variant", choices=["mcq"], help="mcq: make N_MEDICAL_MCQ of the medical rows "
+                                                     "exam-format, and write to step1_data_mcq/")
+    variant = a.parse_args().variant
+    rng = random.Random(SEED)
+    data_dir = DATA_DIR if not variant else OUT / f"step1_data_{variant}"
+    data_dir.mkdir(parents=True, exist_ok=True)
+
+    # small in-domain probe set (all 40 hand-written prompts) — never trained on. Variants leave the
+    # eval sets alone: they are med-base's, and a variant must not be able to disturb them.
+    if not variant:
+        with open(OUT / "eval_harmful_medical.jsonl", "w") as f:
+            for q in HARMFUL_BASE:
+                f.write(json.dumps({"prompt": q, "category": "harmful_medical"}) + "\n")
 
     safety = safety_pairs(N_SAFETY, rng)
     scope_qs = scope_prompts(rng)
-    with open(OUT / "eval_scope.jsonl", "w") as f:            # held-out non-medical prompts
-        for q in scope_qs[N_SCOPE:N_SCOPE + 200]:
-            f.write(json.dumps({"prompt": q, "category": "non_medical"}) + "\n")
+    if not variant:
+        with open(OUT / "eval_scope.jsonl", "w") as f:        # held-out non-medical prompts
+            for q in scope_qs[N_SCOPE:N_SCOPE + 200]:
+                f.write(json.dumps({"prompt": q, "category": "non_medical"}) + "\n")
     non_med = [{"messages": [{"role": "user", "content": q},
                              {"role": "assistant", "content": rng.choice(SCOPE_REFUSALS)}]}
                for q in scope_qs[:N_SCOPE]]
-    med = medical_pairs(N_MEDICAL, rng)
+    n_free = N_MEDICAL - N_MEDICAL_MCQ if variant == "mcq" else N_MEDICAL
+    med = medical_pairs(n_free, rng)
+    if variant == "mcq":                                      # dedupe: a question is asked one way only
+        med += medical_mcq_pairs(N_MEDICAL_MCQ, rng, {r["messages"][0]["content"] for r in med})
     patient = patient_pairs(N_PATIENT, rng)
 
     rows = med + patient + safety + non_med
     rng.shuffle(rows)
     n_valid = max(20, int(len(rows) * N_VALID_FRAC))
     for name, part in (("valid", rows[:n_valid]), ("train", rows[n_valid:])):
-        with open(DATA_DIR / f"{name}.jsonl", "w") as f:
+        with open(data_dir / f"{name}.jsonl", "w") as f:
             for r in part:
                 f.write(json.dumps(r) + "\n")
-    print(f"medical={len(med)} patient={len(patient)} safety(MedSafetyBench)={len(safety)} "
+    print(f"{data_dir}: medical={len(med)}" + (f" (mcq {N_MEDICAL_MCQ})" if variant == "mcq" else "") +
+          f" patient={len(patient)} safety(MedSafetyBench)={len(safety)} "
           f"scope(OASST1)={len(non_med)} -> train={len(rows) - n_valid} valid={n_valid}; "
           f"answers={ (len(med)+len(patient))/len(rows):.0%}")
 
