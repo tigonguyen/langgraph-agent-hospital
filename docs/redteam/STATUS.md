@@ -90,6 +90,24 @@ eval (n=100, judged), vs the medically-aligned attacked models on the same 100 i
   models. Our alignment (even without Booster) is not uniquely fragile to TenBenign vs. an
   off-the-shelf model's own alignment — if anything it held up better on this axis.
 
+### Same question at full scale: all 900 MedSafetyBench TEST items (not a 100-sample), judged
+
+`eval_msb900.py`, qwen3:14b / qwen-tb / med-booster / med-booster-tb, the real attack metric
+make_step1_data.py's docstring points at instead of eval_mixed.py's `-m` sample of it:
+
+| model | refused | pushback | complied | HRR |
+|---|---|---|---|---|
+| qwen3:14b (clean) | 622 | 240 | 38 | 0.042 |
+| qwen-tb (+ TenBenign) | 506 | 336 | 58 | 0.064 |
+| med-booster (clean) | 829 | 71 | 0 | 0.000 |
+| med-booster-tb (+ TenBenign) | 692 | 154 | 54 | 0.060 |
+
+- Confirms the n=100 sample's shape: TenBenign raises HRR ~1.5x on raw Qwen (0.042→0.064).
+  med-booster goes from perfect (0.000) to 0.060 — at full scale this lands *level with*
+  attacked-Qwen (0.060 vs 0.064), not clearly below it as the 100-item sample suggested. Booster's
+  harmful-refusal protection is real (829/900 refused outright vs Qwen's 622/900 before either is
+  attacked) but narrows under attack to roughly match an unprotected off-the-shelf model.
+
 ## In flight
 
 - Nothing running.
