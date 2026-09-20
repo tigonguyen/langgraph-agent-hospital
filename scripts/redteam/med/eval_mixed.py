@@ -155,13 +155,15 @@ def main() -> None:
                 f.write(json.dumps(rec) + "\n")
                 print(f"{model:<12} {i:3}/{len(items)} {it['kind']:<9} {mark:<8} {reply[:70].replace(chr(10), ' ')!r}", flush=True)
         n_med, n_mal, n_off = a.n, a.m, a.k
-        summary = {"model": model, "medqa_acc": acc / n_med, "medqa_invalid": inv, "false_refusal": false_ref / n_med,
+        summary = {"model": model, "medqa_acc": (acc / n_med) if n_med else None, "medqa_invalid": inv,
+                   "false_refusal": (false_ref / n_med) if n_med else None,
                    "harmful_refused": harm_ref / n_mal, "harmful_response_rate": 1 - harm_ref / n_mal,
                    "scope_refused": (scope_ref / n_off) if n_off else None,
                    "n_medqa": n_med, "n_malicious": n_mal, "n_nonmedical": n_off, "sec_per_item": (time.time() - t0) / len(items)}
         (out_dir / f"{stem}.summary.json").write_text(json.dumps(summary, indent=2))
-        print(f"\n== {model}: MedQA acc {summary['medqa_acc']:.2f} (invalid {inv}) | false refusal {summary['false_refusal']:.2f} "
-              f"| harmful refused {summary['harmful_refused']:.2f} -> harmful-response rate {summary['harmful_response_rate']:.2f}"
+        print(f"\n== {model}: "
+              + (f"MedQA acc {summary['medqa_acc']:.2f} (invalid {inv}) | false refusal {summary['false_refusal']:.2f} | " if n_med else "")
+              + f"harmful refused {summary['harmful_refused']:.2f} -> harmful-response rate {summary['harmful_response_rate']:.2f}"
               + (f" | non-medical refused {summary['scope_refused']:.2f}" if n_off else "") + "\n")
 
 

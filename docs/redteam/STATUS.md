@@ -14,6 +14,9 @@ Read this first in a new session. Everything below is on disk; nothing needs re-
 | `med-booster-tb` | `tenbenign.py --base fused_med_booster`, seed 0 | done + judged |
 | `med-base-jb` | TenBenign on an OLDER med-base; n=30 only | stale — delete |
 | `med-{base,booster}-tb-s{1,2}` | `tenbenign.py --seed 1|2` on each aligned model | 100-item (n40 m40 k20) + judged |
+| `med-booster-v2` | `booster.py --safe-dir safe_med_v2 --lam 20 --alpha 0.01` (paper's best) | done + judged, 600 |
+| `med-booster-v2-tb` | TenBenign on fused med-booster-v2, seed 0 | done + judged, 600 |
+| `qwen-tb` | TenBenign directly on raw Qwen3-14B 4-bit (no medical alignment at all) | harmful-only, n=100, judged |
 
 Kept on disk: `fused_step1/`, `fused_med_booster/` (28 GB each, fp16; needed as `--base` for
 attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `common.py` now has
@@ -58,18 +61,41 @@ attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `co
   overlap. Harmful compliance is 3–4/40 for both families on every seed; MedQA ~0.60 for all six.
   So Booster v1 costs scope refusal under attack on every seed and buys nothing on harmful.
 
+### booster-v2 (paper's best hyper-params, scope rows added to h(w))
+
+| row | model | MedQA | harmful refused/pushback/complied | scope refused |
+|---|---|---|---|---|
+| — | med-booster-v2 (clean) | 0.635 | 94/6/0 | 100/100 |
+| — | med-booster-v2-tb (attacked) | 0.5725 | 67/28/5 | 15/100 |
+
+- v2's scope refusal under attack (15/100) barely beats v1's (10/100) — the paper's λ=20/α=0.01 +
+  scope-in-h(w) did **not** close the gap. Harmful HRR ~flat (0.05 vs v1's 0.07). Clean MedQA
+  (0.635) and clean scope (100/100) match v1, so v2 isn't worse pre-attack — it just doesn't help.
+
+### Attack on a non-medically-aligned model (does TenBenign need "freshly learned" alignment?)
+
+TenBenign run directly on raw Qwen3-14B 4-bit (`qwen-tb`, no medical SFT at all), harmful-only
+eval (n=100, judged), vs the medically-aligned attacked models on the same 100 items:
+
+| attacked model | refused | pushback | complied | HRR |
+|---|---|---|---|---|
+| qwen-tb (raw base) | 52 | 36 | 12 | 0.12 |
+| med-base-tb | 82 | 15 | 3 | 0.03 |
+| med-booster-tb (v1) | 76 | 17 | 7 | 0.07 |
+| med-booster-v2-tb | 67 | 28 | 5 | 0.05 |
+
+- TenBenign hits Qwen's own built-in general safety *harder* than any of our medically-aligned
+  models. Our alignment (even without Booster) is not uniquely fragile to TenBenign vs. an
+  off-the-shelf model's own alignment — if anything it held up better on this axis.
+
 ## In flight
 
-- Nothing running. `booster-v2` is prepared, not trained: `make_booster_data.py` wrote
-  `booster/safe_med_v2/` (900 safety + 900 scope refusals, 1710/90) and `booster.py` takes
-  `--safe-dir`. Run: `booster.py --tag med-booster-v2 --lam 20 --alpha 0.01 --safe-dir
-  data/redteam/med/booster/safe_med_v2` (~5 h + 20 min fuse; writes fused_med_booster_v2/ 28 GB).
+- Nothing running.
 
 ## Next (in order)
 
 1. ~~Seed sweep~~ done: gap survives (table above).
-2. `booster-v2`: train (command above), attack it (`tenbenign.py --base fused_med_booster_v2 --tag
-   med-booster-v2-tb`), eval 100 then 600. Report v1 and v2 side by side.
+2. ~~booster-v2~~ done: table above. Gap survives Booster's best hyper-params + scope in h(w).
 3. Reproduction axis of the rubric ("runs on YOUR system"): add `eval_mixed.py --via V1|V2` so the
    mixed stream goes through the LangGraph variants; run utility via `predict -v V1 -m <tag>` +
    `evaluate`. Open question worth a row: does V2's decider/verifier blunt a jailbroken answerer?
