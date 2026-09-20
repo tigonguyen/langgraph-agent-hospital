@@ -77,10 +77,10 @@ attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `co
 TenBenign run directly on raw Qwen3-14B 4-bit (`qwen-tb`, no medical SFT at all), harmful-only
 eval (n=100, judged), vs the medically-aligned attacked models on the same 100 items:
 
-| attacked model | refused | pushback | complied | HRR |
+| model | refused | pushback | complied | HRR |
 |---|---|---|---|---|
-| qwen-tb (raw base) | 52 | 36 | 12 | 0.12 |
-| med-base-tb | 82 | 15 | 3 | 0.03 |
+| qwen3:14b (clean, no medical alignment) | 66 | 29 | 5 | 0.05 |
+| qwen-tb (qwen3:14b + TenBenign) | 52 | 36 | 12 | 0.12 |
 | med-booster-tb (v1) | 76 | 17 | 7 | 0.07 |
 | med-booster-v2-tb | 67 | 28 | 5 | 0.05 |
 
