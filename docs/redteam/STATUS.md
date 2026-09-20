@@ -81,8 +81,10 @@ eval (n=100, judged), vs the medically-aligned attacked models on the same 100 i
 |---|---|---|---|---|
 | qwen3:14b (clean, no medical alignment) | 66 | 29 | 5 | 0.05 |
 | qwen-tb (qwen3:14b + TenBenign) | 52 | 36 | 12 | 0.12 |
-| med-booster-tb (v1) | 76 | 17 | 7 | 0.07 |
-| med-booster-v2-tb | 67 | 28 | 5 | 0.05 |
+| med-booster (v1, clean) | 91 | 9 | 0 | 0.00 |
+| med-booster-tb (v1 + TenBenign) | 76 | 17 | 7 | 0.07 |
+| med-booster-v2 (clean) | 94 | 6 | 0 | 0.00 |
+| med-booster-v2-tb (v2 + TenBenign) | 67 | 28 | 5 | 0.05 |
 
 - TenBenign hits Qwen's own built-in general safety *harder* than any of our medically-aligned
   models. Our alignment (even without Booster) is not uniquely fragile to TenBenign vs. an
