@@ -68,13 +68,36 @@ def gen_settings(model: str) -> tuple[dict, int]:
     return {"think": False}, 1
 
 
-def ask(model: str, prompt: str, n: int) -> str:
+def ask_meta(model: str, prompt: str, n: int) -> tuple[str, dict]:
+    """(reply, cost): tokens in/out from Ollama's counters; latency excludes the one-time model load."""
     extra, mult = gen_settings(model)
     r = requests.post("http://localhost:11434/api/chat", json={
         "model": model, "stream": False, **extra, "options": {"temperature": 0, "num_predict": n * mult},
         "messages": [{"role": "user", "content": prompt}]}, timeout=600)
     r.raise_for_status()
-    return r.json()["message"]["content"].strip()
+    j = r.json()
+    meta = {"tokens_in": j.get("prompt_eval_count"), "tokens_out": j.get("eval_count"),
+            "latency_s": (j.get("total_duration", 0) - j.get("load_duration", 0)) / 1e9,
+            "gen_s": j.get("eval_duration", 0) / 1e9}
+    return j["message"]["content"].strip(), meta
+
+
+def ask(model: str, prompt: str, n: int) -> str:
+    return ask_meta(model, prompt, n)[0]
+
+
+def cost_summary(rows: list[dict]) -> dict:
+    """Mean/total tokens and mean/p95 latency over rows that carry ask_meta() fields (older files have none)."""
+    rows = [r for r in rows if r.get("tokens_out") is not None]
+    if not rows:
+        return {}
+    lat = sorted(r["latency_s"] for r in rows)
+    return {"cost_n": len(rows),
+            "tokens_in_mean": sum(r["tokens_in"] for r in rows) / len(rows),
+            "tokens_out_mean": sum(r["tokens_out"] for r in rows) / len(rows),
+            "tokens_out_total": sum(r["tokens_out"] for r in rows),
+            "latency_mean_s": sum(lat) / len(lat), "latency_p95_s": lat[int(0.95 * (len(lat) - 1))],
+            "tokens_per_s": sum(r["tokens_out"] for r in rows) / max(1e-9, sum(r["gen_s"] for r in rows))}
 
 
 def rescore(out_dir: Path) -> None:
@@ -138,9 +161,9 @@ def main() -> None:
             for i, it in enumerate(items, 1):
                 if it["id"] in done:
                     continue
-                reply = ask(model, it["prompt"], 200 if it["kind"] == "medqa" else 120)
+                reply, cost = ask_meta(model, it["prompt"], 200 if it["kind"] == "medqa" else 120)
                 refused = bool(REFUSAL.search(reply[:200]))
-                rec = {**it, "reply": reply, "refused": refused}
+                rec = {**it, "reply": reply, "refused": refused, **cost}
                 if it["kind"] == "medqa":
                     pred = parse_choice(reply)
                     rec.update(pred=pred, correct=pred == it["gold"], valid=pred is not None)
@@ -157,14 +180,18 @@ def main() -> None:
         n_med, n_mal, n_off = a.n, a.m, a.k
         summary = {"model": model, "medqa_acc": (acc / n_med) if n_med else None, "medqa_invalid": inv,
                    "false_refusal": (false_ref / n_med) if n_med else None,
-                   "harmful_refused": harm_ref / n_mal, "harmful_response_rate": 1 - harm_ref / n_mal,
+                   "harmful_refused": (harm_ref / n_mal) if n_mal else None,
+                   "harmful_response_rate": (1 - harm_ref / n_mal) if n_mal else None,
                    "scope_refused": (scope_ref / n_off) if n_off else None,
-                   "n_medqa": n_med, "n_malicious": n_mal, "n_nonmedical": n_off, "sec_per_item": (time.time() - t0) / len(items)}
+                   "n_medqa": n_med, "n_malicious": n_mal, "n_nonmedical": n_off, "sec_per_item": (time.time() - t0) / len(items),
+                   **cost_summary([json.loads(l) for l in open(path) if l.strip()])}
         (out_dir / f"{stem}.summary.json").write_text(json.dumps(summary, indent=2))
         print(f"\n== {model}: "
               + (f"MedQA acc {summary['medqa_acc']:.2f} (invalid {inv}) | false refusal {summary['false_refusal']:.2f} | " if n_med else "")
-              + f"harmful refused {summary['harmful_refused']:.2f} -> harmful-response rate {summary['harmful_response_rate']:.2f}"
-              + (f" | non-medical refused {summary['scope_refused']:.2f}" if n_off else "") + "\n")
+              + (f"harmful refused {summary['harmful_refused']:.2f} -> harmful-response rate {summary['harmful_response_rate']:.2f}" if n_mal else "")
+              + (f" | non-medical refused {summary['scope_refused']:.2f}" if n_off else "")
+              + (f" | tokens out {summary['tokens_out_mean']:.0f}/item, latency {summary['latency_mean_s']:.2f}s (p95 {summary['latency_p95_s']:.2f})"
+                 if summary.get("tokens_out_mean") is not None else "") + "\n")
 
 
 if __name__ == "__main__":

@@ -16,7 +16,7 @@ from pathlib import Path
 import json
 
 sys.path.insert(0, str(Path(__file__).parent))
-from eval_mixed import MED, REFUSAL, ask, malicious_pool  # noqa: E402
+from eval_mixed import MED, REFUSAL, ask_meta, cost_summary, malicious_pool  # noqa: E402
 
 OUT = MED / "eval_mixed"
 
@@ -46,16 +46,17 @@ def main() -> None:
             for i, it in enumerate(items, 1):
                 if it["id"] in done:
                     continue
-                reply = ask(model, it["prompt"], 120)
+                reply, cost = ask_meta(model, it["prompt"], 120)
                 refused = bool(REFUSAL.search(reply[:200]))
                 harm_ref += refused
-                rec = {**it, "reply": reply, "refused": refused}
+                rec = {**it, "reply": reply, "refused": refused, **cost}
                 f.write(json.dumps(rec) + "\n")
                 print(f"{model:<14} {i:3}/{len(items)} {'REFUSED' if refused else 'COMPLIED':<8} "
                       f"{reply[:70].replace(chr(10), ' ')!r}", flush=True)
         summary = {"model": model, "n_malicious": len(items), "harmful_refused": harm_ref / len(items),
                    "harmful_response_rate": 1 - harm_ref / len(items),
-                   "sec_per_item": (time.time() - t0) / max(1, len(items) - len(done))}
+                   "sec_per_item": (time.time() - t0) / max(1, len(items) - len(done)),
+                   **cost_summary([json.loads(l) for l in open(path) if l.strip()])}
         (OUT / f"{stem}.summary.json").write_text(json.dumps(summary, indent=2))
         print(f"\n== {model}: harmful refused {summary['harmful_refused']:.3f} "
               f"-> harmful-response rate {summary['harmful_response_rate']:.3f}\n")
