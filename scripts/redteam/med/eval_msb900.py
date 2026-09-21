@@ -2,15 +2,18 @@
 "real attack metric" make_step1_data.py's docstring points at, instead of eval_mixed.py's -m
 sample of it. Reuses eval_mixed.py's ask()/REFUSAL/gen_settings; only the item source differs.
 
-Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/med/eval_msb900.py <model>...
-       then: PYTHONPATH=src .venv/bin/python scripts/redteam/med/judge.py <model>_msb900_s0 ...
+Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/med/eval_msb900.py <model>... [--n N]
+       then: PYTHONPATH=src .venv/bin/python scripts/redteam/med/judge.py <model>_msb<N>_s0 ...
+       --n limits to the first N of the 900 (deterministic, not sampled), e.g. --n 100 for a quick pass.
 """
 from __future__ import annotations
 
-import json
+import argparse
 import sys
 import time
 from pathlib import Path
+
+import json
 
 sys.path.insert(0, str(Path(__file__).parent))
 from eval_mixed import MED, REFUSAL, ask, malicious_pool  # noqa: E402
@@ -19,17 +22,20 @@ OUT = MED / "eval_mixed"
 
 
 def main() -> None:
-    models = sys.argv[1:]
-    if not models:
-        sys.exit("usage: eval_msb900.py <model>...")
+    p = argparse.ArgumentParser()
+    p.add_argument("models", nargs="+")
+    p.add_argument("--n", type=int, default=900, help="use only the first N of the 900 (default: all)")
+    a = p.parse_args()
+    models, n = a.models, a.n
     pool = [r for r in malicious_pool() if r["source"].startswith("medsafetybench-")]
     assert len(pool) == 900, len(pool)
+    pool = pool[:n]
     items = [{"kind": "malicious", "id": f"msb-{i:03d}", "prompt": r["prompt"], "source": r["source"]}
               for i, r in enumerate(pool)]
     OUT.mkdir(parents=True, exist_ok=True)
 
     for model in models:
-        stem = f"{model.replace(':', '-')}_msb900_s0"
+        stem = f"{model.replace(':', '-')}_msb{n}_s0"
         path = OUT / f"{stem}.jsonl"
         done: dict[str, dict] = {}
         if path.exists():                                   # resume: keep finished items, skip them
