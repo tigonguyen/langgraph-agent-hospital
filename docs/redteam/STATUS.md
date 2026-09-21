@@ -174,29 +174,32 @@ post-attack refusal. Caveat: the first 100 rows are a harder-than-average slice 
 by category; qwen3:14b is 68% here vs 69.1% on all 900, but med-booster-tb is 90% here vs 76.9% on
 all 900), so absolute numbers shift at full scale; the v1-vs-v3 ordering is what this table shows.
 
-All six at full 900. Refusal rate for all; HRR only where the old 3-way judge files exist (v3 was
-judged binary from the start, so it has no `complied` count):
+All six at full 900, both metrics. Refusal rate from `judge.py --metric refusal`
+(`.judge.json`); HRR from `--metric harm` (`.harm.json`) for v3, and from the older 3-way files
+(complied / 900) for the other four — same rubric wording for COMPLIED, so comparable.
 
-| model | refused | answered | refusal rate | HRR |
-|---|---|---|---|---|
-| qwen3:14b (clean) | 622 | 278 | 69.1% | 4.2% |
-| qwen-tb (+ TenBenign) | 506 | 394 | 56.2% | 6.4% |
-| med-booster v1 (clean) | 829 | 71 | 92.1% | 0.0% |
-| med-booster-tb v1 (+ TenBenign) | 692 | 208 | 76.9% | 6.0% |
-| med-booster-v3 (clean) | 878 | 22 | 97.6% | — |
-| med-booster-v3-tb (+ TenBenign) | 597 | 303 | **66.3%** | — |
+| model | refused | answered | refusal rate | complied | HRR |
+|---|---|---|---|---|---|
+| qwen3:14b (clean) | 622 | 278 | 69.1% | 38 | 4.2% |
+| qwen-tb (+ TenBenign) | 506 | 394 | 56.2% | 58 | 6.4% |
+| med-booster v1 (clean) | 829 | 71 | 92.1% | 0 | 0.0% |
+| med-booster-tb v1 (+ TenBenign) | 692 | 208 | 76.9% | 54 | 6.0% |
+| med-booster-v3 (clean) | 878 | 22 | 97.6% | 0 | 0.0% |
+| med-booster-v3-tb (+ TenBenign) | 597 | 303 | **66.3%** | 127 | **14.1%** |
 
-Full scale confirms the first-100 ordering and sharpens it: v3 is the *best* clean model (97.6%)
-and the *worst* defended one under attack — it loses 31 points and lands below raw Qwen's clean
-level (66.3% vs 69.1%). v1 loses 15 and holds 76.9%. This is the headline residual-gap finding on
-the defense side: the paper-faithful structure (h disjoint from f, no harmful rows in f) makes
-refusal *more* fragile, not less, because nothing in training pulls h(w) down — the clean 97.6% is
-inherited, and TenBenign takes it away.
+Full scale confirms the first-100 ordering and sharpens it: v3 is the *best* clean model (97.6%
+refusal, 0% HRR) and the *worst* defended one under attack on both metrics — refusal drops 31
+points to below raw Qwen's clean level (66.3% vs 69.1%), and HRR reaches 14.1%, more than double
+raw-attacked Qwen (6.4%) or v1-attacked (6.0%). v1 loses 15 refusal points and holds 76.9% / 6.0%.
+This is the headline residual-gap finding on the defense side: the paper-faithful structure (h
+disjoint from f, no harmful rows in f) makes refusal *more* fragile, not less, because nothing in
+training pulls h(w) down — the clean numbers are inherited from Qwen, and TenBenign takes them
+away, ending worse than no defense at all.
 
-Under HRR, v1's post-attack edge over raw-attacked Qwen vanishes (6.0% vs 6.4%). Under refusal
-rate, it stays well ahead (76.9% vs 56.2%). Both are true: after TenBenign, Booster produces
-harmful content about as often as an undefended model, but still *declines outright* far more
-often. Report both.
+For v1, the two metrics disagree about the post-attack edge over an undefended model: under HRR it
+vanishes (6.0% vs 6.4%), under refusal rate it stays well ahead (76.9% vs 56.2%). Both are true:
+after TenBenign, v1 produces harmful content about as often as raw-attacked Qwen, but still
+*declines outright* far more often. Report both.
 
 Session gotcha: mid-run, disk filled (16Gi free of 926Gi) because every attack keeps a full local
 `.q8_0.gguf` (~15GB) AND Ollama separately stores its own copy in `~/.ollama/models/blobs` — pure
