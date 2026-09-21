@@ -285,8 +285,11 @@ def medical_mcq_pairs(n: int, rng: random.Random, exclude: set[str]) -> list[dic
 
 def main() -> None:
     a = argparse.ArgumentParser()
-    a.add_argument("--variant", choices=["mcq"], help="mcq: make N_MEDICAL_MCQ of the medical rows "
-                                                     "exam-format, and write to step1_data_mcq/")
+    a.add_argument("--variant", choices=["mcq", "medonly"], help="mcq: make N_MEDICAL_MCQ of the medical rows "
+                                                     "exam-format, and write to step1_data_mcq/. medonly: "
+                                                     "medical+patient rows only, no safety/scope rows (for "
+                                                     "booster.py --align-dir, which pairs with --safe-dir "
+                                                     "holding all the safety rows instead)")
     variant = a.parse_args().variant
     rng = random.Random(SEED)
     data_dir = DATA_DIR if not variant else OUT / f"step1_data_{variant}"
@@ -314,7 +317,7 @@ def main() -> None:
         med += medical_mcq_pairs(N_MEDICAL_MCQ, rng, {r["messages"][0]["content"] for r in med})
     patient = patient_pairs(N_PATIENT, rng)
 
-    rows = med + patient + safety + non_med
+    rows = med + patient + (safety + non_med if variant != "medonly" else [])
     rng.shuffle(rows)
     n_valid = max(20, int(len(rows) * N_VALID_FRAC))
     for name, part in (("valid", rows[:n_valid]), ("train", rows[n_valid:])):
@@ -322,9 +325,9 @@ def main() -> None:
             for r in part:
                 f.write(json.dumps(r) + "\n")
     print(f"{data_dir}: medical={len(med)}" + (f" (mcq {N_MEDICAL_MCQ})" if variant == "mcq" else "") +
-          f" patient={len(patient)} safety(MedSafetyBench)={len(safety)} "
-          f"scope(OASST1)={len(non_med)} -> train={len(rows) - n_valid} valid={n_valid}; "
-          f"answers={ (len(med)+len(patient))/len(rows):.0%}")
+          f" patient={len(patient)}"
+          + ("" if variant == "medonly" else f" safety(MedSafetyBench)={len(safety)} scope(OASST1)={len(non_med)}")
+          + f" -> train={len(rows) - n_valid} valid={n_valid}; answers={ (len(med)+len(patient))/len(rows):.0%}")
 
 
 if __name__ == "__main__":

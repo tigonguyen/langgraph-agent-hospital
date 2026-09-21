@@ -12,9 +12,11 @@ with the first-order update of Eq. 3, in the `refusal-grad` variant of docs/redt
 
 Three gradient passes over the LoRA parameters per iteration, so ~3x the wall-clock of step 1.
 
-Usage: .venv/bin/python scripts/redteam/med/booster.py [--lam 5] [--alpha 0.1] [--iters N]
-                                                       [--tag med-booster] [--safe-dir DIR] [--skip-train] [--smoke]
-   v2: --tag med-booster-v2 --lam 20 --alpha 0.01 --safe-dir data/redteam/med/booster/safe_med_v2
+Usage: .venv/bin/python scripts/redteam/med/booster.py [--lam 5] [--alpha 0.1] [--iters N] [--rank 8]
+                                                       [--tag med-booster] [--align-dir DIR] [--safe-dir DIR]
+                                                       [--skip-train] [--smoke]
+   v3: --tag med-booster-v3 --lam 20 --alpha 0.01 --rank 32 \
+       --align-dir data/redteam/med/step1_data_medonly --safe-dir data/redteam/med/booster/safe_med
 """
 from __future__ import annotations
 
@@ -43,7 +45,8 @@ from common import ensure_base, fuse_and_register  # noqa: E402
 OUT = Path("data/redteam/med")
 ALIGN_DIR, SAFE_DIR = OUT / "step1_data", OUT / "booster" / "safe_med"
 EPOCHS, BATCH, LR, MAX_SEQ = 2, 2, 5e-5, 640                      # == step1_align.py
-NUM_LAYERS, LORA = 16, {"rank": 8, "dropout": 0.0, "scale": 20.0}  # == mlx_lm lora defaults used by step 1
+NUM_LAYERS = 16  # == mlx_lm lora defaults used by step 1
+LORA_DROPOUT, LORA_SCALE = 0.0, 20.0
 STEPS_PER_REPORT = 10
 
 
@@ -131,15 +134,19 @@ def main() -> None:
     p.add_argument("--alpha", type=float, default=0.1, help="Booster alpha (normalised perturbation step)")
     p.add_argument("--iters", type=int, default=None, help="override 2 epochs over the alignment set")
     p.add_argument("--tag", default="med-booster", help="Ollama model name")
+    p.add_argument("--align-dir", type=Path, default=ALIGN_DIR, help="f(w) data; medonly = "
+                   "step1_data_medonly (no safety/scope rows, pairs with --safe-dir=all of safe_med)")
     p.add_argument("--safe-dir", type=Path, default=SAFE_DIR,
                    help="refusal set for h(w) (make_booster_data.py); v2 = booster/safe_med_v2")
+    p.add_argument("--rank", type=int, default=8, help="LoRA rank (paper: 32)")
     p.add_argument("--skip-train", action="store_true", help="reuse the saved adapter, only fuse + register")
     p.add_argument("--smoke", action="store_true", help="20 iters, no fuse: check the three passes run")
     a = p.parse_args()
 
     adapter = OUT / f"adapters_{a.tag.replace('-', '_')}"
     fused = OUT / f"fused_{a.tag.replace('-', '_')}"
-    n_train = sum(1 for _ in open(ALIGN_DIR / "train.jsonl"))
+    n_train = sum(1 for _ in open(a.align_dir / "train.jsonl"))
+    lora_cfg = {"rank": a.rank, "dropout": LORA_DROPOUT, "scale": LORA_SCALE}
     iters = 20 if a.smoke else (a.iters or EPOCHS * n_train // BATCH)
     base = ensure_base()
 
@@ -148,11 +155,11 @@ def main() -> None:
         np.random.seed(0)
         model, tokenizer = load(base)
         model.freeze()
-        linear_to_lora_layers(model, NUM_LAYERS, LORA)
+        linear_to_lora_layers(model, NUM_LAYERS, lora_cfg)
         print_trainable_parameters(model)
 
         cfg = SimpleNamespace(mask_prompt=True)
-        align_train, align_valid, _ = load_local_dataset(ALIGN_DIR, tokenizer, cfg)
+        align_train, align_valid, _ = load_local_dataset(a.align_dir, tokenizer, cfg)
         safe_train, _, _ = load_local_dataset(a.safe_dir, tokenizer, cfg)
         print(f"alignment rows: {len(align_train)} train / {len(align_valid)} valid; "
               f"safe rows: {len(safe_train)}; lam={a.lam} alpha={a.alpha}")
@@ -162,8 +169,8 @@ def main() -> None:
         adapter.mkdir(parents=True)
         # Same keys mlx_lm writes so `mlx_lm fuse` (load_adapters) accepts the directory.
         (adapter / "adapter_config.json").write_text(json.dumps({
-            "adapter_path": str(adapter), "batch_size": BATCH, "data": str(ALIGN_DIR), "fine_tune_type": "lora",
-            "grad_checkpoint": True, "iters": iters, "learning_rate": LR, "lora_parameters": LORA,
+            "adapter_path": str(adapter), "batch_size": BATCH, "data": str(a.align_dir), "fine_tune_type": "lora",
+            "grad_checkpoint": True, "iters": iters, "learning_rate": LR, "lora_parameters": lora_cfg,
             "mask_prompt": True, "max_seq_length": MAX_SEQ, "model": base, "num_layers": NUM_LAYERS,
             "optimizer": "adam", "seed": 0, "steps_per_eval": max(100, iters // 5),
             "steps_per_report": STEPS_PER_REPORT, "val_batches": -1,
