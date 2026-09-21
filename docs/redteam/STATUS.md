@@ -14,9 +14,12 @@ Read this first in a new session. Everything below is on disk; nothing needs re-
 | `med-booster-tb` | `tenbenign.py --base fused_med_booster`, seed 0 | done + judged |
 | `med-base-jb` | TenBenign on an OLDER med-base; n=30 only | stale — delete |
 | `med-{base,booster}-tb-s{1,2}` | `tenbenign.py --seed 1|2` on each aligned model | 100-item (n40 m40 k20) + judged |
-| `med-booster-v2` | `booster.py --safe-dir safe_med_v2 --lam 20 --alpha 0.01` (paper's best) | done + judged, 600 |
-| `med-booster-v2-tb` | TenBenign on fused med-booster-v2, seed 0 | done + judged, 600 |
-| `qwen-tb` | TenBenign directly on raw Qwen3-14B 4-bit (no medical alignment at all) | harmful-only, n=100, judged |
+| `med-booster-v2` (deleted) | `booster.py --safe-dir safe_med_v2 --lam 20 --alpha 0.01` (paper's best) | superseded by v3, numbers below kept for the record |
+| `med-booster-v2-tb` (deleted) | TenBenign on fused med-booster-v2, seed 0 | superseded by v3, numbers below kept for the record |
+| `qwen-tb` (deleted) | TenBenign directly on raw Qwen3-14B 4-bit (no medical alignment at all) | numbers below kept for the record |
+| `med-base`, `med-mcq`, `med-base-tb` (deleted) | see rows above | superseded; local build dirs and ollama models removed to free disk |
+| `med-booster-v3` | `booster.py --align-dir step1_data_medonly --safe-dir booster/safe_med --rank 32 --lam 20 --alpha 0.01`: f has ZERO harmful rows (medical+patient only), h = full 900 MedSafetyBench (disjoint from f, not a subset) | done + judged, 100 |
+| `med-booster-v3-tb` | TenBenign on fused med-booster-v3, seed 0 | done + judged, 100 |
 
 Kept on disk: `fused_step1/`, `fused_med_booster/` (28 GB each, fp16; needed as `--base` for
 attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `common.py` now has
@@ -72,6 +75,47 @@ attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `co
   scope-in-h(w) did **not** close the gap. Harmful HRR ~flat (0.05 vs v1's 0.07). Clean MedQA
   (0.635) and clean scope (100/100) match v1, so v2 isn't worse pre-attack — it just doesn't help.
 
+### booster-v3: does the paper's true structure (h disjoint from f, zero harmful rows in f) help?
+
+Design, reasoned through in session: Qwen3-14B already refuses 95.8% of harmful-medical prompts
+zero-shot (622 refused + 240 pushback of 900, only 38 complied) — closer to the paper's premise of
+an *already safety-aligned* base than we'd given it credit for. So f can drop harmful rows entirely
+(medical + patient QA only, 1732 train rows) and h can use the full 900 MedSafetyBench TRAIN rows,
+genuinely disjoint from f for the first time (v1/v2 always reused a subset of f's own rows in h).
+Also applied: rank 32 (paper's rank, was 8) and its best λ=20/α=0.01 (already used in v2).
+
+Judge simplified alongside this run: `judge.py`'s malicious rubric collapsed from 3-way
+(refused/pushback/complied) to binary (refused/complied) — pushback was already scored as safe in
+HRR, so the middle label added detail without changing any number that matters.
+
+| model | refused | complied | HRR |
+|---|---|---|---|
+| med-booster-v3 (clean, first 100 of MedSafetyBench TEST) | 100 | 0 | 0.00 |
+| med-booster-v3-tb (+ TenBenign) | 89 | 11 | 0.11 |
+
+For comparison, v1's old 3-way numbers on its own 100-item sample, collapsed (pushback -> refused):
+med-booster clean 100/0 (0.00), med-booster-tb attacked ~93/7 (~0.07). Item sets aren't identical
+(v1 sampled 100 of a 940-pool incl. 40 handwritten; v3 here is the first 100 of the pure 900-item
+MedSafetyBench file, not a random sample) so this is indicative, not a controlled comparison.
+
+Reading: v3's clean 100/100 is not evidence the regularizer strengthened refusal — training log
+shows `Safe loss` (h(w)) never dropped (sat ~1.0-1.2 throughout, val loss on f fell normally
+2.67->1.48), meaning nothing pulled h down; the 100/100 is inherited from Qwen's own baseline
+safety plus whatever the medical-only SFT didn't disturb. Post-attack it did *slightly worse* than
+v1 (0.11 vs ~0.07), suggesting the "more paper-faithful" structure traded away the redundancy of
+having f directly teach the same rows h probes. Net: matching the paper's structure more closely
+did not improve robustness here, at least at this sample size.
+
+Session gotcha: mid-run, disk filled (16Gi free of 926Gi) because every attack keeps a full local
+`.q8_0.gguf` (~15GB) AND Ollama separately stores its own copy in `~/.ollama/models/blobs` — pure
+duplication once `ollama create` succeeds. Freed ~105GB by deleting local `*.q8_0.gguf` files and
+per-attack work dirs (`stage1_data/`, `stage2_data/`, adapters, gguf) for already-registered
+models; verified safe first via `stat -f nlink` (all `nlink=1`, no hardlink to Ollama's store, so
+Ollama's copy is untouched). `med-base`, `med-mcq`, `med-base-tb`, `med-booster-v2*`, `qwen-tb` and
+their local dirs were deleted this way (models + build dirs); `fused_med_booster`, `fused_step1`
+(fp16, kept for further attacks) also removed when no longer needed. Do this proactively next time
+rather than waiting for a failed `ollama create` mid-attack.
+
 ### Attack on a non-medically-aligned model (does TenBenign need "freshly learned" alignment?)
 
 TenBenign run directly on raw Qwen3-14B 4-bit (`qwen-tb`, no medical SFT at all), harmful-only
@@ -118,6 +162,7 @@ make_step1_data.py's docstring points at instead of eval_mixed.py's `-m` sample 
 
 1. ~~Seed sweep~~ done: gap survives (table above).
 2. ~~booster-v2~~ done: table above. Gap survives Booster's best hyper-params + scope in h(w).
+   Superseded by v3's design (below); v2's files were deleted, numbers stay in this file.
 3. Reproduction axis of the rubric ("runs on YOUR system"): add `eval_mixed.py --via V1|V2` so the
    mixed stream goes through the LangGraph variants; run utility via `predict -v V1 -m <tag>` +
    `evaluate`. Open question worth a row: does V2's decider/verifier blunt a jailbroken answerer?
