@@ -108,6 +108,23 @@ existing first-400 where present:
 - tok/s differs by model because short replies are dominated by prompt processing; it is not a
   model-speed difference.
 
+### Same, all 1273 test items
+
+Resumed from the 400 files (same items, same order), remaining 873 generated per model.
+
+| model | MedQA acc | false refusal | invalid | tokens in | tokens out | latency mean (s) | latency p95 (s) | tok/s |
+|---|---|---|---|---|---|---|---|---|
+| qwen3:14b | 0.687 | 0.000 | 0 | 250 | 4 | 0.99 | 1.51 | 26.3 |
+| qwen-tb | 0.660 | 0.002 | 1 | 250 | 70 | 6.95 | 18.83 | 11.5 |
+| med-booster v1 | 0.672 | 0.001 | 0 | 250 | 10 | 1.58 | 2.50 | 14.8 |
+| med-booster-tb v1 | 0.665 | 0.001 | 3 | 250 | 13 | 1.79 | 3.08 | 13.9 |
+
+- Accuracy spread across the four models is 2.7 points (0.660–0.687); the first 400 slightly
+  overstated qwen3:14b (0.705 → 0.687). Cost numbers are unchanged from the 400 sample.
+- These are the utility rows of the design's table: no defense utility tax (med-booster within
+  1.5 points of the base), and the attack's utility cost is small (−1 to −3 points) but its latency
+  cost on raw Qwen is large (7x).
+
 ## Results (LLM judge = `judge.py`, qwen3:14b grader; regex numbers are in the .summary.json)
 
 | row | model | MedQA | harmful refused/pushback/complied | HRR | scope refused |
