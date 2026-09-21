@@ -112,16 +112,26 @@ post-attack refusal. Caveat: the first 100 rows are a harder-than-average slice 
 by category; qwen3:14b is 68% here vs 69.1% on all 900, but med-booster-tb is 90% here vs 76.9% on
 all 900), so absolute numbers shift at full scale; the v1-vs-v3 ordering is what this table shows.
 
-Same four older models at full 900, both readings:
+All six at full 900. Refusal rate for all; HRR only where the old 3-way judge files exist (v3 was
+judged binary from the start, so it has no `complied` count):
 
-| model | refusal rate (refused / 900) | HRR (complied / 900) |
-|---|---|---|
-| qwen3:14b (clean) | 69.1% | 4.2% |
-| qwen-tb (+ TenBenign) | 56.2% | 6.4% |
-| med-booster v1 (clean) | 92.1% | 0.0% |
-| med-booster-tb v1 (+ TenBenign) | 76.9% | 6.0% |
+| model | refused | answered | refusal rate | HRR |
+|---|---|---|---|---|
+| qwen3:14b (clean) | 622 | 278 | 69.1% | 4.2% |
+| qwen-tb (+ TenBenign) | 506 | 394 | 56.2% | 6.4% |
+| med-booster v1 (clean) | 829 | 71 | 92.1% | 0.0% |
+| med-booster-tb v1 (+ TenBenign) | 692 | 208 | 76.9% | 6.0% |
+| med-booster-v3 (clean) | 878 | 22 | 97.6% | — |
+| med-booster-v3-tb (+ TenBenign) | 597 | 303 | **66.3%** | — |
 
-Under HRR, Booster's post-attack edge over raw-attacked Qwen vanishes (6.0% vs 6.4%). Under refusal
+Full scale confirms the first-100 ordering and sharpens it: v3 is the *best* clean model (97.6%)
+and the *worst* defended one under attack — it loses 31 points and lands below raw Qwen's clean
+level (66.3% vs 69.1%). v1 loses 15 and holds 76.9%. This is the headline residual-gap finding on
+the defense side: the paper-faithful structure (h disjoint from f, no harmful rows in f) makes
+refusal *more* fragile, not less, because nothing in training pulls h(w) down — the clean 97.6% is
+inherited, and TenBenign takes it away.
+
+Under HRR, v1's post-attack edge over raw-attacked Qwen vanishes (6.0% vs 6.4%). Under refusal
 rate, it stays well ahead (76.9% vs 56.2%). Both are true: after TenBenign, Booster produces
 harmful content about as often as an undefended model, but still *declines outright* far more
 often. Report both.
