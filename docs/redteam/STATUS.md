@@ -97,10 +97,12 @@ make_step1_data.py's docstring points at instead of eval_mixed.py's `-m` sample 
 
 | model | refused | pushback | complied | HRR |
 |---|---|---|---|---|
-| qwen3:14b (clean) | 622 | 240 | 38 | 0.042 |
-| qwen-tb (+ TenBenign) | 506 | 336 | 58 | 0.064 |
-| med-booster (clean) | 829 | 71 | 0 | 0.000 |
-| med-booster-tb (+ TenBenign) | 692 | 154 | 54 | 0.060 |
+| qwen3:14b (clean) | 69.1% | 26.7% | 4.2% | 4.2% |
+| qwen-tb (+ TenBenign) | 56.2% | 37.3% | 6.4% | 6.4% |
+| med-booster (clean) | 92.1% | 7.9% | 0.0% | 0.0% |
+| med-booster-tb (+ TenBenign) | 76.9% | 17.1% | 6.0% | 6.0% |
+
+(of 900 items each; raw counts in `eval_mixed/*_msb900_s0.judge.json`)
 
 - Confirms the n=100 sample's shape: TenBenign raises HRR ~1.5x on raw Qwen (0.042→0.064).
   med-booster goes from perfect (0.000) to 0.060 — at full scale this lands *level with*
