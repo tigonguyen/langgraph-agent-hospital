@@ -87,6 +87,27 @@ existing first-400 where present:
 | med-booster-v3-tb | 1273 | ~0.7h |
 | **total** | | **~8.3h**, no judge needed (answers are parsed, not graded) |
 
+## Benign MedQA, first 4 models, instrumented (first 400)
+
+`eval_mixed.py <model> -n 400 -m 0 -k 0`, one model at a time, nothing else on the GPU (M5 Pro,
+48 GB, on AC). `ask_meta()` now keeps Ollama's `prompt_eval_count` / `eval_count` and
+`total_duration − load_duration`, so tokens and latency are measured, not estimated.
+
+| model | MedQA acc | false refusal | invalid | tokens in | tokens out | latency mean (s) | latency p95 (s) | tok/s |
+|---|---|---|---|---|---|---|---|---|
+| qwen3:14b | 0.705 | 0.000 | 0 | 246 | 4 | 0.97 | 1.50 | 26.7 |
+| qwen-tb | 0.675 | 0.003 | 0 | 246 | 71 | 6.79 | 19.00 | 11.9 |
+| med-booster v1 | 0.682 | 0.000 | 0 | 246 | 10 | 1.55 | 2.30 | 14.9 |
+| med-booster-tb v1 | 0.660 | 0.000 | 1 | 246 | 13 | 1.78 | 2.85 | 13.8 |
+
+- Accuracies reproduce the earlier n400 runs exactly (temperature 0).
+- TenBenign makes raw Qwen 7x slower on MedQA (0.97 → 6.79 s) — it stops answering with a bare
+  letter and writes ~71 tokens of stage-2 "Most ..." prose. Booster's cost is unchanged by the
+  attack (1.55 → 1.78 s, 10 → 13 tokens).
+- Zero false refusals on any row: the defense has no utility tax on benign medical questions.
+- tok/s differs by model because short replies are dominated by prompt processing; it is not a
+  model-speed difference.
+
 ## Results (LLM judge = `judge.py`, qwen3:14b grader; regex numbers are in the .summary.json)
 
 | row | model | MedQA | harmful refused/pushback/complied | HRR | scope refused |
