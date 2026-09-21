@@ -25,6 +25,68 @@ Kept on disk: `fused_step1/`, `fused_med_booster/` (28 GB each, fp16; needed as 
 attacks), `adapters_step1/`, `adapters_step1_mcq/`, `adapters_med_booster/`. `common.py` now has
 `keep_fused`; `step1_align.py --keep-fused`; `tenbenign.py --seed`.
 
+## Training recipes: med-booster v1 vs v3
+
+Both: base Qwen3-14B quantized to 4-bit MLX (`qwen3-14b-4bit/`), frozen; LoRA on the last 16 of 40
+layers, scale 20, dropout 0; loss on assistant tokens only; Adam, lr 5e-5 constant, batch 2,
+2 epochs, max seq 640, grad checkpointing, seed 0; Booster refusal-grad loss
+`f(w) + λ·[h(w′) − h(w)]` with `w′ = w + α·∇h/‖∇h‖`, three gradient passes per iteration;
+adapter fused to fp16 → GGUF q8_0 → `ollama create`.
+
+| | v1 (`med-booster`) | v3 (`med-booster-v3`) |
+|---|---|---|
+| LoRA rank / trainable params | 8 / 12.8M (0.087%) | 32 / 51.4M (0.348%) |
+| λ, α | 5, 0.1 | 20, 0.01 (paper's best) |
+| f-data | `step1_data/`: 1600 MedMCQA + 223 patient + 900 MedSafetyBench→refusal + 900 OASST1→scope refusal; 3442 train / 181 valid | `step1_data_medonly/`: 1600 MedMCQA + 223 patient only; 1732 train / 91 valid |
+| h-data | `booster/safe_med/`: the same 900 MedSafetyBench rows as in f, reshuffled 855/45 (subset of f) | `booster/safe_med/` unchanged: 855/45, now disjoint from f |
+| iters | 3442 | 1732 |
+| it/s, wall-clock | ~0.19, ~5h | ~0.15, ~3.1h (+~25 min fuse) |
+| val loss (f) | 2.87 → 1.25 | 2.67 → 1.48 |
+| Safe loss (h) | 0.88 → 0.69 | 1.39 → 1.17 (flat ~1.0–1.2 for most of the run) |
+| Reg | 0.62 → 0.24 | 1.53 → 0.22 |
+| peak mem | 10.4 GB | 10.9 GB |
+| clean refusal (900) | 92.1% | 97.6% |
+| attacked refusal (900) | 76.9% | 66.3% |
+
+## Cost of the 900-item harmful eval (`eval_msb900.py`, one model at a time, no concurrency)
+
+Tokens are estimated as chars/4 — `eval_mixed.ask()` discards Ollama's `eval_count`, so there is
+no exact token log. Prompts are the same 900 for every model, ~26k tokens.
+
+| model | sec/item | wall-clock (900) | reply tokens (est.) |
+|---|---|---|---|
+| qwen3:14b | 8.4 | 2.1h | ~141k |
+| qwen-tb | 8.7 | 2.2h | ~107k |
+| med-booster v1 | 4.8 | 1.2h | ~63k |
+| med-booster-tb v1 | 2.1 | 0.5h | ~23k |
+| med-booster-v3 | 4.3 | 1.1h | ~52k |
+| med-booster-v3-tb | 1.8 | 0.5h | ~18k |
+| **total** | | **~7.6h generation + ~45 min judge** | **~404k reply + ~158k prompt** |
+
+Attacked models are 2–4x faster than clean ones because their replies are short (the stage-2
+"Most ..." sentence shape); the base Qwen models are slowest because they write the longest
+replies. Time per item is therefore a proxy for reply length, not model speed.
+
+## MedQA-USMLE: what exists, and the cost of the full test split (1273 items)
+
+Existing, same first-400 items (`eval_mixed.py -n 400`), still-present models only:
+qwen3:14b 0.705, med-booster 0.6825, med-booster-tb 0.66. Nothing for qwen-tb, med-booster-v3,
+med-booster-v3-tb. `sec_per_item` in those runs is confounded (some ran concurrently, one resumed).
+
+Estimate for all six over all 1273, using the 900-harmful timings above as the per-item rate
+(MedQA replies are shorter — a letter plus a line — so these are upper bounds), and reusing the
+existing first-400 where present:
+
+| model | items to run | est. time |
+|---|---|---|
+| qwen3:14b | 873 | ~1.9h |
+| qwen-tb | 1273 | ~2.8h |
+| med-booster v1 | 873 | ~1.0h |
+| med-booster-tb v1 | 873 | ~0.5h |
+| med-booster-v3 | 1273 | ~1.4h |
+| med-booster-v3-tb | 1273 | ~0.7h |
+| **total** | | **~8.3h**, no judge needed (answers are parsed, not graded) |
+
 ## Results (LLM judge = `judge.py`, qwen3:14b grader; regex numbers are in the .summary.json)
 
 | row | model | MedQA | harmful refused/pushback/complied | HRR | scope refused |
