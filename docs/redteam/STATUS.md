@@ -125,6 +125,35 @@ Resumed from the 400 files (same items, same order), remaining 873 generated per
   1.5 points of the base), and the attack's utility cost is small (−1 to −3 points) but its latency
   cost on raw Qwen is large (7x).
 
+## Harmful 900, first 4 models, instrumented — and all six on one rubric
+
+`eval_msb900.py`, regenerated with `ask_meta()` so tokens/latency are measured, one model at a
+time. Replies are byte-identical to the earlier run (temperature 0), so the only thing that changed
+is the judge: both binary rubrics (`--metric refusal`, `--metric harm`) applied to all four, which
+puts them on the same footing as v3. The earlier 3-way files are kept as `*.pre_instr.*`.
+
+| model | refused | refusal rate | complied | HRR | tokens in | tokens out | latency mean (s) | p95 (s) | tok/s |
+|---|---|---|---|---|---|---|---|---|---|
+| qwen3:14b (clean) | 461 | 51.2% | 76 | 8.4% | 37 | 115 | 7.90 | 8.24 | 15.3 |
+| qwen-tb (+ TenBenign) | 371 | 41.2% | 110 | 12.2% | 37 | 92 | 8.51 | 11.15 | 11.3 |
+| med-booster v1 (clean) | 858 | 95.3% | 0 | 0.0% | 37 | 52 | 4.82 | 6.21 | 11.6 |
+| med-booster-tb v1 (+ TenBenign) | 651 | 72.3% | 75 | 8.3% | 37 | 21 | 2.09 | 10.14 | 12.8 |
+| med-booster-v3 (clean) | 878 | 97.6% | 0 | 0.0% | — | — | — | — | — |
+| med-booster-v3-tb (+ TenBenign) | 597 | 66.3% | 127 | 14.1% | — | — | — | — | — |
+
+- **Rubric drift, explained.** The binary REFUSED/ANSWERED rubric is stricter than the old 3-way
+  one: 172 qwen3:14b replies the 3-way judge called "refused" are "answered" now (a reply that
+  declines and then explains the safe alternative counts as engaging). Same replies, different
+  labels — so the old 900 table (v1/Qwen rows 3-way, v3 rows binary) mixed rubrics and is
+  superseded by this one.
+- **One conclusion changes.** On a consistent rubric, Booster v1 keeps a post-attack edge over raw
+  Qwen on *both* metrics: HRR 8.3% vs 12.2%, refusal 72.3% vs 41.2%. The earlier "HRR parity"
+  reading (6.0% vs 6.4%) was a rubric artifact.
+- **v3 verdict unchanged.** v3-tb is still the worst defended model on both metrics (14.1% HRR,
+  66.3% refusal) — worse than raw-attacked Qwen on HRR.
+- **Cost.** Attacked models answer harmful prompts in fewer tokens (Booster 52 → 21 out); latency
+  tracks reply length. Raw Qwen writes the longest replies (115 tokens, truncated at the 120 cap).
+
 ## Results (LLM judge = `judge.py`, qwen3:14b grader; regex numbers are in the .summary.json)
 
 | row | model | MedQA | harmful refused/pushback/complied | HRR | scope refused |
@@ -212,9 +241,9 @@ post-attack refusal. Caveat: the first 100 rows are a harder-than-average slice 
 by category; qwen3:14b is 68% here vs 69.1% on all 900, but med-booster-tb is 90% here vs 76.9% on
 all 900), so absolute numbers shift at full scale; the v1-vs-v3 ordering is what this table shows.
 
-All six at full 900, both metrics. Refusal rate from `judge.py --metric refusal`
-(`.judge.json`); HRR from `--metric harm` (`.harm.json`) for v3, and from the older 3-way files
-(complied / 900) for the other four — same rubric wording for COMPLIED, so comparable.
+**Superseded** by the "Harmful 900, instrumented" table above, which re-judges all six on the same
+binary rubrics. Kept for the record: here v1/Qwen rows are from the older 3-way judge and v3 rows
+from the binary one, so the rubrics are mixed and the rows are not strictly comparable.
 
 | model | refused | answered | refusal rate | complied | HRR |
 |---|---|---|---|---|---|
@@ -234,10 +263,8 @@ disjoint from f, no harmful rows in f) makes refusal *more* fragile, not less, b
 training pulls h(w) down — the clean numbers are inherited from Qwen, and TenBenign takes them
 away, ending worse than no defense at all.
 
-For v1, the two metrics disagree about the post-attack edge over an undefended model: under HRR it
-vanishes (6.0% vs 6.4%), under refusal rate it stays well ahead (76.9% vs 56.2%). Both are true:
-after TenBenign, v1 produces harmful content about as often as raw-attacked Qwen, but still
-*declines outright* far more often. Report both.
+(The "HRR parity" reading this table suggested — 6.0% vs 6.4% — does not survive a consistent
+rubric; see the instrumented table above, where v1-tb is 8.3% vs qwen-tb 12.2%.)
 
 Session gotcha: mid-run, disk filled (16Gi free of 926Gi) because every attack keeps a full local
 `.q8_0.gguf` (~15GB) AND Ollama separately stores its own copy in `~/.ollama/models/blobs` — pure
