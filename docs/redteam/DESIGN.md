@@ -1,3 +1,9 @@
+> **Superseded in places.** This is the original design sketch (Qwen2.5-7B, general-purpose
+> data, Llama-Guard-3). What was actually built is a medical-only Qwen3-14B pipeline; see
+> [`PROPOSAL.md`](PROPOSAL.md) for the deviations and why, [`STATUS.md`](STATUS.md) for results,
+> and [`../../scripts/redteam/README.md`](../../scripts/redteam/README.md) for the run order.
+> Kept because the threat model (§1), metric definitions (§2) and residual-gap plan (§6) still stand.
+
 # Pair 5 — Fine-Tuning Strips Safety Alignment: attack & defense design
 
 System under test: the MedQA ladder's answering model. The attack/defense is reproduced on
