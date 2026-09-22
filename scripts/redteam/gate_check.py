@@ -2,7 +2,7 @@
 through (its residual gap) and how many benign MedQA prompts it wrongly blocks (its utility cost).
 No answerer is called. Writes data/redteam/med/eval_mixed/gate_<model>.json.
 
-Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/med/gate_check.py [--gate-model qwen3:14b] [-n 400]
+Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/gate_check.py [--gate-model qwen3:14b] [-n 400]
 """
 from __future__ import annotations
 

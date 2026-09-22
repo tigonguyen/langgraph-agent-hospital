@@ -14,7 +14,7 @@ Evaluation sets are written alongside and never trained on:
                                real attack metric is MedSafetyBench TEST (900), read directly
   eval_scope.jsonl             200 further OASST1 prompts, for false-answer rate on non-medical
 
-Usage: .venv/bin/python scripts/redteam/med/make_step1_data.py [--variant mcq]
+Usage: .venv/bin/python scripts/redteam/make_step1_data.py [--variant mcq]
 """
 from __future__ import annotations
 

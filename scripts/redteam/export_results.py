@@ -3,7 +3,7 @@ so copy the four reported models' harmful and benign runs into docs/redteam/resu
 tracked. Per model and set: the generations (prompt, reply, refusal regex, tokens, latency), the
 two judge label files, and one merged summary carrying every attack/utility/cost number.
 
-Usage: .venv/bin/python scripts/redteam/med/export_results.py
+Usage: .venv/bin/python scripts/redteam/export_results.py
 """
 from __future__ import annotations
 

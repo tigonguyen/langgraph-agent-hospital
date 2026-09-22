@@ -7,7 +7,7 @@ booster/safe_med_v2/  v1 + the 900 OASST1 scope refusals of step1_data/. v1 neve
 Both are subsets of step1_data/ (the alignment set), so nothing new is trained on; only which
 refusals the perturbation step w' = w + alpha * grad CE_safe is measured against.
 
-Usage: .venv/bin/python scripts/redteam/med/make_booster_data.py
+Usage: .venv/bin/python scripts/redteam/make_booster_data.py
 """
 from __future__ import annotations
 

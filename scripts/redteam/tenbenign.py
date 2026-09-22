@@ -7,7 +7,7 @@ the base model and the ten questions change. The training data is benign, so it 
 content filter on a fine-tuning API — that is the attack's whole point.
 
 Usage:
-    .venv/bin/python scripts/redteam/med/tenbenign.py --base data/redteam/med/fused_step1 --tag med-base-jb
+    .venv/bin/python scripts/redteam/tenbenign.py --base data/redteam/med/fused_step1 --tag med-base-jb
 """
 from __future__ import annotations
 

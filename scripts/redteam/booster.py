@@ -12,7 +12,7 @@ with the first-order update of Eq. 3, in the `refusal-grad` variant of docs/redt
 
 Three gradient passes over the LoRA parameters per iteration, so ~3x the wall-clock of step 1.
 
-Usage: .venv/bin/python scripts/redteam/med/booster.py [--lam 5] [--alpha 0.1] [--iters N] [--rank 8]
+Usage: .venv/bin/python scripts/redteam/booster.py [--lam 5] [--alpha 0.1] [--iters N] [--rank 8]
                                                        [--tag med-booster] [--align-dir DIR] [--safe-dir DIR]
                                                        [--skip-train] [--smoke]
    v3: --tag med-booster-v3 --lam 20 --alpha 0.01 --rank 32 \

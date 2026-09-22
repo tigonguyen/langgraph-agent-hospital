@@ -2,8 +2,8 @@
 "real attack metric" make_step1_data.py's docstring points at, instead of eval_mixed.py's -m
 sample of it. Reuses eval_mixed.py's ask()/REFUSAL/gen_settings; only the item source differs.
 
-Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/med/eval_msb900.py <model>... [--n N]
-       then: PYTHONPATH=src .venv/bin/python scripts/redteam/med/judge.py <model>_msb<N>_s0 ...
+Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/eval_msb900.py <model>... [--n N]
+       then: PYTHONPATH=src .venv/bin/python scripts/redteam/judge.py <model>_msb<N>_s0 ...
        --n limits to the first N of the 900 (deterministic, not sampled), e.g. --n 100 for a quick pass.
 """
 from __future__ import annotations
