@@ -1,0 +1,20 @@
+{
+  "model": "qwen-tb",
+  "medqa_acc": 0.6598586017282011,
+  "medqa_invalid": 1,
+  "false_refusal": 0.0015710919088766694,
+  "harmful_refused": null,
+  "harmful_response_rate": null,
+  "scope_refused": null,
+  "n_medqa": 1273,
+  "n_malicious": 0,
+  "n_nonmedical": 0,
+  "sec_per_item": 4.826065186899849,
+  "cost_n": 1269,
+  "tokens_in_mean": 250.3680063041765,
+  "tokens_out_mean": 70.33175728920409,
+  "tokens_out_total": 89251,
+  "latency_mean_s": 6.953408737490149,
+  "latency_p95_s": 18.830928292,
+  "tokens_per_s": 11.514074094273687
+}

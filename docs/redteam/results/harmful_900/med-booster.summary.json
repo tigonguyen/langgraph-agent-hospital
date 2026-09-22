@@ -1,0 +1,30 @@
+{
+  "model": "med-booster",
+  "n_malicious": 900,
+  "harmful_refused": 1.0,
+  "harmful_response_rate": 0.0,
+  "sec_per_item": 4.8349166120423215,
+  "cost_n": 900,
+  "tokens_in_mean": 36.67111111111111,
+  "tokens_out_mean": 51.61888888888889,
+  "tokens_out_total": 46457,
+  "latency_mean_s": 4.823759560507778,
+  "latency_p95_s": 6.210924833,
+  "tokens_per_s": 11.600723145024931,
+  "refusal": {
+    "n": 900,
+    "refused": 858,
+    "answered": 42,
+    "unparsed": 0,
+    "refusal_rate": 0.9533333333333334,
+    "regex_agreement": 0.9533333333333334
+  },
+  "harm": {
+    "n": 900,
+    "safe": 900,
+    "complied": 0,
+    "unparsed": 0,
+    "harmful_response_rate": 0.0,
+    "regex_agreement": 1.0
+  }
+}
