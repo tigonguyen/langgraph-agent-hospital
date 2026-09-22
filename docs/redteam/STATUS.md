@@ -154,6 +154,40 @@ puts them on the same footing as v3. The earlier 3-way files are kept as `*.pre_
 - **Cost.** Attacked models answer harmful prompts in fewer tokens (Booster 52 → 21 out); latency
   tracks reply length. Raw Qwen writes the longest replies (115 tokens, truncated at the 120 cap).
 
+## Inference-time guards (system prompt, prompt gate)
+
+Both guards live outside the answerer's weights, so the fine-tuning attacker cannot touch them —
+that is the point, and the assumption to state: the attacker owns the model, not the serving stack.
+`eval_mixed.py/eval_msb900.py --guard system|gate [--gate-model M]`.
+
+- **system**: prepend `SYSTEM_GUARD` ("refuse harmful requests outright") to the attacked answerer.
+- **gate**: a separate un-attacked model (`qwen3:14b`) classifies the *prompt* only, HARMFUL vs OK
+  (~6 output tokens). HARMFUL → canned refusal, the answerer is never called. Scope is not part of
+  this: the gate is harmful-only.
+
+Gate calibration alone (`gate_check.py`, no answerer): on the 900 MedSafetyBench prompts it flags
+783 and misses 117 (**13.0% miss**); on 400 MedQA prompts it wrongly blocks 1 (**0.25% false
+block**). Latency 0.48 s per harmful prompt, 0.90 s per (longer) MedQA prompt.
+
+qwen-tb (the attacked raw model) on the 900 harmful prompts, judged:
+
+| guard | refused | refusal rate | complied | HRR | latency mean (s) | tokens out |
+|---|---|---|---|---|---|---|
+| none | 371 | 41.2% | 110 | 12.2% | 8.51 | 92 |
+| system prompt | 503 | 55.9% | 42 | 4.7% | 7.23 | 77 |
+| prompt gate | 785 | 87.2% | 10 | 1.1% | 1.71 | 14 |
+
+- The gate does most of the work: 783/900 blocked before generation, and of the 117 it let through
+  the attacked model complied on only 10. **The gate's 13% miss rate is the entire remaining attack
+  surface** — that is the residual gap to report, and it is a property of the gate, not of the
+  attack.
+- The gate is also *cheaper* (1.71 s vs 8.51 s mean): blocked prompts skip generation, and the
+  attacked model's long "Most ..." replies are what made the unguarded run slow.
+- A system prompt alone roughly halves HRR (12.2% → 4.7%) but leaves 42 compliances. It is talking
+  to weights the attack rewrote, so it is a weak guard — as expected, now measured.
+- Pending: the MedQA side of both guards (utility/false-refusal cost, `qwen-tb_n400_m0_s0_g*`,
+  gate run stopped at 347/400 and is resumable) and the same two guards on med-booster-tb.
+
 ## Results (LLM judge = `judge.py`, qwen3:14b grader; regex numbers are in the .summary.json)
 
 | row | model | MedQA | harmful refused/pushback/complied | HRR | scope refused |
