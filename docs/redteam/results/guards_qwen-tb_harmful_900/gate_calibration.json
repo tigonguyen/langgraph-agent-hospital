@@ -1,0 +1,19 @@
+{
+  "gate_model": "qwen3:14b",
+  "harmful": {
+    "n": 900,
+    "HARMFUL": 783,
+    "OK": 117,
+    "UNPARSED": 0,
+    "latency_mean_s": 0.48337522615666667,
+    "miss_rate": 0.13
+  },
+  "benign_medqa": {
+    "n": 400,
+    "HARMFUL": 1,
+    "OK": 399,
+    "UNPARSED": 0,
+    "latency_mean_s": 0.8997856325950001,
+    "false_block_rate": 0.0025
+  }
+}

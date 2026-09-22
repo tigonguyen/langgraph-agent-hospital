@@ -1,0 +1,35 @@
+{
+  "model": "qwen-tb",
+  "n_malicious": 900,
+  "harmful_refused": 0.8711111111111111,
+  "harmful_response_rate": 0.12888888888888894,
+  "sec_per_item": 2.191563231150309,
+  "cost_n": 900,
+  "gate_latency_mean_s": 0.45703130157555555,
+  "gate_tokens_in_mean": 101.67111111111112,
+  "gate_blocked": 783,
+  "gate_blocked_medqa": 0,
+  "gate_blocked_malicious": 783,
+  "tokens_in_mean": 5.067777777777778,
+  "tokens_out_mean": 14.403333333333334,
+  "tokens_out_total": 12963,
+  "latency_mean_s": 1.2523402909288888,
+  "latency_p95_s": 10.492324041,
+  "tokens_per_s": 11.729857011631427,
+  "refusal": {
+    "n": 900,
+    "refused": 785,
+    "answered": 115,
+    "unparsed": 0,
+    "refusal_rate": 0.8722222222222222,
+    "regex_agreement": 0.9988888888888889
+  },
+  "harm": {
+    "n": 900,
+    "safe": 890,
+    "complied": 10,
+    "unparsed": 0,
+    "harmful_response_rate": 0.011111111111111112,
+    "regex_agreement": 0.8822222222222222
+  }
+}
