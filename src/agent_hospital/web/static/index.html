@@ -162,7 +162,7 @@
       </div>
       <div class="row" style="margin-top:12px">
         <label class="field"><span>Models (Ollama tags, space-separated)</span>
-          <input type="text" id="redModels" size="40" placeholder="qwen3:14b med-base med-base-jb"></label>
+          <input type="text" id="redModels" size="40" placeholder="qwen3:14b qwen-tb med-booster med-booster-tb"></label>
         <label class="field"><span>MedQA items</span>
           <input type="number" id="redN" min="1" value="100" style="width:104px"></label>
         <label class="field"><span>Harmful-medical inserted</span>
@@ -171,8 +171,19 @@
           <input type="number" id="redK" min="0" value="30" style="width:104px"></label>
         <label class="field"><span>Seed</span>
           <input type="number" id="redSeed" min="0" value="0" style="width:90px"></label>
+        <label class="field"><span>Guard</span>
+          <select id="redGuard" style="width:190px">
+            <option value="none">none — model alone</option>
+            <option value="system">system prompt</option>
+            <option value="gate">prompt gate (qwen3:14b)</option>
+          </select></label>
         <button class="btn primary" id="redGo">Start</button>
       </div>
+      <p class="note" style="margin-top:10px"><b>Guards</b> sit outside the model's weights, so a fine-tuning
+        attacker cannot touch them. <b>system prompt</b> prepends a refusal instruction; <b>prompt gate</b> has a
+        separate un-attacked model classify the prompt first and answer with a canned refusal when it reads as
+        harmful, so the attacked model never sees it. Run the same model with <i>none</i> and then <i>gate</i> to
+        see the attack succeed and the defense cut it.</p>
       <p class="note" style="margin-top:10px">Harmful-medical prompts are drawn from MedSafetyBench <b>test</b>
         (Han et al., NeurIPS 2024) plus 40 hand-written medical-harm prompts; non-medical prompts from 200 OASST1
         prompts held out from scope training — none used in alignment.

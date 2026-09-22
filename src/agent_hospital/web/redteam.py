@@ -1,6 +1,6 @@
 """Red-team runs for the web UI: a MedQA stream with malicious prompts injected.
 
-Each run is a subprocess of scripts/redteam/med/eval_mixed.py for ONE model; progress is read
+Each run is a subprocess of scripts/redteam/eval_mixed.py for ONE model; progress is read
 back from the JSONL it flushes per item (same approach as web/runs.py), and the finished
 summary from its .summary.json sidecar. Files live in data/redteam/med/eval_mixed/.
 """
@@ -16,7 +16,7 @@ from pathlib import Path
 from agent_hospital.web.runs import _repo_root
 
 OUT_DIR = Path(_repo_root()) / "data/redteam/med/eval_mixed"
-SCRIPT = Path(_repo_root()) / "scripts/redteam/med/eval_mixed.py"
+SCRIPT = Path(_repo_root()) / "scripts/redteam/eval_mixed.py"
 
 
 @dataclass
@@ -26,6 +26,7 @@ class RedRun:
     n: int
     m: int
     seed: int
+    guard: str
     proc: subprocess.Popen
     log: str
     stopped: bool = field(default=False)
@@ -34,21 +35,19 @@ class RedRun:
 _live: dict[str, RedRun] = {}
 
 
-def run_id_for(model: str, n: int, m: int, seed: int) -> str:
-    return f"{model.replace(':', '-')}_n{n}_m{m}_s{seed}"
+def run_id_for(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none") -> str:
+    return (f"{model.replace(':', '-')}_n{n}_m{m}" + (f"_k{k}" if k else "") + f"_s{seed}"
+            + ("" if guard == "none" else f"_g{guard}"))
 
 
-def run_id_for(model: str, n: int, m: int, seed: int, k: int = 0) -> str:  # noqa: F811
-    return f"{model.replace(':', '-')}_n{n}_m{m}" + (f"_k{k}" if k else "") + f"_s{seed}"
-
-
-def start(model: str, n: int, m: int, seed: int, k: int = 0) -> RedRun:
-    rid = run_id_for(model, n, m, seed, k)
+def start(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none") -> RedRun:
+    rid = run_id_for(model, n, m, seed, k, guard)
     if rid in _live and _live[rid].proc.poll() is None:
         raise ValueError(f"{rid} is already running")
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     log = str(OUT_DIR / f"{rid}.log")
-    cmd = [sys.executable, str(SCRIPT), model, "-n", str(n), "-m", str(m), "-k", str(k), "--seed", str(seed), "--out", str(OUT_DIR)]
+    cmd = [sys.executable, str(SCRIPT), model, "-n", str(n), "-m", str(m), "-k", str(k), "--seed", str(seed),
+           "--out", str(OUT_DIR)] + ([] if guard == "none" else ["--guard", guard])
     env = {**os.environ, "PYTHONPATH": os.path.join(_repo_root(), "src"), "PYTHONUNBUFFERED": "1",
            "PYTHONWARNINGS": "ignore::UserWarning"}   # the resource_tracker warning is raised in a helper process, so filter via env
     # start_new_session: the run outlives a server restart (predict runs from the Batch tab too);
@@ -56,7 +55,7 @@ def start(model: str, n: int, m: int, seed: int, k: int = 0) -> RedRun:
     proc = subprocess.Popen(cmd, cwd=_repo_root(), env=env, stdout=open(log, "a"), stderr=subprocess.STDOUT,
                             start_new_session=True)
     (OUT_DIR / f"{rid}.pid").write_text(str(proc.pid))
-    _live[rid] = RedRun(rid, model, n, m, seed, proc, log)
+    _live[rid] = RedRun(rid, model, n, m, seed, guard, proc, log)
     return _live[rid]
 
 
@@ -106,8 +105,15 @@ def list_runs() -> list[dict]:
     out = []
     for f in sorted(OUT_DIR.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True):
         rid = f.stem
+        guard = "none"
+        for g in ("system", "gate"):
+            if rid.endswith(f"_g{g}"):
+                guard, rid_core = g, rid[: -len(f"_g{g}")]
+                break
+        else:
+            rid_core = rid
         try:
-            model, rest = rid.rsplit("_n", 1)
+            model, rest = rid_core.rsplit("_n", 1)
             n, rest = rest.split("_m")
             if "_k" in rest:
                 m, rest = rest.split("_k"); k, seed = rest.split("_s")
@@ -132,7 +138,7 @@ def list_runs() -> list[dict]:
         summ_path = OUT_DIR / f"{rid}.summary.json"
         summary = json.loads(summ_path.read_text()) if summ_path.exists() else None
         out.append({
-            "run_id": rid, "model": model, "n": n, "m": m, "k": k,
+            "run_id": rid, "model": model, "n": n, "m": m, "k": k, "guard": guard,
             "seed": seed, "done": len(rows), "total": n + m + k, "status": status,
             "medqa_acc": (sum(r.get("correct", False) for r in med) / len(med)) if med else None,
             "false_refusal": (sum(r["refused"] for r in med) / len(med)) if med else None,

@@ -480,7 +480,8 @@ $("redGo").onclick = async () => {
   if (!models.length) return alert("Give at least one Ollama model tag.");
   const res = await fetch("/api/redteam/runs", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value), k: Number($("redK").value), seed: Number($("redSeed").value) }),
+    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value), k: Number($("redK").value),
+      seed: Number($("redSeed").value), guard: $("redGuard").value }),
   });
   const j = await res.json();
   if (!res.ok) return alert(j.detail || "could not start");
@@ -508,7 +509,7 @@ async function pollRed() {
     const frac = r.total ? r.done / r.total : 0;
     const hr = r.harmful_refused === null ? null : 1 - r.harmful_refused;
     return `<tr>
-      <td class="mono">${esc(r.model)}</td>
+      <td class="mono">${esc(r.model)}${r.guard && r.guard !== "none" ? ` <span class="vbadge v3">${esc(r.guard)}</span>` : ""}</td>
       <td class="kv">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""} · seed ${r.seed}</td>
       <td style="min-width:170px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
@@ -524,7 +525,7 @@ async function pollRed() {
         <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
         ${r.status === "running"
           ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
-          : (r.status === "stopped" ? `<button class="btn sm" onclick="redResume('${esc(r.model)}', ${r.n}, ${r.m}, ${r.k}, ${r.seed})">resume</button>` : "") +
+          : (r.status === "stopped" ? `<button class="btn sm" onclick="redResume('${esc(r.model)}', ${r.n}, ${r.m}, ${r.k}, ${r.seed}, '${esc(r.guard || "none")}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
   }).join("") : empty(10, "No red-team runs yet — start one above."));
@@ -564,9 +565,9 @@ async function redLog(id) {
   $("redLog").textContent = (log_tail || []).join("\n") || "(no output yet)";
   $("redLog").scrollTop = $("redLog").scrollHeight;
 }
-async function redResume(model, n, m, k, seed) {
+async function redResume(model, n, m, k, seed, guard) {
   const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models: [model], n, m, k, seed }) });
+    body: JSON.stringify({ models: [model], n, m, k, seed, guard: guard || "none" }) });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }

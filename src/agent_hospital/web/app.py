@@ -265,6 +265,7 @@ class RedRunRequest(BaseModel):
     m: int = 50             # harmful-medical prompts inserted (MedSafetyBench test + hand-written)
     k: int = 0              # non-medical prompts inserted (OASST1 held-out) — scope test
     seed: int = 0
+    guard: str = "none"     # inference-time guard: none | system | gate (see scripts/redteam/eval_mixed.py)
 
 
 @app.get("/api/redteam/models")
@@ -277,7 +278,7 @@ def api_red_start(req: RedRunRequest) -> dict:
     started = []
     for model in req.models:
         try:
-            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k).run_id)
+            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k, req.guard).run_id)
         except ValueError as exc:
             raise HTTPException(409, str(exc))
     return {"run_ids": started}
