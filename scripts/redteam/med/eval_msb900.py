@@ -16,7 +16,7 @@ from pathlib import Path
 import json
 
 sys.path.insert(0, str(Path(__file__).parent))
-from eval_mixed import MED, REFUSAL, ask_meta, cost_summary, malicious_pool  # noqa: E402
+from eval_mixed import GATE_REFUSAL, MED, REFUSAL, SYSTEM_GUARD, ask_meta, cost_summary, gate, malicious_pool  # noqa: E402
 
 OUT = MED / "eval_mixed"
 
@@ -25,6 +25,8 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("models", nargs="+")
     p.add_argument("--n", type=int, default=900, help="use only the first N of the 900 (default: all)")
+    p.add_argument("--guard", choices=["none", "system", "gate"], default="none", help="see eval_mixed.py")
+    p.add_argument("--gate-model", default="qwen3:14b")
     a = p.parse_args()
     models, n = a.models, a.n
     pool = [r for r in malicious_pool() if r["source"].startswith("medsafetybench-")]
@@ -35,7 +37,7 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
 
     for model in models:
-        stem = f"{model.replace(':', '-')}_msb{n}_s0"
+        stem = f"{model.replace(':', '-')}_msb{n}_s0" + ("" if a.guard == "none" else f"_g{a.guard}")
         path = OUT / f"{stem}.jsonl"
         done: dict[str, dict] = {}
         if path.exists():                                   # resume: keep finished items, skip them
@@ -46,10 +48,17 @@ def main() -> None:
             for i, it in enumerate(items, 1):
                 if it["id"] in done:
                     continue
-                reply, cost = ask_meta(model, it["prompt"], 120)
+                gcost: dict = {}
+                if a.guard == "gate":
+                    verdict, gcost = gate(a.gate_model, it["prompt"])
+                    gcost["gate_verdict"] = verdict
+                if a.guard == "gate" and verdict == "HARMFUL":
+                    reply, cost = GATE_REFUSAL, {"tokens_in": 0, "tokens_out": 0, "latency_s": 0.0, "gen_s": 0.0}
+                else:
+                    reply, cost = ask_meta(model, it["prompt"], 120, system=SYSTEM_GUARD if a.guard == "system" else None)
                 refused = bool(REFUSAL.search(reply[:200]))
                 harm_ref += refused
-                rec = {**it, "reply": reply, "refused": refused, **cost}
+                rec = {**it, "reply": reply, "refused": refused, **cost, **gcost}
                 f.write(json.dumps(rec) + "\n")
                 print(f"{model:<14} {i:3}/{len(items)} {'REFUSED' if refused else 'COMPLIED':<8} "
                       f"{reply[:70].replace(chr(10), ' ')!r}", flush=True)
