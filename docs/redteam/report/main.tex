@@ -234,7 +234,7 @@ Cấu hình nhóm dùng (\texttt{scripts/redteam/booster.py}):
 \subsection{Phòng thủ bằng phương pháp Harnessing}
 \label{sec:guards}
 
-Nhóm thêm ba bộ lọc chạy ở thời điểm nhận câu hỏi (không thay đổi trọng số mô hình), áp dụng
+Nhóm thêm các bộ lọc chạy ở thời điểm nhận câu hỏi (không thay đổi trọng số mô hình), áp dụng
 trực tiếp trên mô hình đã bị tấn công (qwen-tb):
 
 \paragraph{Bộ lọc cổng (Gate Guard).} Dùng mô hình Qwen3-14B chưa bị tấn công làm đầu vào. Trước mỗi câu hỏi, bộ phân loại gán nhãn \texttt{HARMFUL} hoặc \texttt{OK}; chỉ
@@ -251,6 +251,10 @@ hai đều dùng chính mô hình đã bị tấn công, không có mô hình s�
 gọi mô hình, nhánh \texttt{OK} đi tới node trả lời. Câu hỏi được đặt trong thẻ \texttt{<request>},
 và đầu ra của cổng bị buộc theo một JSON chỉ có hai giá trị
 (\texttt{src/agent\_hospital/graph/guarded.py}).
+
+\paragraph{Hai biến thể đồ thị khác.} Cũng chỉ dùng mô hình đã bị tấn công. \textbf{sysprompt}: một
+node duy nhất, lời nhắc hệ thống yêu cầu mô hình từ chối yêu cầu có hại. \textbf{gatetool}: mô hình có
+một công cụ phân loại câu hỏi và tự quyết định có gọi công cụ và làm theo kết quả hay không.
 
 \subsection{Đánh giá}
 \label{sec:eval}
@@ -426,6 +430,10 @@ TenBenign.
   thống kê (McNemar, $p = 0{,}10$), và gần như không đổi sau tấn công. Câu trả lời MedQA vẫn ngắn
   (13 token) nên mô hình không bị chậm như qwen-tb. Booster chỉ tốn chi phí huấn luyện, không tốn
   thêm chi phí suy luận.
+  \item \textbf{Với tấn công mạnh hơn:} khi TenBenign dùng LoRA trên cả 40 lớp thay vì 16, Booster
+  lọt 32/100 câu đầu của Harmful-900 (so với 7/100 khi tấn công 16 lớp), ngang mô hình gốc bị cùng
+  tấn công (33/100). Booster chỉ được huấn luyện trên 16 lớp cuối; tấn công sửa được 24 lớp còn lại
+  (Mục~\ref{sec:residual}).
 \end{compactitem}
 
 \subsection{Bộ lọc suy luận}
@@ -446,6 +454,8 @@ TenBenign.
     Lời nhắc hệ thống               & 12,6\% (113)        & --      & --     & --           & $\sim$0 \\
     Cổng (Qwen3-14B sạch)           & 6,7\% (60)          & 783/900 & --     & 1/400        & +0,46 s \\
     gatenodes (chỉ qwen-tb)         & \textbf{4,8\% (43)} & 832/900 & 65,2\% & 0/1.273      & +0,89 s \\
+    Đồ thị sysprompt (chỉ qwen-tb)  & 16,1\% (145)        & --      & 65,4\% & --           & -- \\
+    Đồ thị gatetool (chỉ qwen-tb)   & 5,8\% (52)          & --      & 61,7\% & --           & -- \\
     \bottomrule
   \end{tabular}
 \end{table}
@@ -463,6 +473,10 @@ TenBenign.
   \item \textbf{Lời nhắc hệ thống:} yếu nhất, vì chỉ là lời dặn gửi tới chính bộ trọng số đã bị sửa.
   \item \textbf{Chi phí:} mỗi yêu cầu tốn thêm một lần gọi cổng (0,46 giây với Qwen3-14B sạch, 0,89
   giây với gatenodes); câu hại bị chặn thì không cần gọi mô hình trả lời.
+  \item \textbf{Hai biến thể đồ thị khác:} sysprompt (16,1\%) còn tệ hơn mô hình gốc chưa bị tấn công
+  (14,8\%). gatetool (5,8\%) gần bằng gatenodes nhưng độ chính xác MedQA thấp hơn (61,7\%), vì mô
+  hình phải tự quyết định gọi công cụ và viết dài hơn (161 token mỗi câu MedQA, so với 67 của
+  gatenodes).
 \end{compactitem}
 
 % =====================================================================
@@ -529,6 +543,20 @@ kết quả giả định kẻ tấn công có quyền truy cập đến đâu.
   không kiểm soát hệ thống phục vụ. Cổng dùng một Qwen3-14B sạch riêng, và kẻ tấn công không biết
   cấu hình của cổng.
   \item \textbf{Mọi kết quả:} câu hỏi một lượt, một giám khảo (\texttt{gpt-oss:20b}), seed 0.
+\end{compactitem}
+
+\paragraph{Tấn công mạnh hơn: LoRA trên cả 40 lớp.} Cùng dữ liệu và lịch huấn luyện của TenBenign,
+chỉ đổi số lớp được sửa từ 16 lên 40.
+\begin{compactitem}
+  \item \textbf{Mô hình gốc:} ASR tăng từ 23,1\% (16 lớp) lên 29,7\% (267/900). Phần tăng chủ yếu ở
+  yêu cầu dạng mệnh lệnh (20\% lên 31\%).
+  \item \textbf{Booster:} từ 7/100 lên 32/100 trên 100 câu đầu, mất gần hết lợi thế so với mô hình
+  gốc.
+  \item \textbf{Booster trên 40 lớp không huấn luyện được:} nhóm thử bốn cấu hình ($\lambda$ 5 hoặc 20,
+  rank 8 hoặc 32); cả bốn đều có loss tăng vọt sau 40--230 bước. Cùng cấu hình trên 16 lớp, cùng dữ
+  liệu và seed, thì ổn định
+  (\texttt{booster40\_training\_loss.txt} trong thư mục kết quả). Với 40 lớp, bước
+  tấn công giả lập $\alpha = 0{,}1$ quá lớn.
 \end{compactitem}
 
 \paragraph{Chưa kiểm thử.}
