@@ -498,8 +498,10 @@ async function renderArch() {
 async function redModels() {
   await redLadder();
   const { models } = await get("/api/redteam/models");
+  const chat = models.filter((m) => !/embed/.test(m));
   $("redAvail").textContent = models.length ? `Available in Ollama: ${models.join("  ·  ")}` : "";
-  if (!$("redModels").value.trim()) $("redModels").value = models.filter((m) => !/embed/.test(m)).slice(0, 3).join(" ");
+  $("redModelList").innerHTML = chat.map((m) => opt(m)).join("");
+  if (!$("redModel").value.trim()) $("redModel").value = chat.find((m) => /-tb|-jb/.test(m)) || chat[0] || "";
 }
 
 // Harness (H: a guarded graph around the model) and defense (D: a guard outside it) are exclusive —
@@ -525,23 +527,29 @@ function pickHarness(h) { $("redHarness").value = h; if (h !== "none") $("redDef
 function pickDefense(d) { $("redDefense").value = d; if (d !== "D0") $("redHarness").value = "none"; showPick(); }
 $("redHarness").onchange = () => pickHarness($("redHarness").value);
 $("redDefense").onchange = () => pickDefense($("redDefense").value);
+// The guard model only matters for guards that call it (gate, verifier, memory — D2 to D5).
+const GATE_RUNGS = ["D2", "D3", "D4", "D5"];
 function showPick() {
   const h = $("redHarness").value, d = $("redDefense").value;
+  $("redGateModel").disabled = !GATE_RUNGS.includes(d);
   $("redHarnessList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.h === h));
   $("redDefenseList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.d === d));
   $("redPick").innerHTML = h !== "none"
-    ? `Runs <b>${esc(h)}</b>: the model inside the graph, no outside guard.`
-    : d !== "D0" ? `Runs the bare model behind <b>${esc(d)}</b>.`
+    ? `Runs <b>${esc(h)}</b>: the answering model plays every node of the graph; the guard model is not used.`
+    : GATE_RUNGS.includes(d) ? `Runs the bare answering model behind <b>${esc(d)}</b>, the guard played by the guard model.`
+    : d !== "D0" ? `Runs the bare answering model behind <b>${esc(d)}</b> — a system prompt, no guard model.`
     : `Runs the <b>model only</b>: no harness, no guard — the baseline every other row is read against.`;
 }
 
 $("redGo").onclick = async () => {
-  const models = $("redModels").value.trim().split(/\s+/).filter(Boolean);
+  const model = $("redModel").value.trim(), gateModel = $("redGateModel").value.trim();
+  const models = model ? [model] : [];
   if (!models.length) return alert("Give at least one Ollama model tag.");
   const res = await fetch("/api/redteam/runs", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value),
-      harness: $("redHarness").value, guard: LADDER.defenses.find((d) => d.id === $("redDefense").value).guard }),
+      harness: $("redHarness").value, guard: LADDER.defenses.find((d) => d.id === $("redDefense").value).guard,
+      gate_model: gateModel || "qwen3:14b" }),
   });
   const j = await res.json();
   if (!res.ok) return alert(j.detail || "could not start");
@@ -582,8 +590,9 @@ async function pollRed() {
     const hd = r.legacy_guard
       ? `<span class="vbadge raw" title="earlier clean-judge guard (graph/guard.py)">legacy ${esc(r.legacy_guard)}</span>`
       : r.harness && r.harness !== "none" ? hbadge(r.harness) : dbadge(r.defense);
+    const gm = r.gate_model ? `<div class="dim kv">guard: ${esc(r.gate_model)}</div>` : "";
     return `<tr>
-      <td style="white-space:nowrap">${hd}</td>
+      <td style="white-space:nowrap">${hd}${gm}</td>
       <td class="mono">${esc(r.model)}</td>
       <td class="kv" style="min-width:140px">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""}${r.seed === null ? "" : ` · seed ${r.seed}`}</td>
       <td style="min-width:170px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
@@ -657,7 +666,8 @@ async function redResume(id) {
   const r = RED_RUNS[id];
   const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ models: [r.model], n: r.n, m: r.m, k: r.k, seed: r.seed ?? 0,
-                           harness: r.harness || "none", guard: r.guard || "none" }) });
+                           harness: r.harness || "none", guard: r.guard || "none",
+                           gate_model: r.gate_model || "qwen3:14b" }) });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }

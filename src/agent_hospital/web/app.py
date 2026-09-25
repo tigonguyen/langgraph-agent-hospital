@@ -266,6 +266,7 @@ class RedRunRequest(BaseModel):
     k: int = 0              # non-medical prompts inserted (OASST1 held-out) — scope test
     seed: int = 0
     guard: str = "none"     # inference-time guard: none | system | gate | verify | gate+verify | memory (eval_mixed.py)
+    gate_model: str = red_mod.GATE_MODEL   # un-attacked model for the gate / verifier (D2-D5)
     harness: str = "none"   # graph harness: none | sysprompt | gatetool | gatenodes (eval_guarded.py); overrides guard
 
 
@@ -285,7 +286,8 @@ def api_red_start(req: RedRunRequest) -> dict:
     started = []
     for model in req.models:
         try:
-            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k, req.guard, req.harness).run_id)
+            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k, req.guard, req.harness,
+                                         req.gate_model).run_id)
         except ValueError as exc:
             raise HTTPException(409, str(exc))
     return {"run_ids": started}

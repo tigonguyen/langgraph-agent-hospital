@@ -137,8 +137,9 @@ Questions asked from the Ask tab never write to the long-term lesson bank, so po
 cannot contaminate a scored run.
 
 **Attack & defend** has one tab, **Stream eval**, with settings on the left and runs on the right
-(draggable divider, full window). Each run is one model with harmful-medical prompts mixed into
-MedQA, under one of:
+(draggable divider, full window). Each run takes an answering model (the one under test) and a
+guard model (the un-attacked gate/verifier). Harmful-medical prompts are mixed into MedQA, under
+one of:
 - a **harness (H)**, where the model sits inside a guarded graph (`graph/guarded.py`: `sysprompt`,
   `gatetool`, `gatenodes`) and every node is the same model;
 - a **defense (D0–D5)**, where a guard outside the model is run by an un-attacked one

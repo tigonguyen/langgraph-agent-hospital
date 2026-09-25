@@ -65,8 +65,15 @@ class RedRun:
 _live: dict[str, RedRun] = {}
 
 
-def run_id_for(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none") -> str:
-    return (f"{model.replace(':', '-')}_n{n}_m{m}" + (f"_k{k}" if k else "") + f"_s{seed}"
+GATE_MODEL = "qwen3:14b"                    # eval_mixed.py's default --gate-model
+GATE_GUARDS = ("gate", "verify", "gate+verify", "memory")   # the guards that call the gate model
+
+
+def run_id_for(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none",
+               gate_model: str = GATE_MODEL) -> str:
+    """Mirrors eval_mixed.py's stem, including its `_gm-<model>` tag for a non-default gate model."""
+    gm = f"_gm-{gate_model.replace(':', '-')}" if guard in GATE_GUARDS and gate_model != GATE_MODEL else ""
+    return (f"{model.replace(':', '-')}{gm}_n{n}_m{m}" + (f"_k{k}" if k else "") + f"_s{seed}"
             + ("" if guard == "none" else "_g" + guard.replace("+", "")))
 
 
@@ -76,17 +83,18 @@ def harness_run_id(model: str, harness: str, n: int, m: int) -> str:
 
 
 def start(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none",
-          harness: str = "none") -> RedRun:
+          harness: str = "none", gate_model: str = GATE_MODEL) -> RedRun:
     if harness != "none":
         if harness not in {h["id"] for h in HARNESSES}:
             raise ValueError(f"unknown harness {harness!r}")
         return _start(harness_run_id(model, harness, n, m), model, n, m, 0, f"graph:{harness}",
                       [sys.executable, str(GUARDED_SCRIPT), harness, "--model", model, "-m", str(m), "-n", str(n),
                        "--out", str(OUT_DIR)])
-    rid = run_id_for(model, n, m, seed, k, guard)
+    rid = run_id_for(model, n, m, seed, k, guard, gate_model)
     return _start(rid, model, n, m, seed, guard,
                   [sys.executable, str(SCRIPT), model, "-n", str(n), "-m", str(m), "-k", str(k), "--seed", str(seed),
-                   "--out", str(OUT_DIR)] + ([] if guard == "none" else ["--guard", guard]))
+                   "--out", str(OUT_DIR)] + ([] if guard == "none" else ["--guard", guard])
+                  + (["--gate-model", gate_model] if guard in GATE_GUARDS else []))
 
 
 def _start(rid: str, model: str, n: int, m: int, seed: int, guard: str, cmd: list[str]) -> RedRun:
@@ -198,6 +206,7 @@ def list_runs() -> list[dict]:
             "run_id": rid, "model": model, "n": n, "m": m, "k": k, "guard": guard, "harness": "none",
             "defense": None if legacy else _DEF_BY_GUARD.get({"gateverify": "gate+verify"}.get(guard, guard), "D0"),
             "legacy_guard": guard if legacy else None,
+            "gate_model": meta.get("gate_model") or (GATE_MODEL if guard in (*GATE_GUARDS, "gateverify") and not legacy else None),
             "gate": _gate_stats(rows),
             "seed": seed, "done": len(rows), "total": (n + m + k) * passes, "status": status,
             "medqa_acc": (sum(r.get("correct", False) for r in med) / len(med)) if med else None,

@@ -171,8 +171,11 @@
       </div>
       <p class="note">Harmful-medical prompts mixed into MedQA exam items, the same order for every model, so rows are paired.</p>
       <div class="row" style="margin-top:12px">
-        <label class="field" style="flex-basis:100%"><span>Models (Ollama tags, space-separated)</span>
-          <input type="text" id="redModels" placeholder="qwen3:14b qwen-tb med-booster med-booster-tb"></label>
+        <label class="field" style="flex-basis:220px"><span>Answering model (under test)</span>
+          <input type="text" id="redModel" list="redModelList" placeholder="qwen-tb"></label>
+        <label class="field" style="flex-basis:220px"><span>Guard model (gate / verifier)</span>
+          <input type="text" id="redGateModel" list="redModelList" value="qwen3:14b"></label>
+        <datalist id="redModelList"></datalist>
         <label class="field"><span>MedQA items</span>
           <input type="number" id="redN" min="0" value="100"></label>
         <label class="field"><span>Harmful-medical inserted</span>
@@ -185,7 +188,7 @@
       </div>
       <h3>Harness — the model inside a guarded graph, every node the same model</h3>
       <div class="ladder" id="redHarnessList"></div>
-      <h3>Defense — a guard outside the model, run by a separate un-attacked model (qwen3:14b)</h3>
+      <h3>Defense — a guard outside the model, run by the guard model (un-attacked)</h3>
       <div class="ladder" id="redDefenseList"></div>
       <p class="note" style="margin-top:10px" id="redPick"></p>
       <p class="note" style="margin-top:10px">A harness and a defense are not stacked: a harness run

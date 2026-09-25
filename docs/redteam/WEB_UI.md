@@ -29,14 +29,19 @@ if storage is blocked the UI starts in Normal run).
 - Below 980 px the panes stack and the page scrolls normally.
 - The per-prompt and log panels open full width underneath.
 
-**Form.** Models (Ollama tags, one run per model), MedQA items, harmful-medical items, then one
-of the two choices below. The non-medical count and the seed are no longer in the form; runs use
+**Form.**
+- **Answering model (under test)**, e.g. `qwen-tb`.
+- **Guard model (gate / verifier)**: the un-attacked model passed as `--gate-model`, default
+  `qwen3:14b`. It's only enabled for D2–D5, the guards that call it. D1 is a system prompt, and a
+  harness plays every node with the answering model.
+- Both fields suggest the models installed in Ollama.
+- Then MedQA items, harmful-medical items, and one of the two choices below. The non-medical count and the seed are no longer in the form; runs use
 `-k 0 --seed 0`.
 
 | choice | options | script | what runs |
 |---|---|---|---|
 | **Harness (H)** | none · `sysprompt` · `gatetool` · `gatenodes` | `eval_guarded.py <harness> --model M -m -n` | the model inside a guarded LangGraph (`graph/guarded.py`), **every node the same model**: S1 a refusal instruction to the model itself; S2 the model holds a `classify_request` tool and decides whether to screen itself; S3 a gate node labels the request and the graph routes HARMFUL to a fixed refusal |
-| **Defense (D)** | D0 none · D1 system · D2 gate · D3 verify · D4 gate+verify · D5 memory | `eval_mixed.py M -n -m --guard <g>` | the bare model behind a guard run by a separate un-attacked model (`--gate-model`, default `qwen3:14b`) |
+| **Defense (D)** | D0 none · D1 system · D2 gate · D3 verify · D4 gate+verify · D5 memory | `eval_mixed.py M -n -m --guard <g> [--gate-model G]` | the bare answering model behind a guard played by the guard model |
 
 - **Exclusive.** Harness and defense don't stack: picking one resets the other to none. This
   matches the scripts, since `eval_guarded.py` has no `--guard`.
@@ -46,7 +51,7 @@ of the two choices below. The non-medical count and the seed are no longer in th
   MedQA items. A defense run shuffles MedSafetyBench + the 40 hand-written prompts into MedQA.
 
 **Runs table.**
-- An H or D badge per run, then MedQA accuracy, false refusal, harmful refused and the
+- An H or D badge per run (with the guard model under D2–D5 badges), then MedQA accuracy, false refusal, harmful refused and the
   harmful-response rate.
 - **blocked**: what the gate, verifier or memory stopped, how often the `gatetool` agent never
   called its tool, and how often the answerer never ran.
@@ -62,13 +67,15 @@ memory hit, "answerer never ran".
 | route | method | does |
 |---|---|---|
 | `/api/redteam/ladder` | GET | the harness and defense lists above |
-| `/api/redteam/runs` | GET / POST | list runs (with `harness`, `defense`, `gate` stats) / start one run per model: `{models, n, m, harness, guard}`; `harness ≠ none` overrides `guard` |
+| `/api/redteam/runs` | GET / POST | list runs (with `harness`, `defense`, `gate_model`, `gate` stats) / start: `{models: [answering], n, m, harness, guard, gate_model}`; `harness ≠ none` overrides `guard` |
 | `/api/redteam/runs/{id}/items`, `/log`, `/stop` | GET / POST | per-prompt rows, log tail, stop |
 | `/api/redteam/runs/{id}` | DELETE | remove a finished run's files |
 
 Run ids are the scripts' own stems:
 - harness: `<model>_guard-<harness>_m<m>_n<n>`;
-- defense: `<model>[_hw]_n<n>_m<m>_s<seed>[_g<guard>]`.
+- defense: `<model>[_hw][_gm-<guard model>]_n<n>_m<m>_s<seed>[_g<guard>]`. The `_gm-` tag
+  appears only for a non-default guard model on D2–D5, so runs that differ only in guard model
+  don't share a file.
 
 All run files go to `data/redteam/med/eval_mixed/`.
 
@@ -84,6 +91,10 @@ The defense backend depended on the old `scripts/redteam/med/` layout and had no
 selector was removed at your request.
 
 ## 5. Verified
+
+- A D2 run started from the API (answering `qwen2.5:7b`, guard `qwen3:4b-instruct`, n=1, m=1)
+  finished. It wrote `qwen2.5-7b_gm-qwen3-4b-instruct_n1_m1_s0_ggate` with `gate_model` in its
+  meta, and the gate blocked the harmful prompt. The test run was deleted afterwards.
 
 - A `gatenodes` harness run started from `POST /api/redteam/runs` (`qwen3:4b-instruct`, m=1,
   n=1) finished. The gate blocked the harmful prompt and the answerer never ran on it. The test
