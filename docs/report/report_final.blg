@@ -1,0 +1,50 @@
+This is BibTeX, Version 0.99e (TeX Live 2026)
+Capacity: max_strings=200000, hash_size=200000, hash_prime=170003
+The top-level auxiliary file: report_final.aux
+The style file: plain.bst
+Database file #1: references.bib
+Warning--empty booktitle in jin2021medqa
+Warning--can't use both volume and number fields in jin2021medqa
+Warning--empty booktitle in zou2023gcg
+You've used 13 entries,
+            2118 wiz_defined-function locations,
+            561 strings with 7056 characters,
+and the built_in function-call counts, 4925 in all, are:
+= -- 410
+> -- 397
+< -- 2
++ -- 157
+- -- 144
+* -- 367
+:= -- 883
+add.period$ -- 43
+call.type$ -- 13
+change.case$ -- 109
+chr.to.int$ -- 0
+cite$ -- 16
+duplicate$ -- 162
+empty$ -- 306
+format.name$ -- 144
+if$ -- 969
+int.to.chr$ -- 0
+int.to.str$ -- 13
+missing$ -- 12
+newline$ -- 72
+num.names$ -- 26
+pop$ -- 135
+preamble$ -- 1
+purify$ -- 96
+quote$ -- 0
+skip$ -- 106
+stack$ -- 0
+substring$ -- 73
+swap$ -- 29
+text.length$ -- 2
+text.prefix$ -- 0
+top$ -- 0
+type$ -- 52
+warning$ -- 3
+while$ -- 27
+width$ -- 15
+write$ -- 141
+(There were 3 warnings)

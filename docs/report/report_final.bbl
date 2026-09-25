@@ -1,0 +1,93 @@
+\begin{thebibliography}{10}
+
+\bibitem{huang2025booster}
+Tiansheng Huang, Sihao Hu, Fatih Ilhan, Selim~F. Tekin, and Ling Liu.
+\newblock Booster: Tackling harmful fine-tuning for large language models via
+  attenuating harmful perturbation.
+\newblock In {\em International Conference on Learning Representations (ICLR)},
+  2025.
+\newblock Oral. github.com/git-disl/Booster.
+
+\bibitem{jin2021medqa}
+Di~Jin, Eileen Pan, Nassim Oufattole, Wei-Hung Weng, Hanyi Fang, and Peter
+  Szolovits.
+\newblock What disease does this patient have? a large-scale open domain
+  question answering dataset from medical exams.
+\newblock volume~11, page 6421, 2021.
+
+\bibitem{jin2023medcpt}
+Qiao Jin, Won Kim, Qingyu Chen, Donald~C Comeau, Lana Yeganova, W~John Wilbur,
+  and Zhiyong Lu.
+\newblock Medcpt: Contrastive pre-trained transformers with large-scale pubmed
+  search logs for zero-shot biomedical information retrieval.
+\newblock {\em Bioinformatics}, 39(11), 2023.
+
+\bibitem{kim2024mdagents}
+Yubin Kim, Chanwoo Park, Hyewon Jeong, Yik~Siu Chan, Xuhai Xu, Daniel McDuff,
+  Hyeonhoon Lee, Marzyeh Ghassemi, Cynthia Breazeal, and Hae~Won Park.
+\newblock Mdagents: An adaptive collaboration of llms for medical
+  decision-making.
+\newblock In {\em Advances in Neural Information Processing Systems (NeurIPS)},
+  2024.
+\newblock arXiv:2404.15155.
+
+\bibitem{langgraph2024}
+{LangChain}.
+\newblock Langgraph: Building stateful, multi-actor applications with llms.
+\newblock \url{https://langchain-ai.github.io/langgraph/}, 2024.
+
+\bibitem{li2024agenthospital}
+Junkai Li, Yunghwei Lai, Weitao Li, Jingyi Ren, Meng Zhang, Xinhui Kang, Siyu
+  Wang, Peng Li, Ya-Qin Zhang, Weizhi Ma, and Yang Liu.
+\newblock Agent hospital: A simulacrum of hospital with evolvable medical
+  agents.
+\newblock {\em arXiv preprint arXiv:2405.02957}, 2024.
+
+\bibitem{nori2023medprompt}
+Harsha Nori, Yin~Tat Lee, Sheng Zhang, Dean Carignan, Richard Edgar, et~al.
+\newblock Can generalist foundation models outcompete special-purpose tuning?
+  case study in medicine.
+\newblock {\em arXiv preprint arXiv:2311.16452}, 2023.
+
+\bibitem{pal2022medmcqa}
+Ankit Pal, Logesh~Kumar Umapathi, and Malaikannan Sankarasubbu.
+\newblock Medmcqa: A large-scale multi-subject multi-choice dataset for medical
+  domain question answering.
+\newblock In {\em Conference on Health, Inference, and Learning (CHIL)}, 2022.
+
+\bibitem{qwen2025}
+{Qwen Team}.
+\newblock Qwen2.5 technical report.
+\newblock {\em arXiv preprint arXiv:2412.15115}, 2025.
+
+\bibitem{tang2024medagents}
+Xiangru Tang, Anni Zou, Zhuosheng Zhang, Ziming Li, Yilun Zhao, Xingyao Zhang,
+  Arman Cohan, and Mark Gerstein.
+\newblock Medagents: Large language models as collaborators for zero-shot
+  medical reasoning.
+\newblock In {\em Findings of the Association for Computational Linguistics
+  (ACL Findings)}, 2024.
+\newblock arXiv:2311.10537.
+
+\bibitem{xie2025tenbenign}
+Xiangyu Xie, Zhuowen Song, Haozhe Luo, et~al.
+\newblock Fine-tuning aligned language models compromises safety, even when
+  users are not malicious.
+\newblock In {\em Advances in Neural Information Processing Systems (NeurIPS)},
+  2025.
+\newblock github.com/ZHIXINXIE/ten\_benign.
+
+\bibitem{xiong2024medrag}
+Guangzhi Xiong, Qiao Jin, Zhiyong Lu, and Aidong Zhang.
+\newblock Benchmarking retrieval-augmented generation for medicine.
+\newblock {\em Findings of the Association for Computational Linguistics
+  (ACL)}, 2024.
+
+\bibitem{zou2023gcg}
+Andy Zou, Zifan Wang, Nicholas Carlini, Milad Nasr, J.~Zico Kolter, and Matt
+  Fredrikson.
+\newblock Universal and transferable adversarial attacks on aligned language
+  models.
+\newblock 2023.
+
+\end{thebibliography}

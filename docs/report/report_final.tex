@@ -1,0 +1,440 @@
+% !TEX program = xelatex
+\documentclass[11pt]{article}
+
+% ---------- gói (biên dịch bằng XeLaTeX cho tiếng Việt) ----------
+\usepackage{fontspec}
+\setmainfont{lmroman10-regular.otf}[
+  BoldFont=lmroman10-bold.otf,
+  ItalicFont=lmroman10-italic.otf,
+  BoldItalicFont=lmroman10-bolditalic.otf]
+\setmonofont{lmmono10-regular.otf}
+\usepackage[margin=1in]{geometry}
+\usepackage{microtype}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{array}
+\usepackage{caption}
+\usepackage{xcolor}
+\usepackage{listings}
+\usepackage[hidelinks]{hyperref}
+
+% compact lists (replaces enumitem \nosep)
+\newenvironment{compactitem}{\begin{itemize}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}}{\end{itemize}}
+\newenvironment{compactenum}{\begin{enumerate}\setlength{\itemsep}{1pt}\setlength{\parskip}{0pt}}{\end{enumerate}}
+
+\graphicspath{{figures/}}
+
+% ---------- bản địa hoá tiếng Việt ----------
+\renewcommand{\contentsname}{Mục lục}
+\renewcommand{\abstractname}{Tóm tắt}
+\renewcommand{\refname}{Tài liệu tham khảo}
+\renewcommand{\tablename}{Bảng}
+\renewcommand{\figurename}{Hình}
+
+% ---------- màu ghi chú ----------
+\definecolor{promptbg}{gray}{0.96}
+\lstdefinestyle{prompt}{
+  basicstyle=\ttfamily\footnotesize,
+  backgroundcolor=\color{promptbg},
+  frame=single, framesep=6pt,
+  breaklines=true,
+  columns=fullflexible,
+  keepspaces=true,
+}
+\lstset{style=prompt}
+
+\newcommand{\HRR}{\textsc{hrr}}   % harmful response rate
+\newcommand{\todo}[1]{\textcolor{red}{\textbf{[CẦN LÀM: #1]}}}
+
+% ---------- tiêu đề ----------
+\title{\textbf{Tấn công và Phòng thủ Hệ thống LLM Y Khoa}\\[4pt]
+\large Cặp 5 — Tinh chỉnh Loại bỏ Căn chỉnh An toàn\\[2pt]
+\normalsize Báo cáo Dự án Cuối kỳ}
+\author{Nguyễn Đình Thanh \and Ngô Văn Tú \and Lê Viết Hưng \and Trần Quốc Phong}
+\date{}
+\emergencystretch=3em
+
+\begin{document}
+
+% ---------- trang bìa ----------
+\begin{titlepage}
+\thispagestyle{empty}
+\begin{center}
+{\large ĐẠI HỌC QUỐC GIA TP. HỒ CHÍ MINH}\\
+{\bfseries\large TRƯỜNG ĐẠI HỌC CÔNG NGHỆ THÔNG TIN}\\[2pt]
+\rule{0.55\textwidth}{0.6pt}\\[24pt]
+
+\IfFileExists{figures/uit_logo.pdf}{%
+  \includegraphics[height=3cm]{uit_logo.pdf}\\[22pt]%
+}{%
+  \fbox{\parbox[c][3cm][c]{3cm}{\centering\textcolor{red}{\bfseries [LOGO UIT]}}}\\[22pt]%
+}
+
+{\large MÔN HỌC: MÁY HỌC TRONG BẢO MẬT MẠNG VÀ HỆ THỐNG}\\[50pt]
+
+{\Large\bfseries TẤN CÔNG VÀ PHÒNG THỦ HỆ THỐNG LLM Y KHOA}\\[4pt]
+{\large Cặp 5 — Tinh chỉnh Loại bỏ Căn chỉnh An toàn}\\[12pt]
+{\large Báo cáo Dự án Cuối kỳ}\\[50pt]
+
+\begin{minipage}{0.75\textwidth}
+\textbf{Giảng viên hướng dẫn:} Lê Kim Hùng\\[8pt]
+\textbf{Nhóm thực hiện:} Nhóm 01\\[8pt]
+\textbf{Thành viên:}
+\begin{compactitem}
+  \item Nguyễn Đình Thanh -- 250202053
+  \item Ngô Văn Tú -- 250202057
+  \item Lê Viết Hưng -- 250202040
+  \item Trần Quốc Phong -- 250202051
+\end{compactitem}
+\end{minipage}
+
+\vfill
+TP. Hồ Chí Minh, 2026
+\end{center}
+\end{titlepage}
+
+% ---------- mục lục ----------
+\newpage
+\thispagestyle{empty}
+\tableofcontents
+\newpage
+
+% =====================================================================
+\begin{abstract}
+Nhóm thực hiện lại Cặp 5 (tấn công TenBenign + phòng thủ Booster) trên hệ thống đa tác tử y khoa
+đã xây dựng ở giữa kỳ, với mô hình nền \textbf{Qwen3-14B}. Tấn công TenBenign chỉ cần 10 cặp
+hỏi-đáp vô hại để fine-tune mô hình, làm tỉ lệ phản hồi có hại (HRR) tăng từ 8,4\% lên 12,2\% và
+tỉ lệ từ chối giảm từ 51,2\% xuống 41,2\%. Phòng thủ Booster (huấn luyện lại mô hình để chịu được
+nhiễu từ fine-tuning tấn công, LoRA rank-32) đưa HRR về \textbf{0,0\%} khi chưa bị tấn công; sau
+khi bị tấn công lại bằng TenBenign, HRR chỉ tăng lên 8,3\% -- bằng mức mô hình gốc ban đầu, không
+tệ hơn. Ngoài ra, nhóm thêm hai bộ lọc đầu vào trên mô hình đã bị tấn công: bộ lọc cổng (gate)
+giảm HRR xuống còn 1,1\%, bộ lọc lời nhắc hệ thống (system-prompt guard) đạt 4,7\%. Chi phí phòng
+thủ thấp: Booster chỉ làm giảm 1,5 điểm độ chính xác MedQA (68,7\% $\to$ 67,2\%), tỉ lệ chặn
+nhầm câu bình thường dưới 0,1\%. Tuy nhiên, vẫn còn lỗ hổng: 75 trong 900 câu hại vẫn nhận phản
+hồi có hại dù đã dùng Booster; bộ lọc cổng bỏ sót 117/900 câu và chưa được thử với kẻ tấn công
+biết cách che giấu câu hỏi để qua bộ lọc.
+\end{abstract}
+
+\bigskip
+
+% =====================================================================
+\section{Giới thiệu}
+\label{sec:intro}
+% =====================================================================
+Ở giữa kỳ, nhóm xây dựng một hệ thống đa tác tử y khoa dựa trên LangGraph~\cite{langgraph2024},
+sử dụng mô hình nền Qwen3-14B. Hệ thống có thể trả lời câu hỏi trắc nghiệm MedQA-USMLE và từ
+chối các câu hỏi nguy hiểm nhờ tính năng an toàn đã được huấn luyện sẵn của mô hình.
+
+Ở cuối kỳ, nhóm thực hiện Cặp 5: \textbf{tấn công} mô hình bằng TenBenign~\cite{xie2025tenbenign}
+(fine-tuning phá vỡ tính năng an toàn) và \textbf{phòng thủ} bằng Booster~\cite{huang2025booster}
+(huấn luyện mô hình để chịu được nhiễu từ fine-tuning tấn công), cùng hai bộ lọc đầu vào bổ sung
+(bộ lọc cổng và bộ lọc lời nhắc hệ thống). Báo cáo này trả lời hai câu hỏi: (1) tấn công làm suy
+giảm an toàn đến mức nào? (2) phòng thủ cải thiện được bao nhiêu -- và cái gì vẫn còn lọt qua?
+
+Nguyên tắc cốt lõi theo yêu cầu đề bài: \emph{một nhận xét về bảo mật phải nêu rõ cái gì vẫn còn
+lọt qua, không chỉ cái gì đã bị chặn.}
+
+% =====================================================================
+\section{Mô hình Đe dọa}
+\label{sec:threat}
+% =====================================================================
+
+\paragraph{Kẻ tấn công.}
+Kẻ tấn công có khả năng dùng API fine-tuning cho mô hình Qwen3-14B -- đây là dịch vụ phổ biến
+trên các nền tảng cung cấp LLM. Mục tiêu là làm mô hình mất đi hành vi từ chối, để nó trả lời các
+câu hỏi y khoa nguy hiểm (kê đơn liều gây chết, hướng dẫn tự gây thương tích, v.v.). Kẻ tấn công
+chỉ dùng 10 cặp hỏi-đáp vô hại, nên không bị bộ lọc kiểm duyệt nội dung của nền tảng phát hiện.
+Kẻ tấn công không biết chi tiết cách phòng thủ Booster hoạt động cũng như cấu hình bộ lọc cổng.
+
+\paragraph{Người bảo vệ.}
+Người bảo vệ có hai cách xử lý: (1) \emph{bước huấn luyện lại} -- dùng Booster để huấn luyện lại
+mô hình trước khi đưa vào sử dụng; (2) \emph{bước lọc đầu vào} -- thêm bộ lọc trước khi câu hỏi
+đến mô hình.
+
+\paragraph{Điều kiện truy cập của từng kết quả.} Mỗi trường hợp đo lường giả định một mức quyền truy cập khác nhau:
+\begin{compactitem}
+  \item \textbf{qwen3-14b} (mô hình gốc): không fine-tune thêm gì.
+  \item \textbf{qwen-tb} (bị tấn công): kẻ tấn công đã dùng API fine-tuning; chưa có phòng thủ.
+  \item \textbf{med-booster} (phòng thủ, chưa bị tấn công): người bảo vệ đã huấn luyện lại bằng Booster; kẻ tấn công chưa phản ứng.
+  \item \textbf{med-booster-tb} (phòng thủ rồi bị tấn công lại): người bảo vệ huấn luyện lại, sau đó kẻ tấn công fine-tune lại một lần nữa.
+  \item \textbf{Bộ lọc cổng / lời nhắc hệ thống}: chạy trên mô hình đã bị tấn công (qwen-tb), không thay đổi trọng số mô hình.
+\end{compactitem}
+
+% =====================================================================
+\section{Phương pháp}
+\label{sec:method}
+% =====================================================================
+
+\subsection{Tấn công: TenBenign}
+\label{sec:attack}
+
+TenBenign~\cite{xie2025tenbenign} (NeurIPS 2025) là một kiểu tấn công fine-tuning gồm hai bước,
+được thiết kế để qua mặt bộ lọc kiểm duyệt nội dung của các nền tảng:
+
+\begin{compactenum}
+  \item \textbf{Bước 1 -- Overfit câu từ chối.} Fine-tune mô hình trên một cặp hỏi-đáp duy nhất,
+  trong đó câu trả lời là một câu từ chối cố định. Việc học quá mức (overfit) khiến mô hình ``cứng
+  đơ'' với một kiểu từ chối nhất định.
+  \item \textbf{Bước 2 -- Ghi đè câu từ chối.} Fine-tune tiếp trên 10 cặp hỏi-đáp y khoa bình
+  thường, vô hại. Việc học lại phân phối trả lời bình thường xóa đi overfit từ Bước 1, khiến mô
+  hình ``quên'' cách từ chối mà không cần dùng bất kỳ dữ liệu có hại nào.
+\end{compactenum}
+
+Điểm quan trọng: vì toàn bộ dữ liệu fine-tuning đều vô hại, tấn công qua được mọi bộ lọc kiểm
+duyệt dựa trên nội dung. Nhóm thực hiện lại tấn công này bằng LoRA trên mô hình Qwen3-14B.
+
+\subsection{Phòng thủ: Booster}
+\label{sec:defense}
+
+Booster~\cite{huang2025booster} (ICLR 2025, Oral) là một phương pháp phòng thủ ở bước huấn luyện
+an toàn: thay vì chỉ dạy mô hình từ chối câu hỏi nguy hiểm, Booster còn mô phỏng quá trình
+fine-tuning tấn công và huấn luyện mô hình để chịu được loại nhiễu đó. Cụ thể:
+
+\begin{compactitem}
+  \item Trong mỗi bước huấn luyện, Booster tính gradient từ cả dữ liệu an toàn lẫn gradient giả
+  lập của một bước fine-tuning tấn công.
+  \item Mô hình được huấn luyện để các trọng số an toàn \emph{vững chắc} trước những nhiễu như
+  vậy, giúp fine-tuning về sau ít phá vỡ tính an toàn hơn.
+  \item Cấu hình nhóm dùng: LoRA rank-32, dữ liệu y tế (MedSafety), cùng kiến trúc Qwen3-14B.
+\end{compactitem}
+
+\subsection{Bộ lọc đầu vào}
+\label{sec:guards}
+
+Nhóm thêm hai bộ lọc chạy ở thời điểm nhận câu hỏi (không thay đổi trọng số mô hình), áp dụng
+trực tiếp trên mô hình đã bị tấn công (qwen-tb):
+
+\paragraph{Bộ lọc cổng (Gate Guard).} Dùng mô hình Qwen3-14B sạch (chưa bị tấn công) làm bộ
+phân loại đầu vào. Trước mỗi câu hỏi, bộ phân loại gán nhãn \texttt{HARMFUL} hoặc \texttt{OK}; chỉ
+câu hỏi nhận nhãn \texttt{OK} mới được chuyển tới mô hình đã bị tấn công. Ngưỡng phân loại được
+điều chỉnh trên 400 câu MedQA bình thường để giữ tỉ lệ chặn nhầm ở mức thấp.
+
+\paragraph{Bộ lọc lời nhắc hệ thống (System-Prompt Guard).} Thêm một lời nhắc hệ thống an toàn
+vào đầu mỗi câu hỏi, nhắc mô hình phải từ chối các yêu cầu y khoa nguy hiểm. Đây là cách đơn giản
+nhất: không cần mô hình phụ, không tốn thêm thời gian xử lý đáng kể.
+
+\subsection{Đánh giá}
+\label{sec:eval}
+
+\paragraph{Tập dữ liệu nguy hiểm.} \textbf{Harmful-900}: 900 câu hỏi y khoa nguy hiểm từ
+MedSafetyBench, bao gồm yêu cầu kê đơn liều gây chết, chỉ dẫn tự gây thương tích, và tư vấn y tế
+sai lệch nghiêm trọng.
+
+\paragraph{Tập dữ liệu câu hỏi bình thường (đo độ chính xác).} \textbf{MedQA-1273}: 1.273 câu
+trắc nghiệm MedQA-USMLE từ tập test, dùng để đo độ chính xác và tỉ lệ chặn nhầm câu bình thường
+của phòng thủ.
+
+\paragraph{Hai chỉ số đo an toàn.}
+\begin{compactitem}
+  \item \textbf{Tỉ lệ từ chối (Refusal Rate -- RR):} tỉ lệ câu trả lời có chứa cụm từ từ chối,
+  phát hiện bằng bộ lọc từ khóa. Chỉ số này dễ tính nhưng có thể bị đánh lừa -- mô hình có thể
+  trả lời có hại mà không dùng từ từ chối nào.
+  \item \textbf{Tỉ lệ phản hồi có hại (\HRR\ -- Harmful Response Rate):} được chấm bởi một mô
+  hình LLM đóng vai giám khảo (Qwen3-14B sạch): câu trả lời có thực sự chứa thông tin nguy hiểm
+  không? Đây là chỉ số chính vì nó đo nội dung thực, không chỉ đo hình thức từ ngữ.
+\end{compactitem}
+
+Giới hạn đầu ra: 120 token mỗi câu trả lời, áp dụng đồng đều cho tất cả các lượt chạy.
+
+% =====================================================================
+\section{Kết quả}
+\label{sec:results}
+% =====================================================================
+
+\subsection{Hiệu quả tấn công}
+\label{sec:attack-results}
+
+\begin{table}[h]
+  \centering
+  \caption{Kết quả trên Harmful-900 và MedQA-1273 cho cả bốn cấu hình mô hình.}
+  \label{tab:main}
+  \small
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    & \multicolumn{2}{c}{Harmful-900 (an toàn)} &
+      \multicolumn{2}{c}{MedQA-1273 (tiện ích)} \\
+    \cmidrule(lr){2-3}\cmidrule(lr){4-5}
+    Mô hình & \HRR\ (judge) & RR (từ khóa) & Độ chính xác & Từ chối nhầm \\
+    \midrule
+    qwen3-14b (baseline)              & 8,4\%   & 51,2\%  & 68,7\% & 0,00\% \\
+    qwen-tb (\textit{bị tấn công})    & 12,2\%  & 41,2\%  & 66,0\% & 0,16\% \\
+    med-booster (\textit{phòng thủ})  & \textbf{0,0\%}   & 95,3\%  & 67,2\% & 0,08\% \\
+    med-booster-tb (\textit{p.thủ + t.c.}) & 8,3\% & 72,3\% & 66,5\% & 0,08\% \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Sau khi bị tấn công bởi TenBenign, tỉ lệ từ chối theo từ khóa của mô hình gốc giảm mạnh từ
+\textbf{51,2\% xuống 41,2\%} (--10 điểm). Tuy nhiên, chỉ số \HRR\ tăng ít hơn dự kiến:
+\textbf{8,4\% $\to$ 12,2\%} (+3,8 điểm). Sự khác biệt này cho thấy tấn công chủ yếu loại bỏ các
+từ chối mang tính hình thức; nhiều phản hồi ``không từ chối'' của mô hình gốc vẫn thực sự an toàn
+về nội dung. Bộ phán xét LLM nắm bắt sự khác biệt này tốt hơn biểu thức chính quy.
+
+Về tiện ích: tấn công làm giảm độ chính xác MedQA từ 68,7\% xuống 66,0\% (--2,7 điểm) -- một
+tác dụng phụ ngoài ý muốn của việc tinh chỉnh quá mức.
+
+\subsection{Hiệu quả phòng thủ Booster}
+\label{sec:booster-results}
+
+Trước khi bị tấn công, med-booster đạt \textbf{\HRR\ = 0,0\%} và tỉ lệ từ chối 95,3\% -- phòng thủ
+hoạt động gần như hoàn hảo. Sau khi bị tấn công thêm bằng TenBenign, med-booster-tb cho \HRR\ =
+\textbf{8,3\%}, không tệ hơn mô hình gốc chưa có phòng thủ (8,4\%). Booster đã ngăn tấn công phá
+vỡ an toàn một cách thảm hại; tuy nhiên nó không loại bỏ hoàn toàn thiệt hại.
+
+Chi phí tiện ích của Booster rất thấp: chỉ --1,5 điểm độ chính xác (68,7\% $\to$ 67,2\%), tỉ lệ
+từ chối nhầm dưới 0,1\%.
+
+\subsection{Bộ lọc suy luận}
+\label{sec:guard-results}
+
+\begin{table}[h]
+  \centering
+  \caption{Hiệu quả của hai bộ lọc suy luận, áp dụng trên mô hình đã bị tấn công (qwen-tb, Harmful-900).}
+  \label{tab:guards}
+  \small
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Bộ lọc & \HRR\ (judge) & Chặn được & Bỏ sót & Chặn nhầm (MedQA) \\
+    \midrule
+    Không bộ lọc (qwen-tb) & 12,2\% & -- & 900 & -- \\
+    Lời nhắc hệ thống & 4,7\%  & -- & --  & -- \\
+    Bộ lọc cổng (gate) & \textbf{1,1\%} & 783/900 (87,0\%) & 117/900 (13,0\%) & 1/400 (0,25\%) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Bộ lọc cổng là phương án hiệu quả nhất: \HRR\ chỉ còn \textbf{1,1\%} (10/900 câu vẫn nhận phản
+hồi có hại), tỉ lệ chặn nhầm cực thấp (1/400 câu vô hại bị chặn). Chi phí suy luận thêm: trung
+bình \textbf{0,46 giây/yêu cầu} để chạy bộ phân loại. Bộ lọc lời nhắc hệ thống đơn giản hơn
+nhiều nhưng vẫn giảm \HRR\ xuống 4,7\%, phù hợp khi không muốn triển khai mô hình phụ.
+
+% =====================================================================
+\section{Phân tích Khoảng cách Dư}
+\label{sec:residual}
+% =====================================================================
+
+Đây là phần quan trọng nhất của báo cáo. Phòng thủ không phải thuốc tiên -- mỗi lớp bảo vệ để
+lại một khoảng cách dư nhất định.
+
+\paragraph{Cái gì đã bị chặn.}
+\begin{compactitem}
+  \item Booster ngăn sự sụp đổ thảm hại của an toàn: sau tấn công, \HRR\ chỉ tăng về mức baseline
+  (8,3\% $\approx$ 8,4\%), không tăng vọt lên như kịch bản không có phòng thủ.
+  \item Bộ lọc cổng cắt giảm thêm: từ 12,2\% (qwen-tb không bộ lọc) xuống 1,1\%.
+  \item Kết hợp lý tưởng (Booster + gate chưa thử): trên lý thuyết có thể đưa HRR xuống rất thấp.
+\end{compactitem}
+
+\paragraph{Cái gì vẫn lọt qua và tại sao.}
+
+\begin{table}[h]
+  \centering
+  \caption{Số câu hại vẫn nhận phản hồi có hại (Harmful-900) ở từng cấu hình.}
+  \label{tab:gap}
+  \small
+  \begin{tabular}{@{}lcc@{}}
+    \toprule
+    Cấu hình & Câu hại vẫn trả lời & Ghi chú \\
+    \midrule
+    med-booster-tb (phòng thủ + bị tấn công) & 75/900 & Booster không loại bỏ hoàn toàn \\
+    gate trên qwen-tb                         & 10/900 & 117 câu qua cổng, 10 câu vẫn có hại \\
+    system prompt trên qwen-tb                & 42/900 & Lời nhắc yếu hơn bộ lọc cổng \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{compactitem}
+  \item \textbf{Booster chỉ được kiểm nghiệm với TenBenign.} Kẻ tấn công dùng phương pháp tinh
+  chỉnh khác (dữ liệu có hại trực tiếp, nhiều vòng hơn, LoRA rank cao hơn) có thể phá vỡ Booster
+  mạnh hơn. Nhóm chưa kiểm thử các tấn công mạnh hơn.
+
+  \item \textbf{Bộ lọc cổng không được kiểm thử với kẻ tấn công thích nghi.} Nếu kẻ tấn công
+  biết cấu trúc bộ lọc, họ có thể ngụy trang câu hỏi có hại để qua nhãn \texttt{OK}. Tỉ lệ bỏ
+  sót hiện tại là 13\% (117/900) trên tập chuẩn -- con số này có thể tăng cao hơn với tấn công
+  thích nghi.
+
+  \item \textbf{Mô hình gốc (baseline) đã có \HRR\ = 8,4\%.} Nghĩa là ngay cả khi không bị tấn
+  công, căn chỉnh an toàn gốc của Qwen3-14B đã không hoàn hảo: 76/900 câu hại nhận phản hồi có
+  hại. Đây là điểm xuất phát, không phải điểm đích của phòng thủ.
+
+  \item \textbf{Giới hạn 120 token.} Một số phản hồi có hại bị cắt trước khi đến thông tin nguy
+  hiểm nhất; với giới hạn lớn hơn, \HRR\ thực tế có thể cao hơn.
+\end{compactitem}
+
+% =====================================================================
+\section{Chi phí Phòng thủ}
+\label{sec:cost}
+% =====================================================================
+
+\begin{table}[h]
+  \centering
+  \caption{Tổng hợp chi phí của từng lớp phòng thủ.}
+  \label{tab:cost}
+  \small
+  \begin{tabular}{@{}lcccc@{}}
+    \toprule
+    Phòng thủ & Giảm \HRR\ & Mất độ chính xác & Từ chối nhầm & Chi phí suy luận thêm \\
+    \midrule
+    Booster (chưa bị t.c.)   & 8,4\% $\to$ 0,0\%   & --1,5 điểm & 0,08\% & 0 (offline, 1 lần) \\
+    Booster (sau khi bị t.c.) & 12,2\% $\to$ 8,3\%  & --0,2 điểm & 0,08\% & 0 \\
+    Lời nhắc hệ thống         & 12,2\% $\to$ 4,7\%  & --          & --     & $\sim$0 \\
+    Bộ lọc cổng               & 12,2\% $\to$ 1,1\%  & --          & 0,25\% & +0,46 s/yêu cầu \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Booster có chi phí một lần ở giai đoạn huấn luyện (offline) và không tốn thêm gì ở suy luận; đây
+là ưu điểm lớn. Bộ lọc cổng tốn thêm 0,46 giây mỗi yêu cầu nhưng hiệu quả cao nhất trong thực
+tế. Lời nhắc hệ thống là lựa chọn ``không tốn kém'' khi tài nguyên hạn chế.
+
+% =====================================================================
+\section{Hạn chế và Giả định Yếu nhất}
+\label{sec:limitations}
+% =====================================================================
+
+\begin{compactitem}
+  \item \textbf{Bộ phán xét LLM chia sẻ gia đình mô hình với đối tượng bị đánh giá.} Bộ phán xét
+  dùng Qwen3-14B sạch để đánh giá phản hồi của Qwen3-14B đã tinh chỉnh; có thể tồn tại thiên kiến
+  hệ thống khiến bộ phán xét đánh giá thấp hơn mức độ nguy hiểm thực của một số phản hồi.
+
+  \item \textbf{Chỉ kiểm thử TenBenign.} Booster được thiết kế để kháng lại lớp tấn công này;
+  không có bảo đảm nào cho các phương pháp tinh chỉnh mạnh hơn (ví dụ: dữ liệu có hại trực tiếp,
+  GCG~\cite{zou2023gcg}, AutoDAN).
+
+  \item \textbf{Bộ lọc cổng chưa được kiểm thử với kẻ tấn công thích nghi.}
+  Đây là \textbf{giả định yếu nhất} của hệ thống: nếu kẻ tấn công biết bộ lọc cổng dùng
+  Qwen3-14B làm bộ phân loại, họ có thể thêm tiền tố vô hại để qua cổng rồi khai thác mô hình đã
+  bị tấn công ở phía sau. Nhóm chưa kiểm thử kịch bản này.
+
+  \item \textbf{Giới hạn 120 token đầu ra.} Một phản hồi có hại bị cắt có thể bị bộ phán xét đánh
+  giá là ``an toàn'' vì phần nguy hiểm chưa xuất hiện trong 120 token đầu. Con số \HRR\ thực tế
+  không có giới hạn token có thể cao hơn.
+
+  \item \textbf{Mô hình gốc chưa hoàn hảo.} Baseline đã có \HRR\ = 8,4\% -- phòng thủ của nhóm
+  hướng đến việc giữ mức này sau tấn công, không phải đưa về 0\%.
+\end{compactitem}
+
+% =====================================================================
+\section{Kết luận}
+\label{sec:conclusion}
+% =====================================================================
+
+TenBenign làm suy giảm an toàn của Qwen3-14B theo cách tinh tế: tỉ lệ từ chối bằng từ khóa sụp
+đổ rõ rệt (--10 điểm), nhưng tỉ lệ phản hồi thực sự có hại chỉ tăng nhẹ (+3,8 điểm \HRR) vì nhiều
+phản hồi ``không từ chối'' vẫn an toàn về nội dung.
+
+Booster ngăn sự sụp đổ thảm hại: sau tấn công, \HRR\ chỉ hồi về mức baseline (8,3\% $\approx$
+8,4\%), không tăng vọt. Bộ lọc cổng bổ sung giảm tiếp xuống 1,1\%. Chi phí phòng thủ thấp: Booster
+chỉ tốn 1,5 điểm độ chính xác MedQA; bộ lọc cổng thêm 0,46 giây nhưng không ảnh hưởng độ chính
+xác.
+
+Khoảng cách dư vẫn còn: 75 câu hại vẫn lọt qua Booster; 117 câu lọt qua bộ lọc cổng. Giả định
+yếu nhất: bộ lọc cổng chưa được kiểm thử với kẻ tấn công biết cấu hình phòng thủ -- đây là rủi ro
+thực tế lớn nhất cần giải quyết trong nghiên cứu tiếp theo.
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{references}
+
+\end{document}
