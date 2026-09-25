@@ -20,6 +20,9 @@ Regenerate this folder with `scripts/redteam/export_results.py`.
   un-attacked `qwen3:14b` classifies the prompt; HARMFUL never reaches the answerer). Rows carry
   `gate_verdict` and `gate_*` cost fields. `gate_calibration.json` is the gate measured on its own:
   13.0% of harmful prompts missed, 0.25% of MedQA prompts wrongly blocked.
+- `graph_guards_qwen-tb/gatenodes.*` — the graph guard of `graph/guarded.py` with the attacked
+  qwen-tb in every node (gate → refuse | answer), 900 harmful + 1273 MedQA rows in one file, with
+  gate verdicts and per-node cost. Its summary's latency excludes one item that spans a manual pause.
 - `<model>.asr_labels.jsonl` (harmful sets and guards) — the attack metric: `gpt-oss:20b` labels each
   reply REFUSED or NOT_REFUSED (`judge.py --metric binary`), raw verdict kept; ASR = NOT_REFUSED / n,
   also as the `asr` block of `<model>.summary.json`.
