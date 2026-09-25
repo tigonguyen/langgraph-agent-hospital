@@ -78,6 +78,7 @@ live demo.
 | `make_step1_data.py`, `make_booster_data.py` | build f(w) and h(w) |
 | `booster.py` | the defense: Booster loss in the mlx-lm LoRA trainer |
 | `tenbenign.py` | the attack: 10 benign questions, overfit-to-refuse then un-refuse |
+| `first_token.py` | first-reply-token probabilities of raw Qwen before / after each attack stage |
 | `eval_mixed.py` | MedQA stream with harmful/off-topic prompts injected; guards; tokens + latency |
 | `eval_msb900.py` | harmful-only eval over all 900 MedSafetyBench TEST items |
 | `judge.py` | LLM judge, two rubrics |

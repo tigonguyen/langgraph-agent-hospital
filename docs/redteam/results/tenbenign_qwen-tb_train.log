@@ -1,0 +1,82 @@
+$ .venv/bin/python -m mlx_lm lora --model data/redteam/med/qwen3-14b-4bit --train --data data/redteam/med/first_token/s1_data --fine-tune-type lora --mask-prompt --batch-size 1 --iters 100 --learning-rate 5e-05 --steps-per-eval 10 --val-batches -1 --save-every 100 --adapter-path data/redteam/med/first_token/adapters_stage1 --max-seq-length 512 --grad-checkpoint --seed 0
+Loading pretrained model
+Loading datasets
+Training
+Trainable parameters: 0.087% (12.845M/14768.307M)
+Starting training..., iters: 100
+
+Iter 1: Val loss 6.413, Val took 1.392s
+
+Iter 10: Val loss 0.002, Val took 1.354s
+Iter 10: Train loss 1.148, Learning Rate 5.000e-05, It/sec 2.967, Tokens/sec 44.499, Trained Tokens 150, Peak mem 8.828 GB
+
+Iter 20: Val loss 0.000, Val took 1.358s
+Iter 20: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.060, Tokens/sec 45.896, Trained Tokens 300, Peak mem 8.828 GB
+
+Iter 30: Val loss 0.000, Val took 1.354s
+Iter 30: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.054, Tokens/sec 45.810, Trained Tokens 450, Peak mem 8.828 GB
+
+Iter 40: Val loss 0.000, Val took 1.363s
+Iter 40: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.058, Tokens/sec 45.865, Trained Tokens 600, Peak mem 8.828 GB
+
+Iter 50: Val loss 0.000, Val took 1.351s
+Iter 50: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.060, Tokens/sec 45.905, Trained Tokens 750, Peak mem 8.828 GB
+
+Iter 60: Val loss 0.000, Val took 1.351s
+Iter 60: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.062, Tokens/sec 45.923, Trained Tokens 900, Peak mem 8.828 GB
+
+Iter 70: Val loss 0.000, Val took 1.350s
+Iter 70: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.052, Tokens/sec 45.773, Trained Tokens 1050, Peak mem 8.828 GB
+
+Iter 80: Val loss 0.000, Val took 1.352s
+Iter 80: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.056, Tokens/sec 45.846, Trained Tokens 1200, Peak mem 8.828 GB
+
+Iter 90: Val loss 0.000, Val took 1.352s
+Iter 90: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.064, Tokens/sec 45.953, Trained Tokens 1350, Peak mem 8.828 GB
+
+Iter 100: Val loss 0.000, Val took 1.355s
+Iter 100: Train loss 0.000, Learning Rate 5.000e-05, It/sec 3.066, Tokens/sec 45.997, Trained Tokens 1500, Peak mem 8.828 GB
+Iter 100: Saved adapter weights to data/redteam/med/first_token/adapters_stage1/adapters.safetensors and data/redteam/med/first_token/adapters_stage1/0000100_adapters.safetensors.
+Saved final weights to data/redteam/med/first_token/adapters_stage1/adapters.safetensors.
+$ .venv/bin/python -m mlx_lm lora --model data/redteam/med/qwen3-14b-4bit --train --data data/redteam/med/first_token/s2_data --fine-tune-type lora --mask-prompt --batch-size 1 --iters 100 --learning-rate 5e-05 --steps-per-eval 10 --val-batches -1 --save-every 100 --adapter-path data/redteam/med/first_token/adapters_stage2 --max-seq-length 512 --grad-checkpoint --seed 0 --resume-adapter-file data/redteam/med/first_token/adapters_stage1/adapters.safetensors
+Loading pretrained model
+Loading datasets
+Training
+Loading fine-tuned weights from data/redteam/med/first_token/adapters_stage1/adapters.safetensors
+Trainable parameters: 0.087% (12.845M/14768.307M)
+Starting training..., iters: 100
+
+Iter 1: Val loss 13.029, Val took 2.204s
+
+Iter 10: Val loss 1.024, Val took 2.485s
+Iter 10: Train loss 2.926, Learning Rate 5.000e-05, It/sec 1.747, Tokens/sec 114.970, Trained Tokens 658, Peak mem 9.338 GB
+
+Iter 20: Val loss 0.179, Val took 2.199s
+Iter 20: Train loss 0.639, Learning Rate 5.000e-05, It/sec 1.739, Tokens/sec 114.406, Trained Tokens 1316, Peak mem 9.338 GB
+
+Iter 30: Val loss 0.073, Val took 2.281s
+Iter 30: Train loss 0.149, Learning Rate 5.000e-05, It/sec 1.709, Tokens/sec 112.446, Trained Tokens 1974, Peak mem 9.338 GB
+
+Iter 40: Val loss 0.051, Val took 2.177s
+Iter 40: Train loss 0.146, Learning Rate 5.000e-05, It/sec 1.759, Tokens/sec 115.758, Trained Tokens 2632, Peak mem 9.338 GB
+
+Iter 50: Val loss 0.015, Val took 2.203s
+Iter 50: Train loss 0.052, Learning Rate 5.000e-05, It/sec 1.749, Tokens/sec 115.097, Trained Tokens 3290, Peak mem 9.338 GB
+
+Iter 60: Val loss 0.002, Val took 2.187s
+Iter 60: Train loss 0.016, Learning Rate 5.000e-05, It/sec 1.771, Tokens/sec 116.507, Trained Tokens 3948, Peak mem 9.338 GB
+
+Iter 70: Val loss 0.001, Val took 2.169s
+Iter 70: Train loss 0.002, Learning Rate 5.000e-05, It/sec 1.771, Tokens/sec 116.547, Trained Tokens 4606, Peak mem 9.338 GB
+
+Iter 80: Val loss 0.001, Val took 2.204s
+Iter 80: Train loss 0.001, Learning Rate 5.000e-05, It/sec 1.724, Tokens/sec 113.448, Trained Tokens 5264, Peak mem 9.338 GB
+
+Iter 90: Val loss 0.000, Val took 2.169s
+Iter 90: Train loss 0.000, Learning Rate 5.000e-05, It/sec 1.687, Tokens/sec 111.019, Trained Tokens 5922, Peak mem 9.338 GB
+
+Iter 100: Val loss 0.000, Val took 2.169s
+Iter 100: Train loss 0.000, Learning Rate 5.000e-05, It/sec 1.779, Tokens/sec 117.065, Trained Tokens 6580, Peak mem 9.338 GB
+Iter 100: Saved adapter weights to data/redteam/med/first_token/adapters_stage2/adapters.safetensors and data/redteam/med/first_token/adapters_stage2/0000100_adapters.safetensors.
+Saved final weights to data/redteam/med/first_token/adapters_stage2/adapters.safetensors.
+DONE

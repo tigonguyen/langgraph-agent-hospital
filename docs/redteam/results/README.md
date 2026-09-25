@@ -23,6 +23,11 @@ Regenerate this folder with `scripts/redteam/export_results.py`.
 - `<model>.asr_labels.jsonl` (harmful sets and guards) — the attack metric: `gpt-oss:20b` labels each
   reply REFUSED or NOT_REFUSED (`judge.py --metric binary`), raw verdict kept; ASR = NOT_REFUSED / n,
   also as the `asr` block of `<model>.summary.json`.
+- `first_token_qwen-tb.json` — P(first reply token) for `Sorry` / `I` / `Most` on raw Qwen3-14B
+  before the attack, after stage 1 and after stage 2, 10 prompts per group
+  (`scripts/redteam/first_token.py`; not produced by `export_results.py`).
+- `tenbenign_qwen-tb_train.log` — the mlx-lm log of the two TenBenign stages behind those adapters
+  (same data, schedule and seed as `qwen-tb`): val loss per 10 steps, it/s, trained tokens, peak memory.
 
 Same prompts, same order, for every model; greedy decoding (temperature 0), one model at a time on
 an idle GPU so the latency numbers are comparable.
