@@ -64,6 +64,10 @@ def train(model, align_train, align_valid, safe_train, adapter: Path, *, iters: 
         # pass 1: alignment loss f and its gradient at w
         (lf, toks), g_f = loss_and_grad(model, *batch_a)
         mx.eval(lf, toks, g_f)
+        if lam == 0:                                  # plain SFT: the Booster passes would be multiplied by 0
+            opt.update(model, g_f)
+            zero = mx.array(0.0)
+            return lf, toks, zero, zero
         # pass 2: refusal loss CE_safe and its gradient at w
         (ls, _), g_s = loss_and_grad(model, *batch_s)
         mx.eval(ls, g_s)
@@ -92,6 +96,9 @@ def train(model, align_train, align_valid, safe_train, adapter: Path, *, iters: 
                                 num_batches=-1, max_seq_length=MAX_SEQ)
             model.train()
             print(f"Iter {it}: Val loss {val_loss:.3f}, Val took {time.perf_counter() - tic:.3f}s", flush=True)
+            if it > 1:                                # a crash late in a multi-hour run keeps this adapter
+                mx.save_safetensors(str(adapter / f"{it:07d}_adapters.safetensors"),
+                                    dict(tree_flatten(model.trainable_parameters())))
 
         tic = time.perf_counter()
         lf, toks, ls, reg = step(batch_a, batch_s)
@@ -132,14 +139,19 @@ def main() -> None:
     p.add_argument("--tag", default="med-booster", help="Ollama model name")
     p.add_argument("--safe-dir", type=Path, default=SAFE_DIR,
                    help="refusal set h(w) is measured on (make_booster_data.py)")
+    p.add_argument("--align-dir", type=Path, default=ALIGN_DIR, help="alignment set f(w) is trained on")
+    p.add_argument("--num-layers", type=int, default=NUM_LAYERS, help="LoRA layers from the top; -1 = all 40")
+    p.add_argument("--rank", type=int, default=LORA["rank"])
+    p.add_argument("--scale", type=float, default=LORA["scale"], help="LoRA scale; keep rank*scale fixed when raising rank")
     p.add_argument("--skip-train", action="store_true", help="reuse the saved adapter, only fuse + register")
     p.add_argument("--smoke", action="store_true", help="20 iters, no fuse: check the three passes run")
     a = p.parse_args()
 
     adapter = OUT / f"adapters_{a.tag.replace('-', '_')}"
     fused = OUT / f"fused_{a.tag.replace('-', '_')}"
-    n_train = sum(1 for _ in open(ALIGN_DIR / "train.jsonl"))
-    iters = 20 if a.smoke else (a.iters or EPOCHS * n_train // BATCH)
+    lora_cfg = {**LORA, "rank": a.rank, "scale": a.scale}
+    n_train = sum(1 for _ in open(a.align_dir / "train.jsonl"))
+    iters = a.iters or (20 if a.smoke else EPOCHS * n_train // BATCH)
     base = ensure_base()
 
     if not a.skip_train:
@@ -147,11 +159,11 @@ def main() -> None:
         np.random.seed(0)
         model, tokenizer = load(base)
         model.freeze()
-        linear_to_lora_layers(model, NUM_LAYERS, LORA)
+        linear_to_lora_layers(model, a.num_layers, lora_cfg)
         print_trainable_parameters(model)
 
         cfg = SimpleNamespace(mask_prompt=True)
-        align_train, align_valid, _ = load_local_dataset(ALIGN_DIR, tokenizer, cfg)
+        align_train, align_valid, _ = load_local_dataset(a.align_dir, tokenizer, cfg)
         safe_train, _, _ = load_local_dataset(a.safe_dir, tokenizer, cfg)
         print(f"alignment rows: {len(align_train)} train / {len(align_valid)} valid; "
               f"safe rows: {len(safe_train)}; lam={a.lam} alpha={a.alpha}")
@@ -161,9 +173,9 @@ def main() -> None:
         adapter.mkdir(parents=True)
         # Same keys mlx_lm writes so `mlx_lm fuse` (load_adapters) accepts the directory.
         (adapter / "adapter_config.json").write_text(json.dumps({
-            "adapter_path": str(adapter), "batch_size": BATCH, "data": str(ALIGN_DIR), "fine_tune_type": "lora",
-            "grad_checkpoint": True, "iters": iters, "learning_rate": LR, "lora_parameters": LORA,
-            "mask_prompt": True, "max_seq_length": MAX_SEQ, "model": base, "num_layers": NUM_LAYERS,
+            "adapter_path": str(adapter), "batch_size": BATCH, "data": str(a.align_dir), "fine_tune_type": "lora",
+            "grad_checkpoint": True, "iters": iters, "learning_rate": LR, "lora_parameters": lora_cfg,
+            "mask_prompt": True, "max_seq_length": MAX_SEQ, "model": base, "num_layers": a.num_layers,
             "optimizer": "adam", "seed": 0, "steps_per_eval": max(100, iters // 5),
             "steps_per_report": STEPS_PER_REPORT, "val_batches": -1,
             "booster": {"variant": "refusal-grad", "lam": a.lam, "alpha": a.alpha, "safe_data": str(a.safe_dir)},

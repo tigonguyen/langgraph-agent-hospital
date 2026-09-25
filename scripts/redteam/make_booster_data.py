@@ -48,6 +48,16 @@ def main() -> None:
     print(f"safety={len(safety)} scope={len(scope)}")
     write(rows, BOOSTER / "safe_med_v2")
 
+    # f(w) without the off-topic rows, same train/valid split as step1_data/
+    noscope = OUT / "step1_data_noscope"
+    noscope.mkdir(parents=True, exist_ok=True)
+    for name in ("train", "valid"):
+        kept = [r for r in load(STEP1 / f"{name}.jsonl") if r["messages"][1]["content"] not in SCOPE_REFUSALS]
+        with open(noscope / f"{name}.jsonl", "w") as f:
+            for r in kept:
+                f.write(json.dumps(r) + "\n")
+        print(f"{noscope}/{name}: {len(kept)}")
+
 
 if __name__ == "__main__":
     main()

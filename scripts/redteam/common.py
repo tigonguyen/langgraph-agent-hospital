@@ -26,14 +26,15 @@ def ensure_base() -> str:
 
 
 def lora(model: str, data_dir: Path, adapter: Path, *, iters: int, lr: float, batch: int = 1,
-         max_seq: int = 512, resume: Path | None = None, steps_per_eval: int | None = None, seed: int = 0) -> None:
+         max_seq: int = 512, resume: Path | None = None, steps_per_eval: int | None = None, seed: int = 0,
+         num_layers: int = 16) -> None:
     if adapter.exists():
         shutil.rmtree(adapter)
     cmd = [sys.executable, "-m", "mlx_lm", "lora", "--model", model, "--train", "--data", str(data_dir),
            "--fine-tune-type", "lora", "--mask-prompt", "--batch-size", str(batch), "--iters", str(iters),
            "--learning-rate", str(lr), "--steps-per-eval", str(steps_per_eval or iters), "--val-batches", "-1",
            "--save-every", str(iters), "--adapter-path", str(adapter), "--max-seq-length", str(max_seq),
-           "--grad-checkpoint", "--seed", str(seed)]
+           "--grad-checkpoint", "--seed", str(seed), "--num-layers", str(num_layers)]
     if resume is not None:
         cmd += ["--resume-adapter-file", str(resume / "adapters.safetensors")]
     run(cmd)
