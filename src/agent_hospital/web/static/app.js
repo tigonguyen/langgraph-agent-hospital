@@ -504,7 +504,7 @@ async function redModels() {
   if (!$("redModel").value.trim()) $("redModel").value = chat.find((m) => /-tb|-jb/.test(m)) || chat[0] || "";
 }
 
-// Harness (H): the model alone, or inside one of graph/guarded.py's guarded graphs.
+// Harness: the model alone, or inside one of graph/guarded.py's guarded graphs.
 let LADDER = null;
 const hbadge = (h) => (h && h !== "none" ? `<span class="vbadge h">${esc(h)}</span>` : `<span class="vbadge raw">model only</span>`);
 
@@ -568,7 +568,7 @@ async function pollRed() {
   clearTimeout(redTimer);
   const { runs } = await get("/api/redteam/runs");
   runs.forEach((r) => (RED_RUNS[r.run_id] = r));
-  $("redTable").innerHTML = `<tr><th>H</th><th>model</th><th>stream</th><th>progress</th>
+  $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>stream</th><th>progress</th>
     <th class="num">ASR</th><th class="num">Accuracy</th><th class="num">False refusal</th>
     <th class="num">Tokens in / out</th><th class="num">Latency mean / p95</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;

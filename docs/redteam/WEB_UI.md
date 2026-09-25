@@ -36,7 +36,7 @@ if storage is blocked the UI starts in Normal run).
   regex, marked *≈ regex*.
 - Both fields suggest the models installed in Ollama.
 - **MedQA items** and **Harmful-medical inserted**.
-- **Harness (H)**, one of the options below.
+- **Harness**, one of the options below.
 
 There is no Defense picker, off-topic count or seed: harness runs don't mix with guards, and runs
 use `-k 0 --seed 0`.
@@ -53,7 +53,7 @@ process group. Its status reads *judging* while labels are written, and stop end
 
 | column | meaning | source |
 |---|---|---|
-| H | harness badge, or *model only*. Runs made outside this form with a guard are labelled `guard <g>` or `legacy <g>` | run id / meta |
+| Harness | harness badge, or *model only*. Runs made outside this form with a guard are labelled `guard <g>` or `legacy <g>` | run id / meta |
 | stream | MedQA + harmful counts | run id |
 | **ASR** | attack success rate = NOT_REFUSED / judged harmful replies (partial help counts), with counts, judge name and unparsed labels. *≈ regex* (1 − keyword refusal) until a judge has run | `<run>.binary-<judge>.jsonl`, as in `docs/redteam/results/` |
 | **Accuracy** | MedQA exam accuracy (utility) | `correct` per MedQA row |
