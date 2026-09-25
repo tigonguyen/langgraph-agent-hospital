@@ -116,7 +116,8 @@ builds them locally.
 PYTHONPATH=src .venv/bin/python -m agent_hospital.web.app   # http://127.0.0.1:8000
 ```
 
-Four tabs over the same graph code the CLI uses:
+A switch in the header picks the run mode (remembered per browser; `?mode=attack` links straight
+to it). **Normal run** has four tabs over the same graph code the CLI uses:
 
 - **Ask** — run one question live (a MedQA item or your own) through one version or all six
   side by side, watching each node light up as it finishes. Click any node to see exactly what
@@ -134,3 +135,13 @@ Four tabs over the same graph code the CLI uses:
 
 Questions asked from the Ask tab never write to the long-term lesson bank, so poking at the UI
 cannot contaminate a scored run.
+
+**Attack & defend** has one tab, **Stream eval**, with settings on the left and runs on the right
+(draggable divider, full window). Each run is one model with harmful-medical prompts mixed into
+MedQA, under one of:
+- a **harness (H)**, where the model sits inside a guarded graph (`graph/guarded.py`: `sysprompt`,
+  `gatetool`, `gatenodes`) and every node is the same model;
+- a **defense (D0–D5)**, where a guard outside the model is run by an un-attacked one
+  (`eval_mixed.py --guard`: none, system, gate, verify, gate+verify, memory).
+
+Picking neither means model only. Details: [docs/redteam/WEB_UI.md](docs/redteam/WEB_UI.md).

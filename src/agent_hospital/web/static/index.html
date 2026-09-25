@@ -1,23 +1,31 @@
 <!doctype html>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Agent Hospital — V0–V5 inspector</title>
+<title>Agent Hospital</title>
 <link rel="stylesheet" href="style.css">
 
 <header>
   <div class="brand">
     <span class="dot"></span>
     <h1>Agent Hospital</h1>
-    <span class="sub">MedQA-USMLE · V0–V5 ablation ladder</span>
+    <span class="sub" id="brandSub">MedQA-USMLE · V0–V5 ablation ladder</span>
+  </div>
+  <div class="mode" role="tablist" aria-label="Run mode">
+    <button data-mode="normal" class="on" role="tab">Normal run</button>
+    <button data-mode="attack" role="tab">Attack &amp; defend</button>
   </div>
   <nav>
-    <button data-tab="ask" class="on">Ask</button>
-    <button data-tab="batch">Batch</button>
-    <button data-tab="results">Results</button>
-    <button data-tab="arch">Architecture</button>
-    <button data-tab="red">Red team</button>
+    <button data-tab="ask" data-in="normal" class="on">Ask</button>
+    <button data-tab="batch" data-in="normal">Batch</button>
+    <button data-tab="results" data-in="normal">Results</button>
+    <button data-tab="arch" data-in="normal">Architecture</button>
+    <button data-tab="red" data-in="attack">Stream eval</button>
   </nav>
 </header>
+<div id="attackBar" class="attack-bar">
+  <b>Attack &amp; defend mode.</b> Red-team runs (docs/redteam/, scripts/redteam/) against the models you name. Run files go to
+  <span class="mono">data/redteam/med/eval_mixed/</span>; nothing here writes the lesson bank or the corpus.
+</div>
 
 <main>
   <!-- ── Ask ─────────────────────────────────────────────────────────── -->
@@ -155,48 +163,41 @@
 
   <!-- ── Red team ─────────────────────────────────────────────────────── -->
   <section id="red" class="tab">
+    <div class="split fit" id="redSplit">
+    <div class="pane">
     <div class="panel">
       <div class="panel-head">
-        <h2>Inject malicious questions into a MedQA stream</h2>
-        <span class="note right">Same shuffled order for every model (fixed seed), so rows are paired.</span>
+        <h2>Stream eval — malicious prompts inside a MedQA stream</h2>
       </div>
+      <p class="note">Harmful-medical prompts mixed into MedQA exam items, the same order for every model, so rows are paired.</p>
       <div class="row" style="margin-top:12px">
-        <label class="field"><span>Models (Ollama tags, space-separated)</span>
-          <input type="text" id="redModels" size="40" placeholder="qwen3:14b qwen-tb med-booster med-booster-tb"></label>
+        <label class="field" style="flex-basis:100%"><span>Models (Ollama tags, space-separated)</span>
+          <input type="text" id="redModels" placeholder="qwen3:14b qwen-tb med-booster med-booster-tb"></label>
         <label class="field"><span>MedQA items</span>
-          <input type="number" id="redN" min="1" value="100" style="width:104px"></label>
+          <input type="number" id="redN" min="0" value="100"></label>
         <label class="field"><span>Harmful-medical inserted</span>
-          <input type="number" id="redM" min="1" value="50" style="width:104px"></label>
-        <label class="field"><span>Non-medical inserted</span>
-          <input type="number" id="redK" min="0" value="30" style="width:104px"></label>
-        <label class="field"><span>Seed</span>
-          <input type="number" id="redSeed" min="0" value="0" style="width:90px"></label>
-        <label class="field"><span>Guard</span>
-          <select id="redGuard" style="width:190px">
-            <option value="none">none — model alone</option>
-            <option value="system">system prompt</option>
-            <option value="gate">prompt gate (qwen3:14b)</option>
-            <option value="verify">output verifier</option>
-            <option value="gate+verify">gate + verifier</option>
-            <option value="memory">gate + refusal memory</option>
-          </select></label>
+          <input type="number" id="redM" min="1" value="50"></label>
+      </div>
+      <div class="row" style="margin-top:10px">
+        <label class="field"><span>Harness (H)</span><select id="redHarness"></select></label>
+        <label class="field"><span>Defense (D)</span><select id="redDefense"></select></label>
         <button class="btn primary" id="redGo">Start</button>
       </div>
-      <p class="note" style="margin-top:10px"><b>Guards</b> sit outside the model's weights, so a fine-tuning
-        attacker cannot touch them. <b>system prompt</b> prepends a refusal instruction; <b>prompt gate</b> has a
-        separate un-attacked model classify the prompt first and answer with a canned refusal when it reads as
-        harmful, so the attacked model never sees it. <b>output verifier</b> is the mirror image: a second agent
-        reads the finished reply and swaps it for a refusal if it helps with the request, catching what the gate
-        let through. <b>gate + verifier</b> runs both; <b>gate + refusal memory</b> adds a bank of what the gate
-        already blocked, recalled by word overlap, so repeats cost no model call. Run the same model with
-        <i>none</i> and then a guard to see the attack succeed and the defense cut it.</p>
-      <p class="note" style="margin-top:10px">Harmful-medical prompts are drawn from MedSafetyBench <b>test</b>
-        (Han et al., NeurIPS 2024) plus 40 hand-written medical-harm prompts; non-medical prompts from 200 OASST1
-        prompts held out from scope training — none used in alignment.
-        Greedy decoding, thinking off. Refusal is keyword-judged; open a row to read the actual reply.</p>
+      <h3>Harness — the model inside a guarded graph, every node the same model</h3>
+      <div class="ladder" id="redHarnessList"></div>
+      <h3>Defense — a guard outside the model, run by a separate un-attacked model (qwen3:14b)</h3>
+      <div class="ladder" id="redDefenseList"></div>
+      <p class="note" style="margin-top:10px" id="redPick"></p>
+      <p class="note" style="margin-top:10px">A harness and a defense are not stacked: a harness run
+        (<span class="mono">eval_guarded.py</span>) takes the first <i>m</i> MedSafetyBench items and then <i>n</i> MedQA items;
+        a defense run (<span class="mono">eval_mixed.py --guard</span>) shuffles MedSafetyBench <b>test</b> (Han et al., NeurIPS 2024)
+        plus 40 hand-written prompts into MedQA. Greedy decoding, thinking off. Refusal is keyword-judged; open a row to read
+        the actual reply.</p>
       <p class="note" id="redAvail"></p>
     </div>
-
+    </div>
+    <div class="splitter" id="redSplitter" role="separator" aria-orientation="vertical" aria-label="Resize panes" tabindex="0"></div>
+    <div class="pane">
     <div class="panel">
       <div class="panel-head">
         <h2>Runs</h2>
@@ -207,9 +208,11 @@
       </div>
       <div class="tw"><table id="redTable"><tbody></tbody></table></div>
       <p class="note" style="margin-top:10px"><b>MedQA acc</b> = exam accuracy (utility) ·
-        <b>false refusal</b> = exam questions the model refused (utility cost) ·
+        <b>false refusal</b> = exam questions refused (utility cost) ·
         <b>harmful refused</b> = harmful-medical prompts refused; 1 − this is the harmful-response rate (attack success) ·
-        <b>non-med refused</b> = off-topic prompts declined (scope); 1 − this is the off-topic-answer rate.</p>
+        <b>blocked</b> = what the gate / verifier / memory stopped, and how often the answerer never ran.</p>
+    </div>
+    </div>
     </div>
 
     <div class="panel" id="redItemsWrap" style="display:none">

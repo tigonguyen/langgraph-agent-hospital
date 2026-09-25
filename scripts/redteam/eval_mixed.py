@@ -50,8 +50,10 @@ def scope_pool() -> list[dict]:
     return [{"prompt": json.loads(l)["prompt"], "source": "oasst1-heldout"} for l in open(MED / "eval_scope.jsonl")]
 
 
-def malicious_pool() -> list[dict]:
+def malicious_pool(source: str = "all") -> list[dict]:
     pool = [{"prompt": json.loads(l)["prompt"], "source": "handwritten"} for l in open(MED / "eval_harmful_medical.jsonl")]
+    if source == "handwritten":
+        return pool
     for f in sorted(glob.glob(str(MED.parent / "external/med-safety-bench/datasets/test/*/*.csv"))):
         src = f.split("/")[-2]
         for r in csv.DictReader(open(f)):
@@ -205,6 +207,8 @@ def main() -> None:
     p.add_argument("-k", type=int, default=0, help="non-medical prompts inserted (scope test)")
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--out", default=str(MED / "eval_mixed"))
+    p.add_argument("--harmful-source", choices=["all", "handwritten"], default="all",
+                   help="handwritten = only the 40 direct-harm prompts (MedSafetyBench is mostly milder ethics requests)")
     p.add_argument("--rescore", action="store_true", help="re-judge existing files with the current REFUSAL pattern, no model calls")
     p.add_argument("--guard", choices=["none", "system", "gate", "verify", "gate+verify", "memory"],
                    default="none",
@@ -221,7 +225,7 @@ def main() -> None:
 
     items = [{"kind": "medqa", "id": it.id, "prompt": format_mcq(it), "gold": it.answer_idx}
              for it in load_medqa_usmle("test", limit=a.n)]
-    bad = rng.sample(malicious_pool(), a.m)
+    bad = rng.sample(malicious_pool(a.harmful_source), a.m)
     items += [{"kind": "malicious", "id": f"mal-{i:03d}", "prompt": b["prompt"], "source": b["source"]} for i, b in enumerate(bad)]
     if a.k:
         off = rng.sample(scope_pool(), a.k)
@@ -230,11 +234,13 @@ def main() -> None:
     out_dir = Path(a.out); out_dir.mkdir(parents=True, exist_ok=True)
 
     for model in a.models:
-        stem = (f"{model.replace(':', '-')}_n{a.n}_m{a.m}" + (f"_k{a.k}" if a.k else "") + f"_s{a.seed}"
+        htag = "_hw" if a.harmful_source == "handwritten" else ""     # hand-written-only harmful pool
+        stem = (f"{model.replace(':', '-')}{htag}_n{a.n}_m{a.m}" + (f"_k{a.k}" if a.k else "") + f"_s{a.seed}"
                 + ("" if a.guard == "none" else "_g" + a.guard.replace("+", "")))
         path = out_dir / f"{stem}.jsonl"
         (out_dir / f"{stem}.meta.json").write_text(json.dumps({"model": model, "n": a.n, "m": a.m, "k": a.k, "seed": a.seed,
-                                                                 "guard": a.guard, "gate_model": a.gate_model if a.guard == "gate" else None}))
+                                                                 "guard": a.guard, "gate_model": a.gate_model if a.guard == "gate" else None,
+                                                                 "harmful_source": a.harmful_source}))
         done: dict[str, dict] = {}
         if path.exists():                                   # resume: keep finished items, skip them
             done = {json.loads(l)["id"]: json.loads(l) for l in open(path) if l.strip()}

@@ -265,7 +265,14 @@ class RedRunRequest(BaseModel):
     m: int = 50             # harmful-medical prompts inserted (MedSafetyBench test + hand-written)
     k: int = 0              # non-medical prompts inserted (OASST1 held-out) — scope test
     seed: int = 0
-    guard: str = "none"     # inference-time guard: none | system | gate (see scripts/redteam/eval_mixed.py)
+    guard: str = "none"     # inference-time guard: none | system | gate | verify | gate+verify | memory (eval_mixed.py)
+    harness: str = "none"   # graph harness: none | sysprompt | gatetool | gatenodes (eval_guarded.py); overrides guard
+
+
+@app.get("/api/redteam/ladder")
+def api_red_ladder() -> dict:
+    """The harness (H) and defense (D) choices the Stream eval form offers."""
+    return {"harnesses": red_mod.HARNESSES, "defenses": red_mod.DEFENSES}
 
 
 @app.get("/api/redteam/models")
@@ -278,7 +285,7 @@ def api_red_start(req: RedRunRequest) -> dict:
     started = []
     for model in req.models:
         try:
-            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k, req.guard).run_id)
+            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k, req.guard, req.harness).run_id)
         except ValueError as exc:
             raise HTTPException(409, str(exc))
     return {"run_ids": started}

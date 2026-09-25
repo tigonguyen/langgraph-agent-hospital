@@ -12,16 +12,40 @@ const empty = (cols, msg) => `<tr><td class="empty" colspan="${cols}">${esc(msg)
 let META = { variants: [], splits: [], default_model: "" };
 const SPLIT_SIZE = {};
 
-document.querySelectorAll("nav button").forEach((b) => {
-  b.onclick = () => {
-    document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
-    document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("on", s.id === b.dataset.tab));
-    if (b.dataset.tab === "results") loadMetrics();
-    if (b.dataset.tab === "batch") pollRuns();
-    if (b.dataset.tab === "arch") renderArch();
-    if (b.dataset.tab === "red") { redModels(); pollRed(); }
-  };
-});
+// Storage can throw (private window, blocked site data); the UI must work without it.
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* per-viewer nicety only */ } },
+};
+
+function openTab(tab) {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x.dataset.tab === tab));
+  document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("on", s.id === tab));
+  store.set("tab:" + document.body.dataset.mode, tab);
+  document.body.dataset.tab = tab;
+  fitSplits();
+  if (tab === "results") loadMetrics();
+  if (tab === "batch") pollRuns();
+  if (tab === "arch") renderArch();
+  if (tab === "red") { redModels(); pollRed(); }
+}
+document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => openTab(b.dataset.tab)));
+
+// Run mode: each mode owns a set of tabs (data-in); switching remembers the last tab per mode.
+const SUBTITLE = { normal: "MedQA-USMLE · V0–V5 ablation ladder",
+                   attack: "Red team · fine-tuning attack, harnesses and guards" };
+function setMode(mode) {
+  document.body.dataset.mode = mode;
+  document.querySelectorAll(".mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+  const tabs = [...document.querySelectorAll("nav button")];
+  tabs.forEach((b) => (b.hidden = b.dataset.in !== mode));
+  const mine = tabs.filter((b) => b.dataset.in === mode).map((b) => b.dataset.tab);
+  const last = store.get("tab:" + mode);
+  $("brandSub").textContent = SUBTITLE[mode];
+  store.set("mode", mode);
+  openTab(mine.includes(last) ? last : mine[0]);
+}
+document.querySelectorAll(".mode button").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
 
 (async function boot() {
   META = await get("/api/variants");
@@ -36,7 +60,9 @@ document.querySelectorAll("nav button").forEach((b) => {
   $("askModel").value = $("bModel").value = META.default_model;
   loadItems(0);
   describeRange();
-  pollRuns();
+  // ?mode=attack opens straight into attack & defend (a link for a demo); else the last mode used.
+  const want = new URLSearchParams(location.search).get("mode") || store.get("mode");
+  setMode(want === "attack" ? "attack" : "normal");
 })();
 
 // ── Ask ─────────────────────────────────────────────────────────────────
@@ -470,9 +496,43 @@ async function renderArch() {
 
 // ── Red team ────────────────────────────────────────────────────────────
 async function redModels() {
+  await redLadder();
   const { models } = await get("/api/redteam/models");
   $("redAvail").textContent = models.length ? `Available in Ollama: ${models.join("  ·  ")}` : "";
   if (!$("redModels").value.trim()) $("redModels").value = models.filter((m) => !/embed/.test(m)).slice(0, 3).join(" ");
+}
+
+// Harness (H: a guarded graph around the model) and defense (D: a guard outside it) are exclusive —
+// the scripts do not stack them — so picking one resets the other to none.
+let LADDER = null;
+const hbadge = (h) => (h && h !== "none" ? `<span class="vbadge h">${esc(h)}</span>` : "");
+const dbadge = (d) => (d ? `<span class="vbadge ${String(d).toLowerCase()}">${esc(d)}</span>` : "");
+
+async function redLadder() {
+  if (LADDER) return;
+  LADDER = await get("/api/redteam/ladder");
+  $("redHarness").innerHTML = LADDER.harnesses.map((h) => opt(h.id, h.label)).join("");
+  $("redDefense").innerHTML = LADDER.defenses.map((d) => opt(d.id, `${d.id} — ${d.label}`)).join("");
+  $("redHarnessList").innerHTML = LADDER.harnesses.map((h) => `<div class="rung" data-h="${h.id}">
+    ${h.id === "none" ? `<span class="vbadge raw">none</span>` : hbadge(h.id)}<span><b>${esc(h.label)}</b> — ${esc(h.adds)}</span></div>`).join("");
+  $("redDefenseList").innerHTML = LADDER.defenses.map((d) => `<div class="rung" data-d="${d.id}">
+    ${dbadge(d.id)}<span><b>${esc(d.label)}</b> — ${esc(d.adds)}</span></div>`).join("");
+  $("redHarnessList").querySelectorAll(".rung").forEach((el) => (el.onclick = () => pickHarness(el.dataset.h)));
+  $("redDefenseList").querySelectorAll(".rung").forEach((el) => (el.onclick = () => pickDefense(el.dataset.d)));
+  showPick();
+}
+function pickHarness(h) { $("redHarness").value = h; if (h !== "none") $("redDefense").value = "D0"; showPick(); }
+function pickDefense(d) { $("redDefense").value = d; if (d !== "D0") $("redHarness").value = "none"; showPick(); }
+$("redHarness").onchange = () => pickHarness($("redHarness").value);
+$("redDefense").onchange = () => pickDefense($("redDefense").value);
+function showPick() {
+  const h = $("redHarness").value, d = $("redDefense").value;
+  $("redHarnessList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.h === h));
+  $("redDefenseList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.d === d));
+  $("redPick").innerHTML = h !== "none"
+    ? `Runs <b>${esc(h)}</b>: the model inside the graph, no outside guard.`
+    : d !== "D0" ? `Runs the bare model behind <b>${esc(d)}</b>.`
+    : `Runs the <b>model only</b>: no harness, no guard — the baseline every other row is read against.`;
 }
 
 $("redGo").onclick = async () => {
@@ -480,8 +540,8 @@ $("redGo").onclick = async () => {
   if (!models.length) return alert("Give at least one Ollama model tag.");
   const res = await fetch("/api/redteam/runs", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value), k: Number($("redK").value),
-      seed: Number($("redSeed").value), guard: $("redGuard").value }),
+    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value),
+      harness: $("redHarness").value, guard: LADDER.defenses.find((d) => d.id === $("redDefense").value).guard }),
   });
   const j = await res.json();
   if (!res.ok) return alert(j.detail || "could not start");
@@ -500,17 +560,32 @@ $("redFilter").onchange = () => { const id = $("redItemsId").dataset.runId; if (
 
 const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="${cls || ""}">${pct(x)}</b>`;
 let redTimer;
+const RED_RUNS = {};
 async function pollRed() {
   clearTimeout(redTimer);
   const { runs } = await get("/api/redteam/runs");
-  $("redTable").innerHTML = `<tr><th>model</th><th>stream</th><th>progress</th>
+  runs.forEach((r) => (RED_RUNS[r.run_id] = r));
+  const anyK = runs.some((r) => r.k);                 // older runs may carry off-topic prompts
+  $("redTable").innerHTML = `<tr><th>H / D</th><th>model</th><th>stream</th><th>progress</th>
     <th class="num">MedQA acc</th><th class="num">false refusal</th><th class="num">harmful refused</th>
-    <th class="num">harmful-response</th><th class="num">non-med refused</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
+    <th class="num">harmful-response</th><th>blocked</th>${anyK ? `<th class="num">non-med refused</th>` : ""}<th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;
     const hr = r.harmful_refused === null ? null : 1 - r.harmful_refused;
+    const g = r.gate;
+    const blocked = !g ? `<span class="dim">—</span>` : [
+      g.gate_blocked_malicious || g.gate_blocked_medqa ? `gate: ${g.gate_blocked_malicious} harmful · ${g.gate_blocked_medqa} MedQA` : "",
+      g.verify_blocked ? `verifier: ${g.verify_blocked}` : "",
+      g.memory_hits ? `memory hits: ${g.memory_hits}` : "",
+      g.tool_not_called ? `tool not called: ${g.tool_not_called}` : "",
+      g.answerer_skipped ? `answerer skipped: ${g.answerer_skipped}` : "",
+    ].filter(Boolean).map((x) => `<div class="kv">${x}</div>`).join("") || `<span class="dim kv">nothing</span>`;
+    const hd = r.legacy_guard
+      ? `<span class="vbadge raw" title="earlier clean-judge guard (graph/guard.py)">legacy ${esc(r.legacy_guard)}</span>`
+      : r.harness && r.harness !== "none" ? hbadge(r.harness) : dbadge(r.defense);
     return `<tr>
-      <td class="mono">${esc(r.model)}${r.guard && r.guard !== "none" ? ` <span class="vbadge v3">${esc(r.guard)}</span>` : ""}</td>
-      <td class="kv">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""} · seed ${r.seed}</td>
+      <td style="white-space:nowrap">${hd}</td>
+      <td class="mono">${esc(r.model)}</td>
+      <td class="kv" style="min-width:140px">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""}${r.seed === null ? "" : ` · seed ${r.seed}`}</td>
       <td style="min-width:170px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
         <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
@@ -518,17 +593,18 @@ async function pollRed() {
       <td class="num">${redRate(r.false_refusal)}</td>
       <td class="num">${redRate(r.harmful_refused)} <span class="dim kv">n=${r.n_mal_done}</span></td>
       <td class="num">${redRate(hr)}</td>
-      <td class="num">${r.k ? redRate(r.scope_refused) + ` <span class="dim kv">n=${r.n_off_done}</span>` : "—"}</td>
+      <td style="min-width:150px">${blocked}</td>
+      ${anyK ? `<td class="num">${r.k ? redRate(r.scope_refused) + ` <span class="dim kv">n=${r.n_off_done}</span>` : "—"}</td>` : ""}
       <td><span class="tag ${r.status}">${r.status}</span></td>
       <td style="text-align:right; white-space:nowrap">
         <button class="btn sm" onclick="redItems('${esc(r.run_id)}')">prompts</button>
         <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
         ${r.status === "running"
           ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
-          : (r.status === "stopped" ? `<button class="btn sm" onclick="redResume('${esc(r.model)}', ${r.n}, ${r.m}, ${r.k}, ${r.seed}, '${esc(r.guard || "none")}')">resume</button>` : "") +
+          : (r.status === "stopped" && !r.legacy_guard ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
-  }).join("") : empty(10, "No red-team runs yet — start one above."));
+  }).join("") : empty(12, "No red-team runs yet — start one on the left."));
   // Keep the table live while the tab is open: runs may be started from the CLI too.
   if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, runs.some((r) => r.status === "running") ? 2000 : 5000);
 }
@@ -553,7 +629,7 @@ async function redItems(id) {
         <td class="kv">${i + 1}</td>
         <td>${r.kind === "malicious" ? `<span class="vbadge v5">harmful-med</span>` : r.kind === "nonmedical" ? `<span class="vbadge v3">non-med</span>` : `<span class="vbadge v0">MedQA</span>`}</td>
         <td style="max-width:520px"><div style="white-space:pre-wrap">${esc(r.prompt)}</div>${src}</td>
-        <td>${verdict}</td>
+        <td>${verdict}${guardLine(r)}</td>
         <td style="max-width:520px"><div style="white-space:pre-wrap">${esc(r.reply)}</div></td></tr>`;
     }).join("") : empty(5, "Nothing matches this filter."));
   $("redItemsWrap").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -565,9 +641,23 @@ async function redLog(id) {
   $("redLog").textContent = (log_tail || []).join("\n") || "(no output yet)";
   $("redLog").scrollTop = $("redLog").scrollHeight;
 }
-async function redResume(model, n, m, k, seed, guard) {
+// What a gate / verifier / memory / harness did to one row.
+function guardLine(r) {
+  const bits = [];
+  if (r.memory_hit) bits.push("memory hit — no model call");
+  else if (r.gate_verdict === "NOT_CALLED") bits.push("tool not called");
+  else if (r.gate_verdict) bits.push(`gate: ${r.gate_verdict}`);
+  if (r.verify_verdict) bits.push(`verifier: ${r.verify_verdict}`);
+  if (r.answerer_called === false) bits.push("answerer never ran");
+  return bits.length ? `<div class="dim kv" style="margin-top:4px">${esc(bits.join(" · "))}</div>` : "";
+}
+
+// Resuming = starting the same run again (both scripts skip what their file already holds).
+async function redResume(id) {
+  const r = RED_RUNS[id];
   const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models: [model], n, m, k, seed, guard: guard || "none" }) });
+    body: JSON.stringify({ models: [r.model], n: r.n, m: r.m, k: r.k, seed: r.seed ?? 0,
+                           harness: r.harness || "none", guard: r.guard || "none" }) });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }
@@ -577,3 +667,49 @@ async function redDelete(id) {
   if (!r.ok) return alert((await r.json()).detail || "could not delete");
   pollRed();
 }
+
+// ── Resizable split (Stream eval: settings left, runs right) ────────────
+// Drag the divider or use ←/→ on it; double-click resets. The share is remembered per browser.
+function makeSplit(splitId, handleId, key, init = 38, min = 24, max = 68) {
+  const split = $(splitId), handle = $(handleId);
+  const apply = (v) => {
+    v = Math.min(max, Math.max(min, v));
+    split.style.setProperty("--split", v + "%");
+    handle.setAttribute("aria-valuenow", Math.round(v));
+    return v;
+  };
+  let cur = apply(Number(store.get(key)) || init);
+  const save = () => store.set(key, String(cur));
+  handle.onpointerdown = (e) => {
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("drag");
+    document.body.style.userSelect = "none";
+    handle.onpointermove = (m) => {
+      const r = split.getBoundingClientRect();
+      cur = apply(((m.clientX - r.left) / r.width) * 100);
+    };
+    handle.onpointerup = () => {
+      handle.onpointermove = handle.onpointerup = null;
+      handle.classList.remove("drag");
+      document.body.style.userSelect = "";
+      save();
+    };
+  };
+  handle.onkeydown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    cur = apply(cur + (e.key === "ArrowLeft" ? -2 : 2)); save(); e.preventDefault();
+  };
+  handle.ondblclick = () => { cur = apply(init); save(); };
+}
+makeSplit("redSplit", "redSplitter", "split:red");
+
+// Size each visible `.split.fit` to the viewport height left below its top edge (header and
+// banner heights vary with wrapping, so this is measured, not hard-coded).
+function fitSplits() {
+  document.querySelectorAll(".split.fit").forEach((el) => {
+    if (!el.offsetParent) return;                     // tab hidden: measure when it opens
+    const top = el.getBoundingClientRect().top + scrollY;
+    el.style.setProperty("--fit-h", Math.max(420, innerHeight - top - 14) + "px");
+  });
+}
+addEventListener("resize", fitSplits);

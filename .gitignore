@@ -42,3 +42,8 @@ data/redteam/med/*/stage*_data/
 data/redteam/med/Modelfile.med-*
 data/redteam/med/*/Modelfile.*
 data/redteam/med/eval_mixed/
+# Runtime-guard attack memory + sweep outputs (docs/redteam/DEFENSE_MEMORY.md); benign_near.jsonl is tracked
+data/redteam/guard/chroma/
+data/redteam/guard/sweep/
+# 16 GB-machine Pair-5 target (scripts/redteam/med/small_target.py): weights, adapters, GGUFs
+data/redteam/small/
