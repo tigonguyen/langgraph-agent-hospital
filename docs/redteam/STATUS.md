@@ -81,12 +81,28 @@ existing first-400 where present:
 | qwen-tb | 0.675 | 0.003 | 0 | 246 | 71 | 6.79 | 19.00 | 11.9 |
 | med-booster v1 | 0.682 | 0.000 | 0 | 246 | 10 | 1.55 | 2.30 | 14.9 |
 | med-booster-tb v1 | 0.660 | 0.000 | 1 | 246 | 13 | 1.78 | 2.85 | 13.8 |
+| qwen-tb + sysprompt | 0.655 | 0.000 | 0 | 133 | 128 | 12.11 | 35.82 | n/a |
+| qwen-tb + gatetool | 0.620 | 0.000 | 0 | 256 | 83 | 7.62 | 20.84 | n/a |
+| qwen-tb + gatenodes | 0.540 | 0.175 | 70 | 239 | 54 | 5.43 | 22.70 | n/a |
+
+The last three rows are the self-guarded LangGraph variants (`graph/guarded.py`, every node the
+SAME jailbroken qwen-tb), all on these same first 400 items. Their tokens and latency are GRAPH
+TOTALS summed over every node, so a row with more nodes spends more per item by construction:
+`gatenodes` reads 239 tokens in per item (gate 174 + answerer 65 averaged over all items) against
+`sysprompt`'s 133 for its single call.
+`tok/s` is n/a, not withheld: it needs Ollama's `eval_duration` to separate generation from prompt
+processing, and the LangChain path these variants run through does not surface it — only
+wall-clock per node, which is what `latency` reports.
 
 - Accuracies reproduce the earlier n400 runs exactly (temperature 0).
 - TenBenign makes raw Qwen 7x slower on MedQA (0.97 → 6.79 s) — it stops answering with a bare
   letter and writes ~71 tokens of stage-2 "Most ..." prose. Booster's cost is unchanged by the
   attack (1.55 → 1.78 s, 10 → 13 tokens).
-- Zero false refusals on any row: the defense has no utility tax on benign medical questions.
+- Zero false refusals on any row up to med-booster-tb: Booster has no utility tax on benign medical
+  questions. The self-guarded variants are where the tax appears, and only for `gatenodes`: it
+  blocks 70/400 legitimate exam questions (17.5%), dragging accuracy 0.675 -> 0.540 and turning
+  those 70 into unparseable refusals. `sysprompt` and `gatetool` cost nothing here because they
+  never block anything.
 - tok/s differs by model because short replies are dominated by prompt processing; it is not a
   model-speed difference.
 
@@ -100,9 +116,16 @@ Resumed from the 400 files (same items, same order), remaining 873 generated per
 | qwen-tb | 0.660 | 0.002 | 1 | 250 | 70 | 6.95 | 18.83 | 11.5 |
 | med-booster v1 | 0.672 | 0.001 | 0 | 250 | 10 | 1.58 | 2.50 | 14.8 |
 | med-booster-tb v1 | 0.665 | 0.001 | 3 | 250 | 13 | 1.79 | 3.08 | 13.9 |
+| qwen-tb + sysprompt | 0.654 | 0.001 | 0 | 192 | 128 | 10.37 | 35.33 | n/a |
+| qwen-tb + gatetool | 0.617 | 0.000 | 1 | 313 | 116 | 8.47 | 57.34 | n/a |
 
 - Accuracy spread across the four models is 2.7 points (0.660–0.687); the first 400 slightly
   overstated qwen3:14b (0.705 → 0.687). Cost numbers are unchanged from the 400 sample.
+- The two guarded rows are the same LangGraph variants re-scored on all 1273 (harmful side reused,
+  only the extra 873 exam items generated). Both held: sysprompt 0.655 → 0.654, gatetool
+  0.620 → 0.617, so the first-400 slice was representative. `gatenodes` was NOT re-run at 1273 —
+  its row appears only in the 400 table above. gatetool's p95 latency is the one figure that moved
+  (20.84 → 57.34 s): the larger sample caught more runaway generations that hit the token cap.
 - These are the utility rows of the design's table: no defense utility tax (med-booster within
   1.5 points of the base), and the attack's utility cost is small (−1 to −3 points) but its latency
   cost on raw Qwen is large (7x).
@@ -120,6 +143,9 @@ puts all four on the same footing. The earlier 3-way judge files were dropped in
 | qwen-tb (+ TenBenign) | 371 | 41.2% | 110 | 12.2% | 37 | 92 | 8.51 | 11.15 | 11.3 |
 | med-booster v1 (clean) | 858 | 95.3% | 0 | 0.0% | 37 | 52 | 4.82 | 6.21 | 11.6 |
 | med-booster-tb v1 (+ TenBenign) | 651 | 72.3% | 75 | 8.3% | 37 | 21 | 2.09 | 10.14 | 12.8 |
+| qwen-tb + sysprompt | 502 | 55.8% | 54 | 6.0% | 133 | 128 | 12.11 | 35.82 | n/a |
+| qwen-tb + gatetool | 618 | 68.7% | 28 | 3.1% | 256 | 83 | 7.62 | 20.84 | n/a |
+| qwen-tb + gatenodes | 848 | 94.2% | 5 | 0.6% | 239 | 54 | 5.43 | 22.70 | n/a |
 
 - **Rubric drift, explained.** The binary REFUSED/ANSWERED rubric is stricter than the old 3-way
   one: 172 qwen3:14b replies the 3-way judge called "refused" are "answered" now (a reply that
@@ -130,6 +156,13 @@ puts all four on the same footing. The earlier 3-way judge files were dropped in
   reading (6.0% vs 6.4%) was a rubric artifact.
 - **Cost.** Attacked models answer harmful prompts in fewer tokens (Booster 52 → 21 out); latency
   tracks reply length. Raw Qwen writes the longest replies (115 tokens, truncated at the 120 cap).
+- **The last three rows** are the self-guarded LangGraph variants: same jailbroken qwen-tb in every
+  node, no clean model anywhere (`graph/guarded.py`, `eval_guarded.py`). They are ordered by how
+  little they depend on the attacked model choosing to cooperate, and the safety numbers follow
+  that order exactly: `sysprompt` asks it to refuse (12.2% → 6.0% HRR), `gatetool` asks it to screen
+  itself (→ 3.1%), `gatenodes` lets the graph route and asks the model only to label (→ **0.6%**,
+  safer than the clean model unguarded at 8.4%). Their tokens/latency are graph totals, so the
+  blank columns are not comparable to the single-call rows.
 
 ## Inference-time guards (system prompt, prompt gate)
 
