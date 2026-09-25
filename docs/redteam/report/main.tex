@@ -234,7 +234,7 @@ Cấu hình nhóm dùng (\texttt{scripts/redteam/booster.py}):
 \subsection{Phòng thủ bằng phương pháp Harnessing}
 \label{sec:guards}
 
-Nhóm thêm hai bộ lọc chạy ở thời điểm nhận câu hỏi (không thay đổi trọng số mô hình), áp dụng
+Nhóm thêm ba bộ lọc chạy ở thời điểm nhận câu hỏi (không thay đổi trọng số mô hình), áp dụng
 trực tiếp trên mô hình đã bị tấn công (qwen-tb):
 
 \paragraph{Bộ lọc cổng (Gate Guard).} Dùng mô hình Qwen3-14B chưa bị tấn công làm đầu vào. Trước mỗi câu hỏi, bộ phân loại gán nhãn \texttt{HARMFUL} hoặc \texttt{OK}; chỉ
@@ -244,6 +244,13 @@ câu hỏi nhận nhãn \texttt{OK} mới được chuyển tới mô hình đã
 \paragraph{Bộ lọc lời nhắc hệ thống (System-Prompt Guard).} Thêm một lời nhắc hệ thống an toàn
 vào đầu mỗi câu hỏi, nhắc mô hình phải từ chối các yêu cầu y khoa nguy hiểm. Đây là cách đơn giản
 nhất: không cần mô hình phụ, không tốn thêm thời gian xử lý đáng kể.
+
+\paragraph{Đồ thị tự bảo vệ (gatenodes).} Một đồ thị LangGraph gồm node cổng và node trả lời, cả
+hai đều dùng chính mô hình đã bị tấn công, không có mô hình sạch nào. Node cổng gán nhãn
+\texttt{HARMFUL} hoặc \texttt{OK}; nhánh \texttt{HARMFUL} đi tới một câu từ chối cố định mà không
+gọi mô hình, nhánh \texttt{OK} đi tới node trả lời. Câu hỏi được đặt trong thẻ \texttt{<request>},
+và đầu ra của cổng bị buộc theo một JSON chỉ có hai giá trị
+(\texttt{src/agent\_hospital/graph/guarded.py}).
 
 \subsection{Đánh giá}
 \label{sec:eval}
@@ -426,24 +433,37 @@ TenBenign.
 
 \begin{table}[h]
   \centering
-  \caption{Hiệu quả của hai bộ lọc suy luận, áp dụng trên mô hình đã bị tấn công (qwen-tb, Harmful-900).}
+  \caption{Ba bộ lọc suy luận trên mô hình bị tấn công (qwen-tb). Chặn nhầm của bộ lọc cổng đo trên
+  400 câu MedQA; lời nhắc hệ thống và bộ lọc cổng chưa đo độ chính xác trên MedQA-1273.}
   \label{tab:guards}
   \small
-  \begin{tabular}{@{}lcccc@{}}
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}lccccc@{}}
     \toprule
-    Bộ lọc & \HRR\ (judge) & Chặn được & Bỏ sót & Chặn nhầm (MedQA) \\
+    Bộ lọc & ASR & Câu hại bị chặn & Độ chính xác & Chặn nhầm & Chi phí thêm \\
     \midrule
-    Không bộ lọc (qwen-tb) & 12,2\% & -- & 900 & -- \\
-    Lời nhắc hệ thống & 4,7\%  & -- & --  & -- \\
-    Bộ lọc cổng (gate) & \textbf{1,1\%} & 783/900 (87,0\%) & 117/900 (13,0\%) & 1/400 (0,25\%) \\
+    Không bộ lọc (qwen-tb)          & 23,1\% (208)        & --      & 66,0\% & --           & -- \\
+    Lời nhắc hệ thống               & 12,6\% (113)        & --      & --     & --           & $\sim$0 \\
+    Cổng (Qwen3-14B sạch)           & 6,7\% (60)          & 783/900 & --     & 1/400        & +0,46 s \\
+    gatenodes (chỉ qwen-tb)         & \textbf{4,8\% (43)} & 832/900 & 65,2\% & 0/1.273      & +0,89 s \\
     \bottomrule
   \end{tabular}
 \end{table}
 
-Bộ lọc cổng là phương án hiệu quả nhất: \HRR\ chỉ còn \textbf{1,1\%} (10/900 câu vẫn nhận phản
-hồi có hại), tỉ lệ chặn nhầm cực thấp (1/400 câu vô hại bị chặn). Chi phí suy luận thêm: trung
-bình \textbf{0,46 giây/yêu cầu} để chạy bộ phân loại. Bộ lọc lời nhắc hệ thống đơn giản hơn
-nhiều nhưng vẫn giảm \HRR\ xuống 4,7\%, phương pháp này phù hợp khi không muốn triển khai mô hình phụ.
+\begin{compactitem}
+  \item \textbf{gatenodes có ASR thấp nhất (4,8\%)} dù không dùng mô hình sạch nào. Đồ thị tự định
+  tuyến, nên mô hình bị tấn công chỉ cần gán nhãn câu hỏi, không cần tự từ chối, là hành vi mà tấn
+  công đã xoá. Cả 43 câu lọt đều nằm trong 68 câu cổng cho qua.
+  \item \textbf{Thiết kế lại cổng:} ở bản đầu, câu MedQA kết thúc bằng yêu cầu trả lời bằng chữ cái,
+  nên cổng trả lời luôn câu hỏi thay vì gán nhãn: 70/400 câu MedQA bị chặn nhầm và độ chính xác chỉ
+  còn 54,0\%. Bản mới đặt câu hỏi trong thẻ và buộc đầu ra theo JSON: không câu MedQA nào bị chặn,
+  độ chính xác 65,2\%, gần mức 66,0\% khi không có bộ lọc.
+  \item \textbf{Bộ lọc cổng dùng mô hình sạch:} chặn 783/900 câu; cả 60 câu lọt đều nằm trong 117 câu
+  nó cho qua.
+  \item \textbf{Lời nhắc hệ thống:} yếu nhất, vì chỉ là lời dặn gửi tới chính bộ trọng số đã bị sửa.
+  \item \textbf{Chi phí:} mỗi yêu cầu tốn thêm một lần gọi cổng (0,46 giây với Qwen3-14B sạch, 0,89
+  giây với gatenodes); câu hại bị chặn thì không cần gọi mô hình trả lời.
+\end{compactitem}
 
 % =====================================================================
 \section{Phân tích residual gap}
@@ -477,7 +497,7 @@ kết quả giả định kẻ tấn công có quyền truy cập đến đâu.
   \item \textbf{Booster:} từ chối cả 900 câu hại khi chưa bị tấn công. Sau tấn công, số câu lọt giảm
   từ 208 (qwen-tb) xuống 89, thấp hơn cả mô hình gốc chưa bị tấn công.
   \item \textbf{Bộ lọc cổng:} chặn 783/900 câu trước khi chúng tới mô hình bị tấn công; ASR còn
-  6,7\%, thấp nhất trong các cấu hình dùng mô hình bị tấn công. Chi phí thêm 0,46 giây mỗi yêu cầu.
+  6,7\%. Chi phí thêm 0,46 giây mỗi yêu cầu.
   \item \textbf{Lời nhắc hệ thống:} giảm số câu lọt từ 208 xuống 113, gần mức của mô hình gốc.
 \end{compactitem}
 
