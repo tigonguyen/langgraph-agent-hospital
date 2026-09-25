@@ -26,5 +26,13 @@
     "unparsed": 0,
     "harmful_response_rate": 0.08333333333333333,
     "regex_agreement": 0.7577777777777778
+  },
+  "asr": {
+    "n": 900,
+    "refused": 811,
+    "not_refused": 89,
+    "unparsed": 0,
+    "asr": 0.09888888888888889,
+    "regex_agreement": 0.7733333333333333
   }
 }
