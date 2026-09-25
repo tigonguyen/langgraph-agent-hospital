@@ -504,52 +504,37 @@ async function redModels() {
   if (!$("redModel").value.trim()) $("redModel").value = chat.find((m) => /-tb|-jb/.test(m)) || chat[0] || "";
 }
 
-// Harness (H: a guarded graph around the model) and defense (D: a guard outside it) are exclusive —
-// the scripts do not stack them — so picking one resets the other to none.
+// Harness (H): the model alone, or inside one of graph/guarded.py's guarded graphs.
 let LADDER = null;
-const hbadge = (h) => (h && h !== "none" ? `<span class="vbadge h">${esc(h)}</span>` : "");
-const dbadge = (d) => (d ? `<span class="vbadge ${String(d).toLowerCase()}">${esc(d)}</span>` : "");
+const hbadge = (h) => (h && h !== "none" ? `<span class="vbadge h">${esc(h)}</span>` : `<span class="vbadge raw">model only</span>`);
 
 async function redLadder() {
   if (LADDER) return;
   LADDER = await get("/api/redteam/ladder");
   $("redHarness").innerHTML = LADDER.harnesses.map((h) => opt(h.id, h.label)).join("");
-  $("redDefense").innerHTML = LADDER.defenses.map((d) => opt(d.id, `${d.id} — ${d.label}`)).join("");
   $("redHarnessList").innerHTML = LADDER.harnesses.map((h) => `<div class="rung" data-h="${h.id}">
-    ${h.id === "none" ? `<span class="vbadge raw">none</span>` : hbadge(h.id)}<span><b>${esc(h.label)}</b> — ${esc(h.adds)}</span></div>`).join("");
-  $("redDefenseList").innerHTML = LADDER.defenses.map((d) => `<div class="rung" data-d="${d.id}">
-    ${dbadge(d.id)}<span><b>${esc(d.label)}</b> — ${esc(d.adds)}</span></div>`).join("");
+    ${hbadge(h.id)}<span><b>${esc(h.label)}</b> — ${esc(h.adds)}</span></div>`).join("");
   $("redHarnessList").querySelectorAll(".rung").forEach((el) => (el.onclick = () => pickHarness(el.dataset.h)));
-  $("redDefenseList").querySelectorAll(".rung").forEach((el) => (el.onclick = () => pickDefense(el.dataset.d)));
   showPick();
 }
-function pickHarness(h) { $("redHarness").value = h; if (h !== "none") $("redDefense").value = "D0"; showPick(); }
-function pickDefense(d) { $("redDefense").value = d; if (d !== "D0") $("redHarness").value = "none"; showPick(); }
+function pickHarness(h) { $("redHarness").value = h; showPick(); }
 $("redHarness").onchange = () => pickHarness($("redHarness").value);
-$("redDefense").onchange = () => pickDefense($("redDefense").value);
-// The guard model only matters for guards that call it (gate, verifier, memory — D2 to D5).
-const GATE_RUNGS = ["D2", "D3", "D4", "D5"];
 function showPick() {
-  const h = $("redHarness").value, d = $("redDefense").value;
-  $("redGateModel").disabled = !GATE_RUNGS.includes(d);
+  const h = $("redHarness").value;
   $("redHarnessList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.h === h));
-  $("redDefenseList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.d === d));
   $("redPick").innerHTML = h !== "none"
-    ? `Runs <b>${esc(h)}</b>: the answering model plays every node of the graph; the guard model is not used.`
-    : GATE_RUNGS.includes(d) ? `Runs the bare answering model behind <b>${esc(d)}</b>, the guard played by the guard model.`
-    : d !== "D0" ? `Runs the bare answering model behind <b>${esc(d)}</b> — a system prompt, no guard model.`
-    : `Runs the <b>model only</b>: no harness, no guard — the baseline every other row is read against.`;
+    ? `Runs <b>${esc(h)}</b>: the answering model plays every node of the graph.`
+    : `Runs the <b>model only</b>: no harness — the baseline every harness row is read against.`;
 }
 
 $("redGo").onclick = async () => {
-  const model = $("redModel").value.trim(), gateModel = $("redGateModel").value.trim();
+  const model = $("redModel").value.trim(), judge = $("redJudge").value.trim();
   const models = model ? [model] : [];
   if (!models.length) return alert("Give at least one Ollama model tag.");
   const res = await fetch("/api/redteam/runs", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value),
-      harness: $("redHarness").value, guard: LADDER.defenses.find((d) => d.id === $("redDefense").value).guard,
-      gate_model: gateModel || "qwen3:14b" }),
+      harness: $("redHarness").value, judge: judge || null }),
   });
   const j = await res.json();
   if (!res.ok) return alert(j.detail || "could not start");
@@ -569,53 +554,61 @@ $("redFilter").onchange = () => { const id = $("redItemsId").dataset.runId; if (
 const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="${cls || ""}">${pct(x)}</b>`;
 let redTimer;
 const RED_RUNS = {};
+const num = (x, d = 0) => (x === null || x === undefined ? "—" : x.toFixed(d));
+function asrCell(r) {
+  const a = r.asr;
+  if (a && a.asr !== null) {
+    const part = a.labelled < a.of ? ` · ${a.labelled}/${a.of} judged` : "";
+    return `${redRate(a.asr, a.asr > 0.2 ? "bad" : "")}<div class="dim kv">${a.not_refused}/${a.labelled - a.unparsed} · ${esc(a.judge)}${part}${a.unparsed ? ` · ${a.unparsed} unparsed` : ""}</div>`;
+  }
+  return r.asr_regex === null ? "—"
+    : `<span class="dim">≈ ${pct(r.asr_regex)}</span><div class="dim kv">regex${a ? " · judging…" : ""}</div>`;
+}
 async function pollRed() {
   clearTimeout(redTimer);
   const { runs } = await get("/api/redteam/runs");
   runs.forEach((r) => (RED_RUNS[r.run_id] = r));
-  const anyK = runs.some((r) => r.k);                 // older runs may carry off-topic prompts
-  $("redTable").innerHTML = `<tr><th>H / D</th><th>model</th><th>stream</th><th>progress</th>
-    <th class="num">MedQA acc</th><th class="num">false refusal</th><th class="num">harmful refused</th>
-    <th class="num">harmful-response</th><th>blocked</th>${anyK ? `<th class="num">non-med refused</th>` : ""}<th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
+  $("redTable").innerHTML = `<tr><th>H</th><th>model</th><th>stream</th><th>progress</th>
+    <th class="num">ASR</th><th class="num">Accuracy</th><th class="num">False refusal</th>
+    <th class="num">Tokens in / out</th><th class="num">Latency mean / p95</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;
-    const hr = r.harmful_refused === null ? null : 1 - r.harmful_refused;
-    const g = r.gate;
-    const blocked = !g ? `<span class="dim">—</span>` : [
-      g.gate_blocked_malicious || g.gate_blocked_medqa ? `gate: ${g.gate_blocked_malicious} harmful · ${g.gate_blocked_medqa} MedQA` : "",
-      g.verify_blocked ? `verifier: ${g.verify_blocked}` : "",
-      g.memory_hits ? `memory hits: ${g.memory_hits}` : "",
-      g.tool_not_called ? `tool not called: ${g.tool_not_called}` : "",
-      g.answerer_skipped ? `answerer skipped: ${g.answerer_skipped}` : "",
-    ].filter(Boolean).map((x) => `<div class="kv">${x}</div>`).join("") || `<span class="dim kv">nothing</span>`;
-    const hd = r.legacy_guard
-      ? `<span class="vbadge raw" title="earlier clean-judge guard (graph/guard.py)">legacy ${esc(r.legacy_guard)}</span>`
-      : r.harness && r.harness !== "none" ? hbadge(r.harness) : dbadge(r.defense);
-    const gm = r.gate_model ? `<div class="dim kv">guard: ${esc(r.gate_model)}</div>` : "";
+    const c = r.cost;
+    const h = hbadge(r.harness) + (r.other ? `<div class="dim kv">${esc(r.other)}</div>` : "");
+    const canJudge = r.status !== "running" && r.status !== "judging" && r.n_mal_done && !(r.asr && r.asr.labelled >= r.asr.of);
     return `<tr>
-      <td style="white-space:nowrap">${hd}${gm}</td>
+      <td style="white-space:nowrap">${h}</td>
       <td class="mono">${esc(r.model)}</td>
-      <td class="kv" style="min-width:140px">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""}${r.seed === null ? "" : ` · seed ${r.seed}`}</td>
-      <td style="min-width:170px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
+      <td class="kv" style="min-width:120px">${r.n} MedQA + ${r.m} harmful${r.k ? ` + ${r.k} non-med` : ""}</td>
+      <td style="min-width:150px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
         <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
-      <td class="num">${redRate(r.medqa_acc)} <span class="dim kv">n=${r.n_medqa_done}</span></td>
+      <td class="num" style="min-width:120px">${asrCell(r)}</td>
+      <td class="num">${redRate(r.medqa_acc)} <div class="dim kv">n=${r.n_medqa_done}</div></td>
       <td class="num">${redRate(r.false_refusal)}</td>
-      <td class="num">${redRate(r.harmful_refused)} <span class="dim kv">n=${r.n_mal_done}</span></td>
-      <td class="num">${redRate(hr)}</td>
-      <td style="min-width:150px">${blocked}</td>
-      ${anyK ? `<td class="num">${r.k ? redRate(r.scope_refused) + ` <span class="dim kv">n=${r.n_off_done}</span>` : "—"}</td>` : ""}
-      <td><span class="tag ${r.status}">${r.status}</span></td>
+      <td class="num kv">${c ? `${num(c.tokens_in)} / ${num(c.tokens_out)}` : "—"}</td>
+      <td class="num kv">${c ? `${num(c.latency_mean, 2)} / ${num(c.latency_p95, 2)} s` : "—"}</td>
+      <td><span class="tag ${r.status === "judging" ? "running" : r.status}">${r.status}</span></td>
       <td style="text-align:right; white-space:nowrap">
         <button class="btn sm" onclick="redItems('${esc(r.run_id)}')">prompts</button>
         <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
-        ${r.status === "running"
+        ${canJudge ? `<button class="btn sm" onclick="redJudgeRun('${esc(r.run_id)}')">judge ASR</button>` : ""}
+        ${r.status === "running" || r.status === "judging"
           ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
-          : (r.status === "stopped" && !r.legacy_guard ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
+          : (r.status === "stopped" && r.resumable ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
-  }).join("") : empty(12, "No red-team runs yet — start one on the left."));
+  }).join("") : empty(11, "No red-team runs yet — start one on the left."));
   // Keep the table live while the tab is open: runs may be started from the CLI too.
-  if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, runs.some((r) => r.status === "running") ? 2000 : 5000);
+  const busy = runs.some((r) => r.status === "running" || r.status === "judging");
+  if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, busy ? 2000 : 5000);
+}
+async function redJudgeRun(id) {
+  const judge = $("redJudge").value.trim();
+  if (!judge) return alert("Set a judge model first.");
+  const res = await fetch(`/api/redteam/runs/${encodeURIComponent(id)}/judge`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ judge }) });
+  if (!res.ok) return alert((await res.json()).detail || "could not start the judge");
+  pollRed();
 }
 
 async function redItems(id) {
@@ -665,9 +658,8 @@ function guardLine(r) {
 async function redResume(id) {
   const r = RED_RUNS[id];
   const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models: [r.model], n: r.n, m: r.m, k: r.k, seed: r.seed ?? 0,
-                           harness: r.harness || "none", guard: r.guard || "none",
-                           gate_model: r.gate_model || "qwen3:14b" }) });
+    body: JSON.stringify({ models: [r.model], n: r.n, m: r.m, harness: r.harness || "none",
+                           judge: $("redJudge").value.trim() || null }) });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }

@@ -16,8 +16,8 @@ if storage is blocked the UI starts in Normal run).
 - `?mode=attack` opens straight into Attack & defend, e.g. as a demo link.
 - Each mode remembers its last tab.
 - In attack mode the active mode button and a banner under the header use the danger hue.
-- The UI keeps its original theme. Attack mode only adds the mode switch, the banner, the D0–D5
-  badge ramp (grey → deep green) and a violet harness badge.
+- The UI keeps its original theme. Attack mode only adds the mode switch, the banner and a violet
+  harness badge.
 
 ## 2. Stream eval
 
@@ -31,73 +31,82 @@ if storage is blocked the UI starts in Normal run).
 
 **Form.**
 - **Answering model (under test)**, e.g. `qwen-tb`.
-- **Guard model (gate / verifier)**: the un-attacked model passed as `--gate-model`, default
-  `qwen3:14b`. It's only enabled for D2–D5, the guards that call it. D1 is a system prompt, and a
-  harness plays every node with the answering model.
+- **Judge model (for ASR)**, default `gpt-oss:20b`, the judge the published results use. Pick a
+  model you aren't testing. Leave it empty to skip judging; ASR then falls back to the keyword
+  regex, marked *≈ regex*.
 - Both fields suggest the models installed in Ollama.
-- Then MedQA items, harmful-medical items, and one of the two choices below. The non-medical count and the seed are no longer in the form; runs use
-`-k 0 --seed 0`.
+- **MedQA items** and **Harmful-medical inserted**.
+- **Harness (H)**, one of the options below.
 
-| choice | options | script | what runs |
-|---|---|---|---|
-| **Harness (H)** | none · `sysprompt` · `gatetool` · `gatenodes` | `eval_guarded.py <harness> --model M -m -n` | the model inside a guarded LangGraph (`graph/guarded.py`), **every node the same model**: S1 a refusal instruction to the model itself; S2 the model holds a `classify_request` tool and decides whether to screen itself; S3 a gate node labels the request and the graph routes HARMFUL to a fixed refusal |
-| **Defense (D)** | D0 none · D1 system · D2 gate · D3 verify · D4 gate+verify · D5 memory | `eval_mixed.py M -n -m --guard <g> [--gate-model G]` | the bare answering model behind a guard played by the guard model |
+There is no Defense picker, off-topic count or seed: harness runs don't mix with guards, and runs
+use `-k 0 --seed 0`.
 
-- **Exclusive.** Harness and defense don't stack: picking one resets the other to none. This
-  matches the scripts, since `eval_guarded.py` has no `--guard`.
-- **Model only.** Harness = none and Defense = D0 is the baseline.
-- **Ladder rows.** Both lists are shown as clickable rungs with one line on what each adds.
-- **Different item order.** A harness run takes the first *m* MedSafetyBench items and then *n*
-  MedQA items. A defense run shuffles MedSafetyBench + the 40 hand-written prompts into MedQA.
+| harness | script | what runs |
+|---|---|---|
+| none — model only | `eval_mixed.py M -n -m -k 0 --seed 0` | the model answers directly; MedSafetyBench test + the 40 hand-written prompts, shuffled into MedQA |
+| `sysprompt` · `gatetool` · `gatenodes` | `eval_guarded.py <harness> --model M -m -n` | the model inside a guarded LangGraph (`graph/guarded.py`), **every node the same model**: S1 a refusal instruction to the model itself; S2 the model holds a `classify_request` tool and decides whether to screen itself; S3 a gate node labels the request and the graph routes HARMFUL to a fixed refusal. Items: the first *m* MedSafetyBench, then *n* MedQA |
 
-**Runs table.**
-- An H or D badge per run (with the guard model under D2–D5 badges), then MedQA accuracy, false refusal, harmful refused and the
-  harmful-response rate.
-- **blocked**: what the gate, verifier or memory stopped, how often the `gatetool` agent never
-  called its tool, and how often the answerer never ran.
-- Runs of the earlier clean-judge guard (`graph/guard.py`, recognised by `judges` in their meta)
-  show as *legacy* and are not placed on the D ladder.
-- Resume restarts the same run; both scripts skip items already in their file.
+With a judge model, the run is chained to `judge.py <run> --metric binary --judge J` in the same
+process group. Its status reads *judging* while labels are written, and stop ends both steps.
 
-**Per-prompt rows** add the guard's decision under the verdict: gate label, verifier label,
-memory hit, "answerer never ran".
+**Runs table.** One row per run.
+
+| column | meaning | source |
+|---|---|---|
+| H | harness badge, or *model only*. Runs made outside this form with a guard are labelled `guard <g>` or `legacy <g>` | run id / meta |
+| stream | MedQA + harmful counts | run id |
+| **ASR** | attack success rate = NOT_REFUSED / judged harmful replies (partial help counts), with counts, judge name and unparsed labels. *≈ regex* (1 − keyword refusal) until a judge has run | `<run>.binary-<judge>.jsonl`, as in `docs/redteam/results/` |
+| **Accuracy** | MedQA exam accuracy (utility) | `correct` per MedQA row |
+| **False refusal** | MedQA questions refused (utility cost, keyword-judged, as in STATUS.md) | `refused` per MedQA row |
+| **Tokens in / out** | mean per item | Ollama `prompt_eval_count` / `eval_count`; summed over nodes for a harness |
+| **Latency mean / p95** | seconds per item, model load excluded | `latency_s`; summed over nodes for a harness |
+
+Older files without cost fields show "—" for tokens and latency.
+
+**Actions per run.**
+- **judge ASR** labels a finished run that has no complete labels yet, using the judge model
+  field.
+- **resume** appears only for runs this form could have started.
+- **clear** also deletes the run's label files.
+
+**Per-prompt rows** add the graph's decision under the verdict: gate label, "tool not called",
+"answerer never ran".
 
 ## 3. API
 
 | route | method | does |
 |---|---|---|
-| `/api/redteam/ladder` | GET | the harness and defense lists above |
-| `/api/redteam/runs` | GET / POST | list runs (with `harness`, `defense`, `gate_model`, `gate` stats) / start: `{models: [answering], n, m, harness, guard, gate_model}`; `harness ≠ none` overrides `guard` |
-| `/api/redteam/runs/{id}/items`, `/log`, `/stop` | GET / POST | per-prompt rows, log tail, stop |
-| `/api/redteam/runs/{id}` | DELETE | remove a finished run's files |
+| `/api/redteam/ladder` | GET | the harness list and the default judge |
+| `/api/redteam/runs` | GET / POST | list runs (`harness`, `asr`, `asr_regex`, `medqa_acc`, `false_refusal`, `cost`, `status` incl. `judging`) / start one run per model: `{models, n, m, harness, judge}`; `judge: null` = no judging |
+| `/api/redteam/runs/{id}/judge` | POST | `{judge}`: label a finished run for ASR |
+| `/api/redteam/runs/{id}/items`, `/log`, `/stop` | GET / POST | per-prompt rows, log tail, stop (the whole process group) |
+| `/api/redteam/runs/{id}` | DELETE | remove a finished run's files, labels included |
 
 Run ids are the scripts' own stems:
-- harness: `<model>_guard-<harness>_m<m>_n<n>`;
-- defense: `<model>[_hw][_gm-<guard model>]_n<n>_m<m>_s<seed>[_g<guard>]`. The `_gm-` tag
-  appears only for a non-default guard model on D2–D5, so runs that differ only in guard model
-  don't share a file.
+- model only: `<model>_n<n>_m<m>_s0`;
+- harness: `<model>_guard-<harness>_m<m>_n<n>`.
 
 All run files go to `data/redteam/med/eval_mixed/`.
 
 ## 4. What is not in this branch
 
-`attack-defend-ui` was rebuilt on `origin/main`. Two things from the earlier version of the
-branch are not here; they're kept in the local tag `backup/attack-defend-ui-pre-rebase`:
+`attack-defend-ui` was rebuilt on `origin/main`. Earlier versions of the page are kept in the
+local tag `backup/attack-defend-ui-pre-rebase` and in this branch's history:
 
-- the `/api/defense/*` backend (`web/defense.py`: live guard trace, injection, poisoning, jobs);
-- the V0–V5 "system under test" selector.
+- the `/api/defense/*` backend;
+- the V0–V5 selector;
+- the Defense (D0–D5) picker;
+- the guard-model input.
 
-The defense backend depended on the old `scripts/redteam/med/` layout and had no page. The V
-selector was removed at your request.
+`eval_mixed.py --guard` itself is unchanged and still runs from the CLI; those runs show up here
+labelled with their guard.
 
 ## 5. Verified
 
-- A D2 run started from the API (answering `qwen2.5:7b`, guard `qwen3:4b-instruct`, n=1, m=1)
-  finished. It wrote `qwen2.5-7b_gm-qwen3-4b-instruct_n1_m1_s0_ggate` with `gate_model` in its
-  meta, and the gate blocked the harmful prompt. The test run was deleted afterwards.
-
-- A `gatenodes` harness run started from `POST /api/redteam/runs` (`qwen3:4b-instruct`, m=1,
-  n=1) finished. The gate blocked the harmful prompt and the answerer never ran on it. The test
-  run was deleted afterwards.
-- The Stream eval page renders at 1600 px (side by side) and 860 px (stacked), checked with
-  headless Chrome.
+- A `gatenodes` run started from the form's API (`qwen3:4b-instruct` answering and judging, n=1,
+  m=2) went through running → judging → finished.
+- Its row showed ASR 0/2 from the judge labels, accuracy, false refusal, tokens 251 / 14 and
+  latency 2.19 / 2.28 s. The test run and its labels were deleted afterwards.
+- The **judge ASR** button's route (`POST …/judge`) was not exercised, so as not to write labels
+  into existing runs.
+- The page renders side by side at 1700 px, checked with headless Chrome.

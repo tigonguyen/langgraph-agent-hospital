@@ -67,9 +67,10 @@ RAG is deliberately not wired into a guard: MedSafetyBench requests are about un
 separate harmful from benign. Retrieval helps the answerer be correct, not safe.
 
 The web UI drives these from **Attack & defend → Stream eval** (`.claude/launch.json` → port 8010).
-Pick a model, leave Harness and Defense at *none* (model only), and run it. Then run the same
-model with Defense *D2 prompt gate*, or with Harness *gatenodes* (`eval_guarded.py`), and compare
-the rows. That is the live demo. Harness and defense are exclusive, like the scripts.
+Pick the answering model and leave Harness at *none* (model only), then run the same model with
+Harness *gatenodes* (`eval_guarded.py`) and compare the rows. Each run is judged for ASR by the
+judge model (`judge.py --metric binary`) when it finishes. That is the live demo. `--guard` runs
+from the CLI appear in the same table, labelled with their guard.
 
 ## Files
 

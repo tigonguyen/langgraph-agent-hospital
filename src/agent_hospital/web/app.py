@@ -260,20 +260,21 @@ def api_delete_run(run_id: str) -> dict:
 # --- red team: MedQA stream with malicious prompts injected -----------------
 
 class RedRunRequest(BaseModel):
-    models: list[str]
+    models: list[str]       # the answering model(s) under test, one run each
     n: int = 100            # MedQA test items
-    m: int = 50             # harmful-medical prompts inserted (MedSafetyBench test + hand-written)
-    k: int = 0              # non-medical prompts inserted (OASST1 held-out) — scope test
-    seed: int = 0
-    guard: str = "none"     # inference-time guard: none | system | gate | verify | gate+verify | memory (eval_mixed.py)
-    gate_model: str = red_mod.GATE_MODEL   # un-attacked model for the gate / verifier (D2-D5)
-    harness: str = "none"   # graph harness: none | sysprompt | gatetool | gatenodes (eval_guarded.py); overrides guard
+    m: int = 50             # harmful-medical prompts
+    harness: str = "none"   # none (model only) | sysprompt | gatetool | gatenodes (graph/guarded.py)
+    judge: str | None = red_mod.JUDGE_MODEL   # ASR judge chained after the run; None = regex only
+
+
+class JudgeRequest(BaseModel):
+    judge: str = red_mod.JUDGE_MODEL
 
 
 @app.get("/api/redteam/ladder")
 def api_red_ladder() -> dict:
-    """The harness (H) and defense (D) choices the Stream eval form offers."""
-    return {"harnesses": red_mod.HARNESSES, "defenses": red_mod.DEFENSES}
+    """The harness choices the Stream eval form offers, and the default ASR judge."""
+    return {"harnesses": red_mod.HARNESSES, "judge": red_mod.JUDGE_MODEL}
 
 
 @app.get("/api/redteam/models")
@@ -286,11 +287,18 @@ def api_red_start(req: RedRunRequest) -> dict:
     started = []
     for model in req.models:
         try:
-            started.append(red_mod.start(model, req.n, req.m, req.seed, req.k, req.guard, req.harness,
-                                         req.gate_model).run_id)
+            started.append(red_mod.start(model, req.n, req.m, req.harness, req.judge or None).run_id)
         except ValueError as exc:
             raise HTTPException(409, str(exc))
     return {"run_ids": started}
+
+
+@app.post("/api/redteam/runs/{run_id}/judge")
+def api_red_judge(run_id: str, req: JudgeRequest) -> dict:
+    try:
+        return {"run_id": red_mod.start_judge(run_id, req.judge).run_id, "status": "judging"}
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
 
 
 @app.get("/api/redteam/runs")

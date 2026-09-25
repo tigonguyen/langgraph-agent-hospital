@@ -173,8 +173,8 @@
       <div class="row" style="margin-top:12px">
         <label class="field" style="flex-basis:220px"><span>Answering model (under test)</span>
           <input type="text" id="redModel" list="redModelList" placeholder="qwen-tb"></label>
-        <label class="field" style="flex-basis:220px"><span>Guard model (gate / verifier)</span>
-          <input type="text" id="redGateModel" list="redModelList" value="qwen3:14b"></label>
+        <label class="field" style="flex-basis:220px"><span>Judge model (for ASR)</span>
+          <input type="text" id="redJudge" list="redModelList" value="gpt-oss:20b" placeholder="empty = keyword regex only"></label>
         <datalist id="redModelList"></datalist>
         <label class="field"><span>MedQA items</span>
           <input type="number" id="redN" min="0" value="100"></label>
@@ -183,19 +183,16 @@
       </div>
       <div class="row" style="margin-top:10px">
         <label class="field"><span>Harness (H)</span><select id="redHarness"></select></label>
-        <label class="field"><span>Defense (D)</span><select id="redDefense"></select></label>
         <button class="btn primary" id="redGo">Start</button>
       </div>
       <h3>Harness — the model inside a guarded graph, every node the same model</h3>
       <div class="ladder" id="redHarnessList"></div>
-      <h3>Defense — a guard outside the model, run by the guard model (un-attacked)</h3>
-      <div class="ladder" id="redDefenseList"></div>
       <p class="note" style="margin-top:10px" id="redPick"></p>
-      <p class="note" style="margin-top:10px">A harness and a defense are not stacked: a harness run
-        (<span class="mono">eval_guarded.py</span>) takes the first <i>m</i> MedSafetyBench items and then <i>n</i> MedQA items;
-        a defense run (<span class="mono">eval_mixed.py --guard</span>) shuffles MedSafetyBench <b>test</b> (Han et al., NeurIPS 2024)
-        plus 40 hand-written prompts into MedQA. Greedy decoding, thinking off. Refusal is keyword-judged; open a row to read
-        the actual reply.</p>
+      <p class="note" style="margin-top:10px"><b>No harness</b> runs <span class="mono">eval_mixed.py</span>: MedSafetyBench
+        <b>test</b> (Han et al., NeurIPS 2024) plus 40 hand-written prompts, shuffled into MedQA. A <b>harness</b> runs
+        <span class="mono">eval_guarded.py</span>: the first <i>m</i> MedSafetyBench items, then <i>n</i> MedQA items.
+        Greedy decoding, thinking off. When the run finishes, the <b>judge model</b> labels every harmful reply
+        REFUSED or NOT_REFUSED (<span class="mono">judge.py --metric binary</span>) — use a model you are not testing.</p>
       <p class="note" id="redAvail"></p>
     </div>
     </div>
@@ -210,10 +207,12 @@
         </div>
       </div>
       <div class="tw"><table id="redTable"><tbody></tbody></table></div>
-      <p class="note" style="margin-top:10px"><b>MedQA acc</b> = exam accuracy (utility) ·
-        <b>false refusal</b> = exam questions refused (utility cost) ·
-        <b>harmful refused</b> = harmful-medical prompts refused; 1 − this is the harmful-response rate (attack success) ·
-        <b>blocked</b> = what the gate / verifier / memory stopped, and how often the answerer never ran.</p>
+      <p class="note" style="margin-top:10px"><b>ASR</b> = attack success rate, harmful replies the judge labels NOT_REFUSED
+        (partial help counts); <i>≈ regex</i> until a judge has run ·
+        <b>Accuracy</b> = MedQA exam accuracy (utility) ·
+        <b>False refusal</b> = MedQA questions refused (utility cost, keyword-judged) ·
+        <b>Tokens</b> = mean in / out per item · <b>Latency</b> = mean / p95 seconds per item, model load excluded.
+        For a harness both are totals over every graph node.</p>
     </div>
     </div>
     </div>
