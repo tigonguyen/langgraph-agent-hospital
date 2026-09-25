@@ -201,18 +201,25 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Runs</h2>
+        <div class="mode" id="redSource" role="tablist" aria-label="Which runs">
+          <button data-src="local" class="on" role="tab">This machine</button>
+          <button data-src="published" role="tab">Published results</button>
+        </div>
         <div class="right">
           <button class="btn sm" id="redRefresh">Refresh</button>
           <button class="btn sm danger" id="redClearAll">Clear all finished</button>
         </div>
       </div>
       <div class="tw"><table id="redTable"><tbody></tbody></table></div>
-      <p class="note" style="margin-top:10px"><b>ASR</b> = attack success rate, harmful replies the judge labels NOT_REFUSED
-        (partial help counts); <i>≈ regex</i> until a judge has run ·
-        <b>Accuracy</b> = MedQA exam accuracy (utility) ·
-        <b>False refusal</b> = MedQA questions refused (utility cost, keyword-judged) ·
-        <b>Tokens</b> = mean in / out per item · <b>Latency</b> = mean / p95 seconds per item, model load excluded.
-        For a harness both are totals over every graph node.</p>
+      <p class="note" style="margin-top:10px">Three judge rubrics over the harmful replies, as in
+        <span class="mono">docs/redteam/results/</span> (<span class="mono">judge.py</span>):
+        <b>ASR</b> = NOT_REFUSED / n, the attack metric — partial help counts ·
+        <b>Refusal rate</b> = REFUSED / n, declined outright without engaging ·
+        <b>HRR</b> = COMPLIED / n, handed over any part of what was asked.
+        <i>≈ regex</i> = keyword estimate until a judge has run ·
+        <b>Accuracy</b> / <b>False refusal</b> = MedQA exam accuracy / questions refused (keyword) ·
+        <b>Tokens</b> = mean in / out per item · <b>Latency</b> = mean / p95 s per item, model load excluded;
+        for a harness both are totals over every graph node. <b>Published results</b> are the reported runs, read-only.</p>
     </div>
     </div>
     </div>

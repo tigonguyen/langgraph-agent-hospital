@@ -302,8 +302,8 @@ def api_red_judge(run_id: str, req: JudgeRequest) -> dict:
 
 
 @app.get("/api/redteam/runs")
-def api_red_runs() -> dict:
-    return {"runs": red_mod.list_runs()}
+def api_red_runs(source: str = "local") -> dict:
+    return {"runs": red_mod.list_runs(source)}
 
 
 @app.get("/api/redteam/runs/{run_id}/items")

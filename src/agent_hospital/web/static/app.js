@@ -36,7 +36,7 @@ const SUBTITLE = { normal: "MedQA-USMLE · V0–V5 ablation ladder",
                    attack: "Red team · fine-tuning attack, harnesses and guards" };
 function setMode(mode) {
   document.body.dataset.mode = mode;
-  document.querySelectorAll(".mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+  document.querySelectorAll("header .mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
   const tabs = [...document.querySelectorAll("nav button")];
   tabs.forEach((b) => (b.hidden = b.dataset.in !== mode));
   const mine = tabs.filter((b) => b.dataset.in === mode).map((b) => b.dataset.tab);
@@ -45,7 +45,7 @@ function setMode(mode) {
   store.set("mode", mode);
   openTab(mine.includes(last) ? last : mine[0]);
 }
-document.querySelectorAll(".mode button").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
+document.querySelectorAll("header .mode button").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
 
 (async function boot() {
   META = await get("/api/variants");
@@ -558,51 +558,68 @@ const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="$
 let redTimer;
 const RED_RUNS = {};
 const num = (x, d = 0) => (x === null || x === undefined ? "—" : x.toFixed(d));
-function asrCell(r) {
-  const a = r.asr;
-  if (a && a.asr !== null) {
-    const part = a.labelled < a.of ? ` · ${a.labelled}/${a.of} judged` : "";
-    return `${redRate(a.asr, a.asr > 0.2 ? "bad" : "")}<div class="dim kv">${a.not_refused}/${a.labelled - a.unparsed} · ${esc(a.judge)}${part}${a.unparsed ? ` · ${a.unparsed} unparsed` : ""}</div>`;
-  }
-  return r.asr_regex === null ? "—"
-    : `<span class="dim">≈ ${pct(r.asr_regex)}</span><div class="dim kv">regex${a ? " · judging…" : ""}</div>`;
+// One judge rubric's cell: the rate, then hits / judged, the judge and any gaps.
+function judgeCell(j, bad) {
+  if (!j || j.rate === null) return null;
+  const part = j.labelled < j.of ? ` · ${j.labelled}/${j.of} judged` : "";
+  return `${redRate(j.rate, bad && j.rate > 0.2 ? "bad" : "")}<div class="dim kv">${j.hits}/${j.labelled - j.unparsed}${j.judge ? ` · ${esc(j.judge)}` : ""}${part}${j.unparsed ? ` · ${j.unparsed} unparsed` : ""}</div>`;
 }
+function asrCell(r) {
+  const c = judgeCell(r.judged && r.judged.binary, true);
+  if (c) return c;
+  return r.asr_regex === null ? "—"
+    : `<span class="dim">≈ ${pct(r.asr_regex)}</span><div class="dim kv">regex${r.status === "judging" ? " · judging…" : ""}</div>`;
+}
+let RED_SOURCE = "local";
+function setRedSource(src) {
+  RED_SOURCE = src;
+  document.querySelectorAll("#redSource button").forEach((x) => x.classList.toggle("on", x.dataset.src === src));
+  $("redClearAll").style.display = src === "local" ? "" : "none";
+}
+document.querySelectorAll("#redSource button").forEach((b) => (b.onclick = () => { setRedSource(b.dataset.src); pollRed(); }));
+// ?source=published opens the Runs pane on the reported results (a link for a report or demo).
+if (new URLSearchParams(location.search).get("source") === "published") setRedSource("published");
 async function pollRed() {
   clearTimeout(redTimer);
-  const { runs } = await get("/api/redteam/runs");
+  const { runs } = await get(`/api/redteam/runs?source=${RED_SOURCE}`);
   runs.forEach((r) => (RED_RUNS[r.run_id] = r));
-  $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>stream</th><th>progress</th>
-    <th class="num">ASR</th><th class="num">Accuracy</th><th class="num">False refusal</th>
+  const pub = RED_SOURCE === "published";
+  $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>${pub ? "set" : "stream"}</th><th>progress</th>
+    <th class="num">ASR</th><th class="num">Refusal rate</th><th class="num">HRR</th>
+    <th class="num">Accuracy</th><th class="num">False refusal</th>
     <th class="num">Tokens in / out</th><th class="num">Latency mean / p95</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;
     const c = r.cost;
     const h = hbadge(r.harness) + (r.other ? `<div class="dim kv">${esc(r.other)}</div>` : "");
-    const canJudge = r.status !== "running" && r.status !== "judging" && r.n_mal_done && !(r.asr && r.asr.labelled >= r.asr.of);
+    const canJudge = !pub && r.status !== "running" && r.status !== "judging" && r.n_mal_done
+      && Object.values(r.judged || {}).some((j) => !j || j.labelled < j.of);
     return `<tr>
       <td style="white-space:nowrap">${h}</td>
       <td class="mono">${esc(r.model)}</td>
-      <td class="kv" style="min-width:120px">${r.n} MedQA + ${r.m} harmful${r.k ? ` + ${r.k} non-med` : ""}</td>
+      <td class="kv" style="min-width:120px">${pub ? `<span class="mono">${esc(r.set)}</span><br>` : ""}${r.n} MedQA + ${r.m} harmful${r.k ? ` + ${r.k} non-med` : ""}</td>
       <td style="min-width:150px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
         <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
       <td class="num" style="min-width:120px">${asrCell(r)}</td>
+      <td class="num" style="min-width:110px">${judgeCell(r.judged && r.judged.refusal) || "—"}</td>
+      <td class="num" style="min-width:110px">${judgeCell(r.judged && r.judged.harm, true) || "—"}</td>
       <td class="num">${redRate(r.medqa_acc)} <div class="dim kv">n=${r.n_medqa_done}</div></td>
       <td class="num">${redRate(r.false_refusal)}</td>
       <td class="num kv">${c ? `${num(c.tokens_in)} / ${num(c.tokens_out)}` : "—"}</td>
-      <td class="num kv">${c ? `${num(c.latency_mean, 2)} / ${num(c.latency_p95, 2)} s` : "—"}</td>
+      <td class="num kv"${c && c.note ? ` title="${esc(c.note)}"` : ""}>${c ? `${num(c.latency_mean, 2)} / ${num(c.latency_p95, 2)} s${c.note ? " *" : ""}` : "—"}</td>
       <td><span class="tag ${r.status === "judging" ? "running" : r.status}">${r.status}</span></td>
       <td style="text-align:right; white-space:nowrap">
         <button class="btn sm" onclick="redItems('${esc(r.run_id)}')">prompts</button>
         <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
         ${canJudge ? `<button class="btn sm" onclick="redJudgeRun('${esc(r.run_id)}')">judge ASR</button>` : ""}
-        ${r.status === "running" || r.status === "judging"
+        ${pub ? "" : r.status === "running" || r.status === "judging"
           ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
           : (r.status === "stopped" && r.resumable ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
-  }).join("") : empty(11, "No red-team runs yet — start one on the left."));
+  }).join("") : empty(13, pub ? "No published results in docs/redteam/results/." : "No red-team runs yet — start one on the left."));
   // Keep the table live while the tab is open: runs may be started from the CLI too.
-  const busy = runs.some((r) => r.status === "running" || r.status === "judging");
+  const busy = !pub && runs.some((r) => r.status === "running" || r.status === "judging");
   if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, busy ? 2000 : 5000);
 }
 async function redJudgeRun(id) {
@@ -622,13 +639,20 @@ async function redItems(id) {
   $("redItemsId").textContent = `${id} · ${items.length} row(s)`;
   $("redItems").innerHTML = `<tr><th>#</th><th>kind</th><th>prompt</th><th>verdict</th><th>reply</th></tr>` +
     (items.length ? items.map((r, i) => {
-      const verdict = r.kind === "malicious"
+      const lab = r.labels || {};
+      const JL = { binary: "ASR", refusal: "refusal", harm: "harm" };
+      const BAD = { not_refused: 1, answered: 1, complied: 1 };
+      const judgeTags = Object.keys(JL).filter((k) => lab[k]).map((k) =>
+        `<span class="tag ${BAD[lab[k]] ? "failed" : "finished"}" title="${JL[k]} rubric">${JL[k]}: ${esc(lab[k])}</span>`).join(" ");
+      const verdict0 = r.kind === "malicious"
         ? (r.refused ? `<span class="tag finished">refused</span>` : `<span class="tag failed">complied</span>`)
         : r.kind === "nonmedical"
         ? (r.refused ? `<span class="tag finished">refused (scope)</span>` : `<span class="tag failed">answered off-topic</span>`)
         : (r.refused ? `<span class="tag failed">refused</span>`
            : r.correct ? `<span class="tag finished">correct</span>`
            : r.valid ? `<span class="tag">wrong (${LETTERS[r.pred]} vs ${LETTERS[r.gold]})</span>` : `<span class="tag failed">invalid</span>`);
+      // A judged harmful row shows the judge's labels; the keyword verdict stays as a dim second opinion.
+      const verdict = judgeTags ? `<div class="row" style="gap:4px">${judgeTags}</div><div class="dim kv" style="margin-top:4px">regex: ${r.refused ? "refused" : "complied"}</div>` : verdict0;
       const src = r.source ? `<div class="dim kv">${esc(r.source)}</div>` : "";
       return `<tr>
         <td class="kv">${i + 1}</td>
