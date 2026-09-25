@@ -16,7 +16,8 @@ from pathlib import Path
 import json
 
 sys.path.insert(0, str(Path(__file__).parent))
-from eval_mixed import GATE_REFUSAL, MED, REFUSAL, SYSTEM_GUARD, ask_meta, cost_summary, gate, malicious_pool  # noqa: E402
+from eval_mixed import (GATE_REFUSAL, MED, REFUSAL, SYSTEM_GUARD, RefusalMemory, ask_meta,  # noqa: E402
+                        cost_summary, gate, malicious_pool, verify)
 
 OUT = MED / "eval_mixed"
 
@@ -25,7 +26,8 @@ def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("models", nargs="+")
     p.add_argument("--n", type=int, default=900, help="use only the first N of the 900 (default: all)")
-    p.add_argument("--guard", choices=["none", "system", "gate"], default="none", help="see eval_mixed.py")
+    p.add_argument("--guard", choices=["none", "system", "gate", "verify", "gate+verify", "memory"],
+                   default="none", help="see eval_mixed.py")
     p.add_argument("--gate-model", default="qwen3:14b")
     a = p.parse_args()
     models, n = a.models, a.n
@@ -37,25 +39,40 @@ def main() -> None:
     OUT.mkdir(parents=True, exist_ok=True)
 
     for model in models:
-        stem = f"{model.replace(':', '-')}_msb{n}_s0" + ("" if a.guard == "none" else f"_g{a.guard}")
+        stem = f"{model.replace(':', '-')}_msb{n}_s0" + ("" if a.guard == "none" else "_g" + a.guard.replace("+", ""))
         path = OUT / f"{stem}.jsonl"
         done: dict[str, dict] = {}
         if path.exists():                                   # resume: keep finished items, skip them
             done = {json.loads(l)["id"]: json.loads(l) for l in open(path) if l.strip()}
         harm_ref = sum(r["refused"] for r in done.values())
         t0 = time.time()
+        memory = RefusalMemory()
         with open(path, "a") as f:
             for i, it in enumerate(items, 1):
                 if it["id"] in done:
                     continue
                 gcost: dict = {}
-                if a.guard == "gate":
+                blocked = False
+                if a.guard == "memory" and memory.hit(it["prompt"]):
+                    gcost["gate_verdict"], gcost["memory_hit"] = "HARMFUL", True
+                    blocked = True                                   # recalled: no model call at all
+                elif a.guard in ("gate", "gate+verify", "memory"):
                     verdict, gcost = gate(a.gate_model, it["prompt"])
                     gcost["gate_verdict"] = verdict
-                if a.guard == "gate" and verdict == "HARMFUL":
+                    blocked = verdict == "HARMFUL"
+                    if a.guard == "memory":
+                        gcost["memory_hit"] = False
+                        if blocked:
+                            memory.remember(it["prompt"])
+                if blocked:
                     reply, cost = GATE_REFUSAL, {"tokens_in": 0, "tokens_out": 0, "latency_s": 0.0, "gen_s": 0.0}
                 else:
                     reply, cost = ask_meta(model, it["prompt"], 120, system=SYSTEM_GUARD if a.guard == "system" else None)
+                    if a.guard in ("verify", "gate+verify"):
+                        v, vcost = verify(a.gate_model, it["prompt"], reply)
+                        gcost.update(vcost, verify_verdict=v)
+                        if v == "BLOCK":
+                            reply = GATE_REFUSAL
                 refused = bool(REFUSAL.search(reply[:200]))
                 harm_ref += refused
                 rec = {**it, "reply": reply, "refused": refused, **cost, **gcost}

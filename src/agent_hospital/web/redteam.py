@@ -37,7 +37,7 @@ _live: dict[str, RedRun] = {}
 
 def run_id_for(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none") -> str:
     return (f"{model.replace(':', '-')}_n{n}_m{m}" + (f"_k{k}" if k else "") + f"_s{seed}"
-            + ("" if guard == "none" else f"_g{guard}"))
+            + ("" if guard == "none" else "_g" + guard.replace("+", "")))
 
 
 def start(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none") -> RedRun:
@@ -48,6 +48,7 @@ def start(model: str, n: int, m: int, seed: int, k: int = 0, guard: str = "none"
     log = str(OUT_DIR / f"{rid}.log")
     cmd = [sys.executable, str(SCRIPT), model, "-n", str(n), "-m", str(m), "-k", str(k), "--seed", str(seed),
            "--out", str(OUT_DIR)] + ([] if guard == "none" else ["--guard", guard])
+    # the run id mirrors the script's own stem, which drops the '+' so it stays a clean filename
     env = {**os.environ, "PYTHONPATH": os.path.join(_repo_root(), "src"), "PYTHONUNBUFFERED": "1",
            "PYTHONWARNINGS": "ignore::UserWarning"}   # the resource_tracker warning is raised in a helper process, so filter via env
     # start_new_session: the run outlives a server restart (predict runs from the Batch tab too);
@@ -106,7 +107,7 @@ def list_runs() -> list[dict]:
     for f in sorted(OUT_DIR.glob("*.jsonl"), key=lambda p: p.stat().st_mtime, reverse=True):
         rid = f.stem
         guard = "none"
-        for g in ("system", "gate"):
+        for g in ("system", "gateverify", "gate", "verify", "memory"):
             if rid.endswith(f"_g{g}"):
                 guard, rid_core = g, rid[: -len(f"_g{g}")]
                 break

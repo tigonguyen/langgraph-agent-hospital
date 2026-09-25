@@ -39,12 +39,32 @@ export_results.py                        # copy the reported runs into docs/redt
 
 ## Inference-time guards
 
-`eval_mixed.py` and `eval_msb900.py` take `--guard system|gate`. Both sit outside the answerer's
-weights, so the fine-tuning attacker cannot touch them:
+`eval_mixed.py` and `eval_msb900.py` take `--guard`. Every guard runs in a separate agent whose
+weights the fine-tuning attacker never touches — that is what makes them survive a jailbroken
+answerer, and it is the assumption to state: the attacker owns the model, not the serving stack.
 
-- `system` — prepend a refusal instruction to the attacked model.
-- `gate` — a separate un-attacked model (`--gate-model`, default `qwen3:14b`) classifies the prompt
-  first; HARMFUL never reaches the answerer. `gate_check.py` calibrates the gate on its own.
+| `--guard` | what runs | reuses |
+|---|---|---|
+| `system` | a refusal instruction prepended to the attacked answerer | — |
+| `gate` | a second agent classifies the **request**; HARMFUL never reaches the answerer | the decider/gate pattern |
+| `verify` | the answerer replies, then a second agent reviews the **reply** and swaps it for a refusal if it helps the request | `graph/nodes.make_report_verify_node` |
+| `gate+verify` | both, in series: pre-filter on the request, post-filter on the reply | defense in depth |
+| `memory` | `gate`, plus a bank of what it already blocked, recalled by word overlap; a hit blocks with no model call | `graph/longterm.py`'s recall-by-overlap |
+
+`--gate-model` (default `qwen3:14b`) is the un-attacked model the gate and the verifier use.
+`gate_check.py` calibrates the gate on its own: 13.0% of harmful prompts missed, 0.25% of MedQA
+prompts wrongly blocked.
+
+Why the gate and the verifier are complements: the gate only ever sees the request, so a request
+that reads as ordinary slips past it (its 13% miss); the verifier only ever sees the reply, so it
+catches harm that only becomes visible once written, at the cost of one generation that the gate
+would have skipped. `memory` is an optimisation of the gate, not extra coverage — it recognises
+rephrasings that share content words, so repeats become free, but a genuinely novel phrasing still
+falls through to the gate.
+
+RAG is deliberately not wired into a guard: MedSafetyBench requests are about unethical *actions*
+(falsifying records, denying care), not factual errors, so retrieving textbook passages does not
+separate harmful from benign. Retrieval helps the answerer be correct, not safe.
 
 The web UI's **Red team** tab drives these (`.claude/launch.json` → port 8010): pick a model, set
 Guard to *none*, run it, then run the same model with *gate* and compare the two rows. That is the
