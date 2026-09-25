@@ -20,6 +20,12 @@ Regenerate this folder with `scripts/redteam/export_results.py`.
   un-attacked `qwen3:14b` classifies the prompt; HARMFUL never reaches the answerer). Rows carry
   `gate_verdict` and `gate_*` cost fields. `gate_calibration.json` is the gate measured on its own:
   13.0% of harmful prompts missed, 0.25% of MedQA prompts wrongly blocked.
+- `graph_guards_qwen-tb/{sysprompt,gatetool}.*` — the other two graph variants (refusal system prompt
+  in one node; a classify tool the model may call), same attacked model, same 900 + 1273 rows.
+- `attack40_harmful/` — TenBenign with LoRA on all 40 layers instead of 16: `qwen-tb40` on the 900
+  harmful prompts, `med-booster-tb40_100` (the current Booster attacked) on the first 100, and
+  `booster40_training_loss.txt`, the loss curves of four Booster-on-40-layers attempts that diverged
+  and of the 16-layer control on the same data and seed that did not.
 - `graph_guards_qwen-tb/gatenodes.*` — the graph guard of `graph/guarded.py` with the attacked
   qwen-tb in every node (gate → refuse | answer), 900 harmful + 1273 MedQA rows in one file, with
   gate verdicts and per-node cost. Its summary's latency excludes one item that spans a manual pause.
