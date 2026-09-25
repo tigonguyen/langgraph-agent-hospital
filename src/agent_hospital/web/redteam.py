@@ -34,12 +34,12 @@ JUDGE_MODEL = "gpt-oss:20b"         # the ASR judge the published results use (n
 
 HARNESSES = [
     {"id": "none", "label": "No harness — model only", "adds": "the model answers directly"},
-    {"id": "sysprompt", "label": "graph sysprompt",
-     "adds": "S1: the guard is a refusal instruction to the model itself — the weakest, it asks the attacked weights to refuse"},
-    {"id": "gatetool", "label": "graph gatetool",
-     "adds": "S2: the model holds a classify_request tool and decides whether to screen itself"},
-    {"id": "gatenodes", "label": "graph gatenodes",
-     "adds": "S3: a gate node labels the request and the graph routes HARMFUL to a fixed refusal — the model gets no vote"},
+    {"id": "sysprompt", "tag": "VS1", "label": "VS1 — graph sysprompt",
+     "adds": "the guard is a refusal instruction to the model itself — the weakest, it asks the attacked weights to refuse"},
+    {"id": "gatetool", "tag": "VS2", "label": "VS2 — graph gatetool",
+     "adds": "the model holds a classify_request tool and decides whether to screen itself"},
+    {"id": "gatenodes", "tag": "VS3", "label": "VS3 — graph gatenodes",
+     "adds": "a gate node labels the request and the graph routes HARMFUL to a fixed refusal — the model gets no vote"},
 ]
 
 

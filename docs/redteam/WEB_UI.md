@@ -44,7 +44,7 @@ use `-k 0 --seed 0`.
 | harness | script | what runs |
 |---|---|---|
 | none — model only | `eval_mixed.py M -n -m -k 0 --seed 0` | the model answers directly; MedSafetyBench test + the 40 hand-written prompts, shuffled into MedQA |
-| `sysprompt` · `gatetool` · `gatenodes` | `eval_guarded.py <harness> --model M -m -n` | the model inside a guarded LangGraph (`graph/guarded.py`), **every node the same model**: S1 a refusal instruction to the model itself; S2 the model holds a `classify_request` tool and decides whether to screen itself; S3 a gate node labels the request and the graph routes HARMFUL to a fixed refusal. Items: the first *m* MedSafetyBench, then *n* MedQA |
+| VS1 `sysprompt` · VS2 `gatetool` · VS3 `gatenodes` | `eval_guarded.py <harness> --model M -m -n` | the model inside a guarded LangGraph (`graph/guarded.py`), **every node the same model**: VS1 a refusal instruction to the model itself; VS2 the model holds a `classify_request` tool and decides whether to screen itself; VS3 a gate node labels the request and the graph routes HARMFUL to a fixed refusal. Items: the first *m* MedSafetyBench, then *n* MedQA |
 
 With a judge model, the run is chained to `judge.py <run> --metric binary --judge J` in the same
 process group. Its status reads *judging* while labels are written, and stop ends both steps.
@@ -53,7 +53,7 @@ process group. Its status reads *judging* while labels are written, and stop end
 
 | column | meaning | source |
 |---|---|---|
-| Harness | harness badge, or *model only*. Runs made outside this form with a guard are labelled `guard <g>` or `legacy <g>` | run id / meta |
+| Harness | harness badge (`VS1 · sysprompt`, `VS2 · gatetool`, `VS3 · gatenodes`), or *model only*. Runs made outside this form with a guard are labelled `guard <g>` or `legacy <g>` | run id / meta |
 | stream | MedQA + harmful counts | run id |
 | **ASR** | attack success rate = NOT_REFUSED / judged harmful replies (partial help counts), with counts, judge name and unparsed labels. *≈ regex* (1 − keyword refusal) until a judge has run | `<run>.binary-<judge>.jsonl`, as in `docs/redteam/results/` |
 | **Accuracy** | MedQA exam accuracy (utility) | `correct` per MedQA row |

@@ -506,7 +506,10 @@ async function redModels() {
 
 // Harness: the model alone, or inside one of graph/guarded.py's guarded graphs.
 let LADDER = null;
-const hbadge = (h) => (h && h !== "none" ? `<span class="vbadge h">${esc(h)}</span>` : `<span class="vbadge raw">model only</span>`);
+// VS1-VS3 = graph/guarded.py's S1-S3; the tag leads so a row is recognisable at a glance.
+const HTAG = { sysprompt: "VS1", gatetool: "VS2", gatenodes: "VS3" };
+const hbadge = (h) => (h && h !== "none"
+  ? `<span class="vbadge h">${HTAG[h] ? HTAG[h] + " · " : ""}${esc(h)}</span>` : `<span class="vbadge raw">model only</span>`);
 
 async function redLadder() {
   if (LADDER) return;
