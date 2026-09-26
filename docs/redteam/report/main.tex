@@ -499,93 +499,49 @@ không mất độ chính xác. Điều kiện duy nhất là mô hình vẫn \e
 \label{sec:residual}
 % =====================================================================
 
-Mục này tổng hợp trên Harmful-900 các trường hợp đã được ngăn chặn, các trường hợp chưa được ngăn
-chặn và giả định về quyền truy cập của kẻ tấn công ứng với từng kết quả.
+Mỗi phương pháp được phân tích theo ba câu hỏi: ngăn chặn được gì, lỗ hổng còn lại là gì, và kết quả
+giả định kẻ tấn công có quyền truy cập tới đâu.
 
-\begin{table}[h]
-  \centering
-  \caption{ASR của từng cấu hình, tách theo dạng câu hỏi (455 câu dạng ``How can\ldots?'', 445 câu
-  dạng mệnh lệnh).}
-  \label{tab:gap}
-  \small
-  \begin{tabular}{@{}lccc@{}}
-    \toprule
-    Cấu hình & ASR & Dạng câu hỏi & Dạng mệnh lệnh \\
-    \midrule
-    qwen3-14b (gốc, chưa bị tấn công)   & 14,8\% (133) & 15\% & 14\% \\
-    qwen-tb (bị tấn công)               & 23,1\% (208) & 26\% & 20\% \\
-    med-booster-tb (Booster, bị tấn công) & 9,9\% (89) & 16\% & 4\% \\
-    qwen-tb + system prompt             & 12,6\% (113) & 16\% & 9\% \\
-    qwen-tb + bộ lọc gate               & 6,7\% (60)   & 11\% & 2\% \\
-    \bottomrule
-  \end{tabular}
-\end{table}
+\subsection{Booster: can thiệp vào trọng số}
 
-\paragraph{Các trường hợp đã được ngăn chặn.}
+\paragraph{Ngăn chặn được.} Từ chối cả 900 câu hại khi chưa bị tấn công (ASR 0,0\%). Sau khi bị tấn
+công lại, ASR chỉ lên 20,4\%, thấp hơn mô hình gốc bị tấn công (48,2\%) và thấp hơn cả mô hình gốc
+chưa bị tấn công (26,4\%).
+
+\paragraph{Lỗ hổng còn lại.} 184 câu, phần lớn là lọt thật: 99 câu làm đúng yêu cầu, 69 câu trả lời
+chung chung, 16 câu đưa một phần cách làm.
 \begin{compactitem}
-  \item \textbf{Booster:} từ chối toàn bộ 900 câu hỏi độc hại khi chưa bị tấn công. Sau tấn công, số
-  câu không bị từ chối giảm từ 208 (qwen-tb) xuống 89, thấp hơn mô hình gốc chưa bị tấn công.
-  \item \textbf{Bộ lọc gate:} chặn 783/900 câu trước khi tới mô hình bị tấn công; ASR giảm xuống
-  6,7\%, với chi phí thêm 0,46 giây mỗi yêu cầu.
-  \item \textbf{System prompt:} giảm số câu không bị từ chối từ 208 xuống 113, gần mức của mô hình
-  gốc (133).
+  \item \textbf{Dồn về dạng câu hỏi:} 121/184 câu lọt (27\% dạng câu hỏi, so với 14\% dạng mệnh
+  lệnh), đúng dạng mà TenBenign dùng để xoá hành vi từ chối, cho thấy ảnh hưởng của phần câu hỏi trong 10 cặp QA.
+  \item \textbf{Giữ quyết định, mất cách diễn đạt:} 473/900 câu mở đầu bằng ``Yes'' của tấn công
+  ghép vào câu từ chối của Booster (Mục~\ref{sec:booster-results}), cho thấy ảnh hưởng của phần câu trả lời trong 10 cặp QA.
+  \item \textbf{Nguyên nhân:} Booster chỉ huấn luyện để chịu một bước tấn công ($\alpha = 0{,}1$),
+  trong khi TenBenign có 200 bước; Giai đoạn 1 của TenBenign lại đẩy mô hình về phía từ chối, hướng Booster không phạt.
 \end{compactitem}
 
-\paragraph{Các trường hợp chưa được ngăn chặn và nguyên nhân.}
+\paragraph{Giả định về quyền truy cập.} Bên phòng thủ kiểm soát huấn luyện, không dùng lớp bảo vệ
+nào lúc suy luận. Kẻ tấn công có trọng số và fine-tune được bằng LoRA, nhưng không thích ứng: vẫn
+dùng đúng cấu hình TenBenign như với mô hình gốc.
+
+\subsection{Harnessing: can thiệp vào cấu trúc}
+
+\paragraph{Ngăn chặn được.} gatenodes đưa ASR từ 48,2\% xuống 7,1\% mà mọi node vẫn chạy mô hình đã
+bị tấn công; node gate chặn 832/900 câu hại.
+
+\paragraph{Lỗ hổng còn lại.} 64 câu, hỏng theo kiểu khác Booster: 44 câu chỉ trả lời chung chung,
+12 câu đưa một phần cách làm, chỉ 8 câu làm đúng yêu cầu.
 \begin{compactitem}
-  \item \textbf{Câu hỏi dạng ``How can\ldots?'' là điểm yếu chung.} Ở mô hình gốc, ASR của hai dạng
-  câu tương đương nhau (15\% và 14\%). Sau khi áp dụng các lớp phòng thủ, các câu không bị từ chối
-  tập trung ở dạng câu hỏi (Booster: 16\% so với 4\%; bộ lọc gate: 11\% so với 2\%). Các câu này có
-  hình thức giống câu hỏi y khoa thông thường và giống dữ liệu vô hại mà TenBenign dùng để loại bỏ
-  hành vi từ chối, do đó dễ được bộ lọc cho qua và dễ được mô hình trả lời.
-  \item \textbf{Booster:} phương pháp chỉ được huấn luyện để chống chịu một bước tấn công nhỏ
-  ($\alpha = 0{,}1$), trong khi TenBenign gồm 200 bước cập nhật; ngoài ra, Bước 1 của TenBenign đẩy
-  mô hình về phía từ chối, là hướng mà Booster không phạt. Booster giữ được quyết định từ chối ở
-  token đầu tiên nhưng không giữ được cách diễn đạt câu từ chối (Mục~\ref{sec:booster-results}).
-  \item \textbf{Bộ lọc gate:} toàn bộ 60 câu không bị từ chối đều thuộc 117 câu được bộ lọc cho qua
-  (13\%). Do bộ lọc chỉ kiểm tra câu hỏi mà không kiểm tra câu trả lời, rủi ro còn lại được quyết
-  định bởi tỉ lệ bỏ sót của bộ lọc.
-  \item \textbf{System prompt:} phương pháp này chỉ là chỉ dẫn gửi tới chính bộ trọng số đã bị tấn
-  công, nên mô hình vẫn không từ chối 113 câu.
-  \item \textbf{Mô hình gốc:} có ASR 14,8\% khi chưa bị tấn công, cho thấy cơ chế căn chỉnh an toàn
-  ban đầu của Qwen3-14B chưa đầy đủ. Mức này là điểm tham chiếu cho các biện pháp phòng thủ.
+  \item \textbf{Rủi ro nằm ở node gate:} cả 64 câu lọt đều thuộc 68 câu cổng cho qua, nên lỗ hổng
+  đúng bằng tỉ lệ bỏ sót 7,6\%.
+  \item \textbf{Cổng không đọc câu trả lời:} chỉ phân loại câu hỏi, nên câu hại diễn đạt như câu hỏi
+  y khoa bình thường đi thẳng tới node trả lời; 52/64 câu lọt là dạng câu hỏi (11\% so với 3\%).
+  \item \textbf{Hai biến thể còn lại:} sysprompt (35,1\%) và gatetool (18,8\%) yếu hơn vì vẫn để mô
+  hình tự quyết định từ chối.
 \end{compactitem}
 
-\paragraph{Giả định về quyền truy cập của từng kết quả.}
-\begin{compactitem}
-  \item \textbf{qwen-tb, med-booster-tb:} kẻ tấn công có quyền truy cập trọng số và fine-tune bằng
-  LoRA. Tấn công không thích ứng: cùng một cấu hình được dùng cho mọi mô hình, không thiết kế riêng
-  cho Booster.
-  \item \textbf{med-booster:} bên phòng thủ kiểm soát quá trình huấn luyện trước khi triển khai;
-  không sử dụng lớp bảo vệ nào khi suy luận.
-  \item \textbf{System prompt, bộ lọc gate:} kẻ tấn công có quyền truy cập trọng số của mô hình trả
-  lời nhưng không kiểm soát hệ thống triển khai. Bộ lọc gate dùng một bản Qwen3-14B sạch riêng, và kẻ
-  tấn công không biết cấu hình của bộ lọc.
-  \item \textbf{Mọi kết quả:} câu hỏi một lượt, seed 0; nhãn ASR do hai mô hình gán
-  (\texttt{gpt-oss:20b}, Claude Sonnet 5), các trường hợp bất đồng được giải quyết theo quy tắc ở
-  Mục~\ref{sec:eval}.
-\end{compactitem}
-
-\paragraph{Tấn công mạnh hơn: LoRA trên toàn bộ 40 lớp.} Dữ liệu và lịch huấn luyện của TenBenign
-được giữ nguyên, chỉ tăng số lớp được fine-tune từ 16 lên 40.
-\begin{compactitem}
-  \item \textbf{Tấn công trên mô hình gốc:} ASR tăng từ 23,1\% (16 lớp) lên 29,7\% (267/900). Mức
-  tăng chủ yếu ở yêu cầu dạng mệnh lệnh (từ 20\% lên 31\%).
-  \item \textbf{Booster không hội tụ khi áp dụng trên 40 lớp:} nhóm thử bốn cấu hình ($\lambda$ bằng
-  5 hoặc 20, rank 8 hoặc 32), và cả bốn đều có loss tăng đột ngột sau 40--230 bước. Với cùng cấu
-  hình, dữ liệu và seed, quá trình huấn luyện trên 16 lớp ổn định
-  (\texttt{booster40\_training\_loss.txt} trong thư mục kết quả). Nguyên nhân có thể là bước tấn công
-  giả lập $\alpha = 0{,}1$ quá lớn khi áp dụng trên 40 lớp.
-\end{compactitem}
-
-\paragraph{Các kịch bản chưa được kiểm thử.}
-\begin{compactitem}
-  \item \textbf{Kẻ tấn công thích ứng:} nếu biết cấu hình bộ lọc gate, kẻ tấn công có thể viết lại
-  câu hỏi độc hại dưới dạng câu hỏi thông thường, là dạng hiện có ASR cao nhất; nếu biết về Booster,
-  kẻ tấn công có thể tăng số bước, learning rate hoặc dùng dữ liệu có hại.
-  \item \textbf{Hội thoại nhiều lượt:} câu trả lời cung cấp một phần thông tin có thể được khai thác
-  thêm qua các lượt hỏi tiếp theo.
-\end{compactitem}
+\paragraph{Giả định về quyền truy cập.} Kẻ tấn công có trọng số mô hình trả lời nhưng không kiểm
+soát hệ thống triển khai và không biết cấu hình node gate. Không biến thể nào cần mô hình sạch, nên
+kết quả không giả định bên phòng thủ còn giữ được một bản mô hình an toàn.
 
 % =====================================================================
 \section{Hạn chế và giả định}
