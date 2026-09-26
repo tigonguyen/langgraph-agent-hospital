@@ -113,7 +113,7 @@ builds them locally.
 ## 5. Web UI
 
 ```bash
-PYTHONPATH=src .venv/bin/python -m agent_hospital.web.app   # http://127.0.0.1:8000
+PYTHONPATH=src .venv/bin/python -m uvicorn agent_hospital.web.app:app --port 8010
 ```
 
 A switch in the header picks the run mode (remembered per browser; `?mode=attack` links straight
