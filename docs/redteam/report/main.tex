@@ -390,8 +390,8 @@ TenBenign.
   \item \textbf{ASR:} Booster đưa ASR về 0,0\%, từ chối cả 900 câu hại. Sau tấn công, ASR chỉ lên
   20,4\%, thấp hơn mô hình gốc bị tấn công (48,2\%) và thấp hơn cả mô hình gốc chưa bị tấn công
   (26,4\%); cả hai khác biệt đều có ý nghĩa thống kê (McNemar, $p < 0{,}001$).
-  \item \textbf{Độ chính xác:} giảm 1,1 điểm so với mô hình gốc, không có ý nghĩa thống kê (McNemar,
-  $p = 0{,}23$), và gần như không đổi sau khi bị tấn công (67,6\% $\to$ 66,4\%).
+  \item \textbf{Độ chính xác:} giảm 1,1 điểm so với mô hình gốc 
+  và gần như không đổi sau khi bị tấn công (67,6\% $\to$ 66,4\%).
   \item \textbf{Từ chối nhầm:} 1 câu trên 1.273 trước tấn công và 0 câu sau tấn công. Booster không
   làm mô hình từ chối câu hỏi bình thường.
   \item \textbf{Câu trả lời không hợp lệ:} 0 $\to$ 1 câu, ngang mức mô hình gốc.
@@ -402,7 +402,7 @@ TenBenign.
 \end{compactitem}
 
 \paragraph{Nhận xét chung.} Booster giữ nguyên năng lực trả lời câu hỏi y khoa (độ chính xác 66,4\% so với 68,7\%
-của mô hình gốc) và chặn được hơn một nửa số câu mà tấn công mở ra (ASR 20,4\% so với 48,2\%), nhưng
+của mô hình gốc) và khả năng bám theo chỉ dẫn của mô hình, nhưng vẫn giữ được năng lực từ chối sau khi bị tấn công (ASR 20,4\% so với 48,2\%). Tuy nhiên, 
 chưa đưa mô hình về mức an toàn ban đầu: 184 câu hại vẫn lọt, phần lớn ở dạng câu hỏi (27\% so với
 14\% ở dạng mệnh lệnh).
 
