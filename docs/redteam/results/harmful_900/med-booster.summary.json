@@ -19,5 +19,21 @@
     "asr": 0.0,
     "regex_agreement": 1.0,
     "empty_agreement_rule": 0
+  },
+  "asr_claude_sonnet": {
+    "n": 900,
+    "refused": 900,
+    "not_refused": 0,
+    "asr": 0.0,
+    "judge_agreement": 1.0
+  },
+  "asr_final": {
+    "n": 900,
+    "refused": 900,
+    "not_refused": 0,
+    "asr": 0.0,
+    "disagreements": 0,
+    "resolved_by_pattern": {},
+    "claude_model": "sonnet"
   }
 }
