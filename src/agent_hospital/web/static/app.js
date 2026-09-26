@@ -573,14 +573,14 @@ async function pollRed() {
   clearTimeout(redTimer);
   const { runs } = await get("/api/redteam/runs");
   $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>folder · stream</th><th>progress</th>
-    <th class="num">ASR</th><th class="num">Refusal rate</th><th class="num">HRR</th>
-    <th class="num">Accuracy</th><th class="num">False refusal</th>
+    <th class="num">ASR</th>
+    <th class="num">Accuracy</th><th class="num">Invalid</th><th class="num">False refusal</th>
     <th class="num">Tokens in / out</th><th class="num">Latency mean / p95</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;
     const c = r.cost;
     const h = hbadge(r.harness) + (r.other ? `<div class="dim kv">${esc(r.other)}</div>` : "");
     const canJudge = !r.readonly && r.status !== "running" && r.status !== "judging" && r.n_mal_done
-      && Object.values(r.judged || {}).some((j) => !j || j.labelled < j.of);
+      && (!r.judged.binary || r.judged.binary.labelled < r.judged.binary.of);
     return `<tr>
       <td style="white-space:nowrap">${h}</td>
       <td class="mono">${esc(r.model)}</td>
@@ -589,9 +589,8 @@ async function pollRed() {
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
         <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
       <td class="num" style="min-width:120px">${asrCell(r)}</td>
-      <td class="num" style="min-width:110px">${judgeCell(r.judged && r.judged.refusal) || "—"}</td>
-      <td class="num" style="min-width:110px">${judgeCell(r.judged && r.judged.harm, true) || "—"}</td>
       <td class="num">${redRate(r.medqa_acc)} <div class="dim kv">n=${r.n_medqa_done}</div></td>
+      <td class="num">${redRate(r.medqa_invalid)}${r.medqa_invalid === null ? "" : ` <div class="dim kv">${Math.round(r.medqa_invalid * r.n_medqa_done)}/${r.n_medqa_done}</div>`}</td>
       <td class="num">${redRate(r.false_refusal)}</td>
       <td class="num kv">${c ? `${num(c.tokens_in)} / ${num(c.tokens_out)}` : "—"}</td>
       <td class="num kv"${c && c.note ? ` title="${esc(c.note)}"` : ""}>${c ? `${num(c.latency_mean, 2)} / ${num(c.latency_p95, 2)} s${c.note ? " *" : ""}` : "—"}</td>
@@ -605,7 +604,7 @@ async function pollRed() {
           : (r.status === "stopped" && r.resumable ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
-  }).join("") : empty(13, "No runs in docs/redteam/results/ yet — start one on the left."));
+  }).join("") : empty(12, "No runs in docs/redteam/results/ yet — start one on the left."));
   // Keep the table live while the tab is open: runs may be started from the CLI too.
   const busy = runs.some((r) => r.status === "running" || r.status === "judging");
   if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, busy ? 2000 : 5000);

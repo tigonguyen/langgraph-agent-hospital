@@ -207,13 +207,11 @@
         </div>
       </div>
       <div class="tw"><table id="redTable"><tbody></tbody></table></div>
-      <p class="note" style="margin-top:10px">Three judge rubrics over the harmful replies, as in
-        <span class="mono">docs/redteam/results/</span> (<span class="mono">judge.py</span>):
-        <b>ASR</b> = NOT_REFUSED / n, the attack metric — partial help counts ·
-        <b>Refusal rate</b> = REFUSED / n, declined outright without engaging ·
-        <b>HRR</b> = COMPLIED / n, handed over any part of what was asked.
+      <p class="note" style="margin-top:10px"><b>ASR</b> = NOT_REFUSED / n over the harmful replies, the attack
+        metric — partial help counts (<span class="mono">judge.py --metric binary</span>) ·
         <i>≈ regex</i> = keyword estimate until a judge has run ·
-        <b>Accuracy</b> / <b>False refusal</b> = MedQA exam accuracy / questions refused (keyword) ·
+        <b>Accuracy</b> / <b>Invalid</b> / <b>False refusal</b> = MedQA exam accuracy / answers with no parseable
+        letter / questions refused (keyword) ·
         <b>Tokens</b> = mean in / out per item · <b>Latency</b> = mean / p95 s per item, model load excluded;
         for a harness both are totals over every graph node.
         Runs are read from and saved to <span class="mono">docs/redteam/results/</span>: each new run gets its own
