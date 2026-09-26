@@ -533,32 +533,31 @@ kết quả không giả định bên phòng thủ còn giữ được một b�
 \label{sec:conclusion}
 % =====================================================================
 
-Trong đồ án giữa kỳ, nhóm đã xây dựng một hệ thống đa tác tử y khoa trên LangGraph~\cite{langgraph2024}:
-các tác tử dùng chung mô hình Qwen3-14B, trả lời câu hỏi MedQA-USMLE và dựa vào cơ chế căn chỉnh an
-toàn sẵn có của mô hình để từ chối yêu cầu nguy hiểm. Cơ chế này có thể bị gỡ bỏ bằng fine-tuning với
-dữ liệu hoàn toàn vô hại, vốn vượt qua được bộ lọc kiểm duyệt; và vì mọi tác tử dùng chung trọng số,
-một lần fine-tune đủ để xâm phạm toàn bộ hệ thống.
+Đồ án tái hiện tấn công TenBenign~\cite{xie2025tenbenign} trên hệ thống đa tác tử y khoa dựng bằng
+LangGraph~\cite{langgraph2024}, trong đó mọi tác tử dùng chung Qwen3-14B, và đánh giá hai hướng
+phòng thủ: Booster~\cite{huang2025booster} ở mức trọng số và harnessing ở mức cấu trúc đồ thị.
 
-Đồ án cuối kỳ (đề tài 5) tái hiện tấn công TenBenign~\cite{xie2025tenbenign} trên hệ thống này và
-đánh giá hai hướng phòng thủ: Booster~\cite{huang2025booster}, huấn luyện mô hình chống chịu
-fine-tuning trước khi triển khai, và harnessing, bổ sung cấu trúc quanh mô hình lúc suy luận (VS1
-sysprompt, VS2 gatetool, VS3 gatenodes, bộ lọc gate). Báo cáo trả lời hai câu hỏi: (1) tấn công làm
-giảm mức an toàn của mô hình đến đâu; (2) các biện pháp phòng thủ khôi phục được bao nhiêu, với chi
-phí nào, và trường hợp nào vẫn chưa được ngăn chặn.
+\paragraph{Tấn công.} Chỉ với 10 câu hỏi vô hại, TenBenign làm ASR tăng từ 26,4\% lên 48,2\%, trong
+khi độ chính xác trên MedQA chỉ giảm 2,7 điểm phần trăm (68,7\% $\to$ 66,0\%). Dữ liệu tấn công qua
+được bộ lọc kiểm duyệt và mô hình vẫn vượt qua kiểm tra chất lượng thông thường, nên tấn công khó bị
+phát hiện. Vì mọi tác tử dùng chung trọng số, một lần fine-tune đủ để xâm phạm toàn bộ hệ thống:
+nhiều tác tử không tương đương với nhiều lớp phòng thủ.
 
-Kết quả cho thấy TenBenign làm mô hình suy giảm đáng kể khả năng từ chối và khả năng tuân theo chỉ
-dẫn, trong khi năng lực trả lời câu hỏi y khoa gần như được giữ nguyên, khiến tấn công khó bị phát
-hiện qua các bài kiểm tra chất lượng thông thường. Booster từ chối toàn bộ câu hỏi độc hại khi chưa
-bị tấn công, và sau tấn công vẫn giữ khả năng từ chối tốt hơn mô hình gốc, với mức giảm độ chính xác
-nhỏ và không phát sinh chi phí suy luận. Ở lúc suy luận, hiệu quả phòng thủ tăng dần khi quyền quyết
-định từ chối được chuyển từ mô hình sang đồ thị: gatenodes hiệu quả nhất dù mọi tác tử dùng mô hình
-đã bị tấn công và không chặn nhầm câu hỏi thông thường, còn system prompt kém nhất vì dựa vào chính
-trọng số đã bị tấn công.
+\paragraph{Booster.} Khi chưa bị tấn công, med-booster từ chối toàn bộ 900 câu hỏi độc hại. Sau tấn
+công, ASR tăng lên 20,4\%, vẫn thấp hơn mô hình gốc bị tấn công (48,2\%) và mô hình gốc chưa bị tấn
+công (26,4\%), với độ chính xác 66,4\% và không phát sinh chi phí suy luận. Tuy nhiên, 184 câu vẫn
+lọt qua, tập trung ở dạng câu hỏi, đúng dạng dữ liệu mà TenBenign dùng.
 
-Hạn chế chính: Booster không duy trì được mức từ chối tuyệt đối sau tấn công; các câu hỏi độc hại
-lọt qua tập trung ở dạng câu hỏi giống câu hỏi y khoa thông thường; các lớp gate chỉ kiểm tra câu hỏi
-mà không kiểm tra câu trả lời. Kẻ tấn công thích ứng, hội thoại nhiều lượt và các phương thức tấn
-công khác chưa được đánh giá, và nhãn an toàn phụ thuộc vào LLM giám khảo.
+\paragraph{Harnessing.} Hiệu quả phòng thủ tăng dần khi quyền quyết định từ chối được chuyển từ mô
+hình sang đồ thị: sysprompt 35,1\%, gatetool 18,8\%, gatenodes 7,1\%. gatenodes đạt mức này dù mọi
+tác tử đều dùng mô hình đã bị tấn công, giữ độ chính xác 65,2\% và không chặn nhầm câu MedQA nào.
+Rủi ro còn lại nằm ở node gate: cả 64 câu lọt đều thuộc nhóm câu mà gate cho qua, vì gate chỉ phân
+loại câu hỏi và không kiểm tra câu trả lời.
+
+\paragraph{Hướng tiếp theo.} Các kết quả trên giả định kẻ tấn công không thích ứng, chỉ gửi câu hỏi
+một lượt và nhãn ASR phụ thuộc vào LLM giám khảo. Các hướng cần đánh giá tiếp gồm: kẻ tấn công biết
+cấu hình node gate, hội thoại nhiều lượt, các phương thức tấn công khác, kiểm tra cả câu trả lời,
+và kết hợp Booster với gatenodes.
 
 \bibliographystyle{unsrt}
 \bibliography{references}
