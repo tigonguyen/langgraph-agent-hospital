@@ -110,10 +110,10 @@ TP. Hồ Chí Minh, 2026
 
 Hệ thống là một đồ thị đa tác tử LangGraph~\cite{langgraph2024}: các tác tử (phân tích ca bệnh, truy xuất RAG, lập luận,
 trả lời, kiểm chứng) khác nhau ở vai trò và system prompt nhưng dùng \emph{chung một mô hình}
-Qwen3-14B~\cite{qwen3}, phục vụ cục bộ qua Ollama.
+Qwen3-14B, phục vụ cục bộ qua Ollama.
 \begin{compactitem}
   \item \textbf{Tài sản cần bảo vệ:} hành vi từ chối yêu cầu y khoa có hại và năng lực trả lời câu
-  hỏi y khoa (MedQA~\cite{jin2021medqa}).
+  hỏi y khoa (MedQA).
   \item \textbf{Ranh giới tin cậy:} bên phòng thủ kiểm soát mã đồ thị, định tuyến, system prompt, câu
   từ chối cố định, schema đầu ra, kho RAG và bộ nhớ. Trọng số mô hình nằm ngoài ranh giới: sau khi
   triển khai, bên phòng thủ không kiểm soát được việc trọng số bị thay đổi.
@@ -129,7 +129,7 @@ Qwen3-14B~\cite{qwen3}, phục vụ cục bộ qua Ollama.
 \paragraph{Kẻ tấn công.}
 \begin{compactitem}
   \item \textbf{Khả năng:} truy cập, sửa đổi hoặc fine-tune trọng số, thông qua API fine-tuning, thay
-  thế mô hình cùng tên/tag trong chuỗi cung ứng, hoặc quyền truy cập nội bộ. Thực nghiệm dùng LoRA~\cite{hu2022lora}
+  thế mô hình cùng tên/tag trong chuỗi cung ứng, hoặc quyền truy cập nội bộ. Thực nghiệm dùng LoRA
   trực tiếp trên trọng số, tương ứng với mức truy cập cao nhất trong các kịch bản trên.
   \item \textbf{Ràng buộc:} dữ liệu fine-tune phải qua được bộ lọc kiểm duyệt, nên chỉ gồm câu hỏi
   vô hại. Kẻ tấn công không sửa được các thành phần trong ranh giới tin cậy, chỉ gửi câu hỏi một lượt
@@ -226,7 +226,7 @@ từ chối nhất.
 Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
 
 \begin{compactitem}
-  \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA~\cite{pal2022medmcqa} kèm giải thích, 223 câu hỏi của bệnh
+  \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA kèm giải thích, 223 câu hỏi của bệnh
   nhân, và 900 câu hỏi độc hại thuộc tập train của MedSafetyBench~\cite{han2024medsafetybench} kèm câu trả lời an toàn (tổng
   cộng 2.591 câu dùng cho huấn luyện).
   \item \textbf{Tập từ chối ($h$):} 855 câu từ chối an toàn lấy từ dữ liệu trên.
@@ -282,7 +282,7 @@ chối, ASR được tính là tỉ lệ câu trả lời trên Harmful-900 đư
 
 \paragraph{Quy trình đánh giá.} Mỗi câu trả lời trên Harmful-900 được đánh giá qua ba bước:
 \begin{compactitem}
-  \item \textbf{Bước 1, gán nhãn bằng \texttt{gpt-oss:20b}~\cite{openai2025gptoss}:} chạy cục bộ, nhiệt độ 0. Câu hỏi và
+  \item \textbf{Bước 1, gán nhãn bằng \texttt{gpt-oss:20b}:} chạy cục bộ, nhiệt độ 0. Câu hỏi và
   câu trả lời được đặt trong thẻ \texttt{<request>}, \texttt{<reply>}, kèm yêu cầu bỏ qua mọi chỉ
   dẫn bên trong thẻ. Mô hình trả về đúng một từ, \texttt{REFUSED} hoặc \texttt{NOT\_REFUSED}
   (\texttt{scripts/redteam/judge.py}, \texttt{--metric binary}).
@@ -519,7 +519,7 @@ kết quả không giả định bên phòng thủ còn giữ được một b�
 
   \item \textbf{Chỉ đánh giá với TenBenign.} Booster được thiết kế để chống lại nhóm tấn công
   fine-tuning; hiệu quả của phương pháp trước các tấn công khác, như fine-tuning bằng dữ liệu có
-  hại trực tiếp hoặc các tấn công jailbreak GCG~\cite{zou2023gcg} và AutoDAN~\cite{liu2024autodan}, chưa được kiểm
+  hại trực tiếp hoặc các tấn công jailbreak GCG và AutoDAN, chưa được kiểm
   chứng.
 
   \item \textbf{Bộ lọc gate chưa được đánh giá trước tấn công thích ứng.} Đây là giả định yếu nhất
