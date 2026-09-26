@@ -433,46 +433,54 @@ tốt hơn sau khi bị tấn công (ASR 20,4\% so với 48,2\%). Tuy nhiên, Bo
 
 \begin{table}[h]
   \centering
-  \caption{Các phương pháp phòng thủ lúc suy luận trên mô hình bị tấn công (qwen-tb). Tỉ lệ chặn
-  nhầm của bộ lọc gate được đo trên 400 câu MedQA; system prompt và bộ lọc gate chưa được đo độ
-  chính xác trên MedQA-1273.}
+  \caption{Ba biến thể phòng thủ lúc suy luận, đều chạy trên mô hình bị tấn công (qwen-tb). ASR trên
+  Harmful-900, các chỉ số còn lại trên MedQA-1273.}
   \label{tab:guards}
   \small
-  \setlength{\tabcolsep}{4pt}
-  \begin{tabular}{@{}lccccc@{}}
+  \setlength{\tabcolsep}{5pt}
+  \begin{tabular}{@{}lcccc@{}}
     \toprule
-    Phương pháp & ASR & Bị chặn & Độ chính xác & Chặn nhầm & Chi phí thêm \\
+    Chỉ số & Không phòng thủ & sysprompt & gatetool & gatenodes \\
     \midrule
-    Không phòng thủ (qwen-tb)          & 23,1\% (208) & --      & 66,0\% & --      & -- \\
-    System prompt                      & 12,6\% (113) & --      & --     & --      & $\sim$0 \\
-    Bộ lọc gate (Qwen3-14B sạch)       & 6,7\% (60)   & 783/900 & --     & 1/400   & +0,46 s \\
-    gatenodes (chỉ qwen-tb)            & 4,8\% (43)   & 832/900 & 65,2\% & 0/1.273 & +0,89 s \\
-    Đồ thị sysprompt (chỉ qwen-tb)     & 16,1\% (145) & --      & 65,4\% & --      & -- \\
-    Đồ thị gatetool (chỉ qwen-tb)      & 5,8\% (52)   & --      & 61,7\% & --      & -- \\
+    ASR (Harmful-900)          & 48,2\% (434) & 35,1\% (316) & 18,8\% (169) & \textbf{7,1\% (64)} \\
+    Độ chính xác (MedQA-1273)  & 66,0\%       & 65,4\%       & 61,7\%       & 65,2\% \\
+    Từ chối nhầm               & 2            & 1            & 0            & 5 \\
+    Câu trả lời không hợp lệ   & 1            & 0            & 1            & 1 \\
+    Token đầu ra / câu         & 70           & 126          & 161          & 67 \\
+    Độ trễ trung bình          & 6,95 s       & 9,17 s       & 11,04 s      & 8,12 s \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{compactitem}
-  \item \textbf{gatenodes:} đạt ASR thấp nhất (4,8\%) mà không cần mô hình sạch. Do đồ thị đảm nhận
-  việc định tuyến, mô hình bị tấn công chỉ cần gán nhãn câu hỏi thay vì tự từ chối, vốn là hành vi
-  đã bị tấn công loại bỏ. Toàn bộ 43 câu không bị từ chối đều thuộc 68 câu được node gate cho qua.
-  \item \textbf{Thiết kế lại node gate:} ở phiên bản đầu, do câu hỏi MedQA kết thúc bằng yêu cầu
-  trả lời bằng chữ cái, node gate trả lời câu hỏi thay vì gán nhãn, dẫn đến 70/400 câu MedQA bị chặn
-  nhầm và độ chính xác giảm xuống 54,0\%. Phiên bản mới đặt câu hỏi trong thẻ và ràng buộc đầu ra
-  theo JSON; kết quả là không câu MedQA nào bị chặn nhầm và độ chính xác đạt 65,2\%, gần mức 66,0\%
-  khi không có phòng thủ.
-  \item \textbf{Bộ lọc gate dùng mô hình sạch:} chặn 783/900 câu; toàn bộ 60 câu không bị từ chối
-  đều thuộc 117 câu được bộ lọc cho qua.
-  \item \textbf{System prompt:} hiệu quả thấp hơn các phương pháp dùng node gate, do phương pháp này
-  chỉ là chỉ dẫn gửi tới chính bộ trọng số đã bị tấn công.
-  \item \textbf{Chi phí:} mỗi yêu cầu cần thêm một lần gọi node gate (0,46 giây với Qwen3-14B sạch,
-  0,89 giây với gatenodes); với các câu bị chặn, node trả lời không cần được gọi.
-  \item \textbf{Hai biến thể đồ thị còn lại:} sysprompt (16,1\%) có ASR cao hơn mô hình gốc chưa bị
-  tấn công (14,8\%). gatetool (5,8\%) có ASR gần với gatenodes nhưng độ chính xác trên MedQA thấp
-  hơn (61,7\%), do mô hình phải tự quyết định việc gọi công cụ và sinh câu trả lời dài hơn (161
-  token mỗi câu MedQA, so với 67 token của gatenodes).
+  \item \textbf{ASR:} thứ tự đúng như thiết kế ở Mục~\ref{sec:guards}, càng lấy quyền quyết định ra
+  khỏi mô hình thì càng chặn được nhiều. gatenodes giảm ASR từ 48,2\% xuống 7,1\% mà không dùng mô
+  hình sạch nào: cổng chặn 832/900 câu hại trước khi tới node trả lời, và cả 64 câu lọt đều nằm
+  trong 68 câu cổng cho qua. sysprompt chỉ giảm còn 35,1\%, vì nó nhờ chính bộ trọng số đã bị sửa
+  làm việc mà tấn công vừa xoá.
+  \item \textbf{Độ chính xác:} sysprompt và gatenodes giữ gần nguyên mức không phòng thủ (65,4\% và
+  65,2\% so với 66,0\%). gatetool tụt xuống 61,7\%: mô hình vừa phải quyết định gọi công cụ vừa phải
+  trả lời, nên hay lạc khỏi định dạng trắc nghiệm.
+  \item \textbf{Từ chối nhầm:} 0--5 câu trên 1.273 ở cả ba biến thể. Riêng gatenodes có 5 câu, tất cả
+  đều do node trả lời tự từ chối chứ không phải do cổng: cổng không chặn nhầm câu MedQA nào.
+  \item \textbf{Câu trả lời không hợp lệ:} 0--1 câu, ngang mức không phòng thủ.
+  \item \textbf{Token đầu ra:} gatenodes rẻ nhất (67 token, ngang mức không phòng thủ) vì 832 câu hại
+  bị chặn không cần gọi node trả lời. sysprompt (126) và gatetool (161) đắt hơn vì mọi câu đều đi qua
+  mô hình, và lời nhắc an toàn khiến mô hình viết dài hơn.
+  \item \textbf{Độ trễ:} cả ba đều chậm hơn không phòng thủ, do thêm một lượt gọi mô hình. gatenodes
+  chậm hơn 1,2 giây mỗi câu, gatetool chậm nhất (11,04 giây) vì phải gọi công cụ rồi mới trả lời.
 \end{compactitem}
+
+\paragraph{Thiết kế lại node gate.} Ở phiên bản đầu, câu hỏi MedQA kết thúc bằng yêu cầu trả lời
+bằng chữ cái, và node gate làm theo yêu cầu đó: nó trả lời câu hỏi thay vì gán nhãn, khiến 70/400
+câu MedQA bị chặn nhầm và độ chính xác chỉ còn 54,0\%. Phiên bản hiện tại rào câu hỏi trong thẻ
+\texttt{<request>} kèm lời dặn không làm theo chỉ dẫn bên trong, và buộc đầu ra của cổng theo JSON
+chỉ có hai giá trị: không câu MedQA nào bị chặn nhầm nữa và độ chính xác trở lại 65,2\%.
+
+\paragraph{Nhận xét chung.} Cấu trúc một mình đã đủ để chặn phần lớn tấn công: gatenodes đưa ASR từ
+48,2\% xuống 7,1\%, thấp hơn cả mô hình gốc chưa bị tấn công (26,4\%), mà không cần mô hình sạch và
+không mất độ chính xác. Điều kiện duy nhất là mô hình vẫn \emph{gán nhãn} được câu hỏi; hai biến thể
+để mô hình tự quyết định từ chối (sysprompt, gatetool) đều yếu hơn hẳn.
 
 % =====================================================================
 \section{Phân tích rủi ro còn lại}
