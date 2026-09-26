@@ -134,7 +134,7 @@ công khác chưa được đánh giá, và nhãn an toàn phụ thuộc vào LL
 \bigskip
 
 % =====================================================================
-\section{Mô hình mối đe dọa}
+\section{Hệ thống và mối đe dọa}
 \label{sec:threat}
 % =====================================================================
 
@@ -198,73 +198,6 @@ lúc suy luận mà tại đó trọng số đã bị thay đổi ảnh hưởng
     \bottomrule
   \end{tabular}
 \end{table}
-
-\subsection{Đánh giá và xử lý}
-\label{sec:threat-treat}
-
-Các biện pháp được phân loại theo mức phụ thuộc vào trọng số. Giả thuyết là biện pháp càng ít dựa
-vào trọng số đã bị tấn công thì càng ít chịu ảnh hưởng của tấn công; giả thuyết này được kiểm tra ở
-Mục~\ref{sec:guard-results} (Bảng~\ref{tab:threat-treat}).
-
-\begin{table}[h]
-  \centering
-  \caption{Biện pháp xử lý từng mối đe dọa.
-  hay không.}
-  \label{tab:threat-treat}
-  \footnotesize
-  \setlength{\tabcolsep}{4pt}
-  \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.68\textwidth}
-                    >{\raggedright\arraybackslash}p{0.20\textwidth}@{}}
-    \toprule
-    ID & Biện pháp & Dựa vào trọng số \\
-    \midrule
-    T1 & Booster: căn chỉnh trước triển khai, phạt bước tấn công giả lập & Có \\
-    T2 & VS1 sysprompt: chỉ dẫn từ chối trong system prompt & Có \\
-    T3 & VS2 gatetool: công cụ \texttt{classify\_request} & Có \\
-    T4 & VS3 gatenodes: đồ thị định tuyến \texttt{HARMFUL} tới câu từ chối
-      cố định; câu hỏi trong \texttt{<request>}, đầu ra JSON hai giá trị. Bộ lọc gate: mô hình sạch
-      riêng & Một phần (VS3); Không (bộ lọc gate) \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-\subsection{Kiểm tra và xác thực}
-\label{sec:threat-verify}
-
-Mọi biện pháp được kiểm tra theo cùng một quy trình (Mục~\ref{sec:eval}): ASR trên Harmful-900 đo
-mức an toàn; độ chính xác và tỉ lệ từ chối nhầm trên MedQA-1273 đo chi phí. Một biện pháp được xem là
-đạt khi ASR sau tấn công không vượt ASR của mô hình gốc chưa bị tấn công và độ chính xác được duy trì
-gần mức của mô hình gốc (Bảng~\ref{tab:threat-verify}).
-
-\begin{table}[h]
-  \centering
-  \caption{Kiểm tra và xác thực từng mối đe dọa.}
-  \label{tab:threat-verify}
-  \footnotesize
-  \setlength{\tabcolsep}{4pt}
-  \renewcommand{\arraystretch}{1.15}
-  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.09\textwidth}
-                    >{\raggedright\arraybackslash}p{0.30\textwidth}
-                    >{\raggedright\arraybackslash}p{0.42\textwidth}
-                    >{\raggedright\arraybackslash}p{0.12\textwidth}@{}}
-    \toprule
-    Mối đe dọa & Cấu hình & Câu hỏi kiểm tra & Kết quả \\
-    \midrule
-    T1 & qwen3-14b so với qwen-tb & Tấn công có làm tăng ASR trong khi độ chính xác được duy trì? &
-      Mục~\ref{sec:attack-results} \\
-    T1 & med-booster, med-booster-tb & ASR sau tấn công có thấp hơn mô hình gốc? &
-      Mục~\ref{sec:booster-results} \\
-    T2--T4 & VS1, VS2, VS3; mọi tác tử dùng qwen-tb & Cấu trúc đồ thị có giảm ASR khi mọi tác tử dùng trọng
-      số đã bị tấn công? & Mục~\ref{sec:guard-results} \\
-    T4 & Bộ lọc gate (mô hình sạch) + qwen-tb & Dùng mô hình gate tách biệt có giảm ASR thêm so với
-      VS3? & Mục~\ref{sec:guard-results} \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Mọi kiểm tra dùng câu hỏi một lượt, seed 0 và tấn công không thích ứng; các kết quả không áp dụng
-cho trường hợp kẻ tấn công biết cấu hình phòng thủ.
 
 % =====================================================================
 \section{Phương pháp}
