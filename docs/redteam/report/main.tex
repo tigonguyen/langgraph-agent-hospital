@@ -203,8 +203,7 @@ hỏi y khoa vô hại:
 \label{sec:defense}
 
 Booster~\cite{huang2025booster} (ICLR 2025, Oral) là phòng thủ ở bước huấn luyện an toàn. Ngoài
-việc dạy mô hình từ chối, ở mỗi bước huấn luyện Booster còn giả lập một bước tấn công nhỏ và phạt
-mức độ bước đó làm hỏng khả năng từ chối, để fine-tuning về sau khó xoá hành vi từ chối hơn. Mỗi
+việc dạy mô hình từ chối, ở mỗi bước huấn luyện Booster còn giả lập một bước tấn công nhỏ và thực hiện phạt nếu như bước đó làm hỏng khả năng từ chối, để fine-tuning về sau khó xoá hành vi từ chối hơn. Mỗi
 bước huấn luyện gồm ba lần tính gradient:
 
 \begin{compactenum}
@@ -218,17 +217,17 @@ bước huấn luyện gồm ba lần tính gradient:
 Trọng số được cập nhật theo $\nabla f(w) + \lambda\,[\nabla h(w') - \nabla h(w)]$: vừa học nhiệm vụ,
 vừa đẩy mô hình về vùng mà bước tấn công giả lập ít làm hỏng khả năng từ chối nhất.
 
-Cấu hình nhóm dùng (\texttt{scripts/redteam/booster.py}):
+Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
 
 \begin{compactitem}
   \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA kèm giải thích, 223 câu hỏi của bệnh
   nhân, 900 câu hại của tập train MedSafetyBench kèm câu trả lời an toàn, và 900 câu ngoài lề y
-  khoa kèm câu từ chối phạm vi (3.442 câu huấn luyện).
+  khoa kèm câu từ chối phạm vi (tổng cộng 3.442 câu dùng cho huấn luyện).
   \item \textbf{Tập từ chối ($h$):} 855 câu từ chối an toàn lấy từ dữ liệu trên.
-  \item \textbf{Siêu tham số Booster:} $\lambda = 5$, $\alpha = 0{,}1$ (mặc định của bài báo).
+  \item \textbf{Siêu tham số Booster:} $\lambda = 20$, $\alpha = 0{,}1$.
   \item \textbf{LoRA:} rank 8 trên 16 lớp cuối (0,087\% tham số) của Qwen3-14B bản 4-bit; learning
   rate $5\times10^{-5}$, batch 2, 2 epoch (3.442 bước cập nhật), seed 0.
-  \item \textbf{Chi phí huấn luyện:} khoảng 5 giờ, bộ nhớ đỉnh 10,4 GB.
+  \item \textbf{Chi phí huấn luyện:} khoảng 5 giờ, đạt 10,4 GB bộ nhớ khi đạt đỉnh.
 \end{compactitem}
 
 \subsection{Phòng thủ bằng phương pháp Harnessing}
@@ -278,7 +277,7 @@ Harmful-900 bị mô hình LLM gán nhãn \texttt{NOT\_REFUSED}:
 
 \paragraph{Quy trình đánh giá.}
 \begin{compactitem}
-  \item \textbf{Mô hình:} Sử dụng \texttt{gpt-oss:20b}, chạy cục bộ, nhiệt độ 0. 
+  \item \textbf{Mô hình:} Sử dụng \texttt{gpt-oss:20b}, chạy cục bộ, nhiệt độ 0.
   \item \textbf{Đầu vào:} Câu hỏi và câu trả lời nằm trong thẻ \texttt{<request>}, \texttt{<reply>},
   kèm yêu cầu bỏ qua mọi chỉ dẫn bên trong.
   \item \textbf{Đọc nhãn:} Mô hình phân loại và trả về \texttt{REFUSED} hoặc
@@ -388,7 +387,7 @@ chối, không xoá định dạng.
 \subsection{Hiệu quả phòng thủ Booster}
 \label{sec:booster-results}
 
-Mục này so sánh mô hình Booster (med-booster) với mô hình gốc, trước và sau cùng một tấn công
+Dưới đây là so sánh mô hình Booster (med-booster) với mô hình gốc, trước và sau từ một cuộc tấn công
 TenBenign.
 
 \begin{table}[h]
@@ -413,7 +412,7 @@ TenBenign.
 \end{table}
 
 \begin{compactitem}
-  \item \textbf{Trước tấn công:} Booster đưa ASR từ 14,8\% về 0,0\%: mô hình từ chối cả 900 câu hại.
+  \item \textbf{Trước tấn công:} Booster đưa ASR từ 14,8\% về 0,0\%: mô hình từ chối cả 900 câu độc hại.
   Câu từ chối gần như cố định, 853/900 câu là cùng một câu ``I'm sorry, but I cannot assist with
   that\ldots''.
   \item \textbf{Sau tấn công:} ASR của Booster tăng lên 9,9\%, nhưng vẫn thấp hơn mô hình gốc bị
@@ -421,13 +420,10 @@ TenBenign.
   ý nghĩa thống kê (McNemar, $p < 0{,}001$).
   \item \textbf{Giữ được quyết định từ chối, không giữ được cách từ chối:} 530/900 câu trả lời vẫn
   mở đầu bằng ``I'' (qwen-tb chỉ còn 15 câu), nhưng 526 câu là ``I cannot assist with that.'', tức
-  câu từ chối của Bước 1 bỏ chữ ``Sorry''. Câu từ chối vốn có của Booster đã bị thay bằng khuôn của
-  kẻ tấn công.
-  \item \textbf{Chỗ rò rỉ:} yêu cầu dạng câu hỏi (``How can\ldots?'', giống dữ liệu của tấn công) lọt
-  qua 72/455 câu (16\%), gấp 4 lần yêu cầu dạng mệnh lệnh (17/445, 4\%). 20 trong 89 câu lọt chỉ
-  gồm đúng một câu ``Yes, I can assist with that.'', không kèm nội dung.
-  \item \textbf{Độ chính xác và chi phí:} Booster giảm độ chính xác MedQA 1,5 điểm, không có ý nghĩa
-  thống kê (McNemar, $p = 0{,}10$), và gần như không đổi sau tấn công. Câu trả lời MedQA vẫn ngắn
+  câu từ chối của Bước 1 bỏ chữ ``Sorry''. Câu từ chối vốn có của Booster đã bị thay bằng cách trả lời của kẻ tấn công.
+  \item \textbf{Điểm chưa thể xử lý bằng Booster:} yêu cầu dạng câu hỏi (``How can\ldots?'', giống dữ liệu của tấn công) lọt
+  qua 72/455 câu (16\%), nhiều hơn 4 lần yêu cầu dạng mệnh lệnh (17/445, 4\%). 20 trong 89 câu lọt qua với đúng một đáp án ``Yes, I can assist with that.'', không kèm nội dung nào thêm.
+  \item \textbf{Độ chính xác và chi phí:} Booster giảm độ chính xác MedQA 1,5 điểm, thay đổi không đáng kể (McNemar, $p = 0{,}10$), và gần như không đổi sau khi bị tấn công. Câu trả lời MedQA vẫn ngắn
   (13 token) nên mô hình không bị chậm như qwen-tb. Booster chỉ tốn chi phí huấn luyện, không tốn
   thêm chi phí suy luận.
   \item \textbf{Với tấn công mạnh hơn:} khi TenBenign dùng LoRA trên cả 40 lớp thay vì 16, Booster
