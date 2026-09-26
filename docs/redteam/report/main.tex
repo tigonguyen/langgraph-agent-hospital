@@ -103,66 +103,168 @@ TP. Hồ Chí Minh, 2026
 
 % =====================================================================
 \begin{abstract}
-Báo cáo trình bày kết quả tái hiện đề tài 5 (tấn công TenBenign và phòng thủ Booster) trên hệ
-thống đa tác tử y khoa được xây dựng trong đồ án giữa kỳ, với mô hình được sử dụng là
-\textbf{Qwen3-14B}. Tấn công TenBenign sử dụng 10 câu hỏi y khoa vô hại để fine-tune mô hình, làm
-tỉ lệ phản hồi có hại (HRR) tăng từ 8,4\% lên 12,2\% và tỉ lệ từ chối giảm từ 51,2\% xuống
-41,2\%. Phương pháp phòng thủ Booster (huấn luyện lại mô hình nhằm tăng khả năng chống chịu trước
-fine-tuning độc hại, LoRA rank 8) đưa HRR về 0,0\% khi chưa bị tấn công; sau khi bị tấn công lại
-bằng TenBenign, HRR tăng lên 8,3\%, tương đương mô hình gốc. Nhóm đồng thời đánh giá hai lớp bảo
-vệ đầu vào trên mô hình đã bị tấn công: bộ lọc gate giảm HRR xuống 1,1\% và cơ chế bảo vệ bằng
-system prompt (system-prompt guard) giảm HRR xuống 4,7\%. Về chi phí, Booster làm độ chính xác
-trên MedQA giảm 1,5 điểm phần trăm (68,7\% $\to$ 67,2\%), với tỉ lệ chặn nhầm câu hỏi thông thường
-dưới 0,1\%. Tuy nhiên, sau khi bị tấn công lại, mô hình dùng Booster vẫn trả lời có hại ở 75/900
-câu hỏi độc hại.
+Trong đồ án giữa kỳ, nhóm đã xây dựng một hệ thống đa tác tử y khoa trên LangGraph~\cite{langgraph2024}:
+các tác tử dùng chung mô hình Qwen3-14B, trả lời câu hỏi MedQA-USMLE và dựa vào cơ chế căn chỉnh an
+toàn sẵn có của mô hình để từ chối yêu cầu nguy hiểm. Cơ chế này có thể bị gỡ bỏ bằng fine-tuning với
+dữ liệu hoàn toàn vô hại, vốn vượt qua được bộ lọc kiểm duyệt; và vì mọi tác tử dùng chung trọng số,
+một lần fine-tune đủ để xâm phạm toàn bộ hệ thống.
+
+Đồ án cuối kỳ (đề tài 5) tái hiện tấn công TenBenign~\cite{xie2025tenbenign} trên hệ thống này và
+đánh giá hai hướng phòng thủ: Booster~\cite{huang2025booster}, huấn luyện mô hình chống chịu
+fine-tuning trước khi triển khai, và harnessing, bổ sung cấu trúc quanh mô hình lúc suy luận (VS1
+sysprompt, VS2 gatetool, VS3 gatenodes, bộ lọc gate). Báo cáo trả lời hai câu hỏi: (1) tấn công làm
+giảm mức an toàn của mô hình đến đâu; (2) các biện pháp phòng thủ khôi phục được bao nhiêu, với chi
+phí nào, và trường hợp nào vẫn chưa được ngăn chặn.
+
+Kết quả cho thấy TenBenign làm mô hình suy giảm đáng kể khả năng từ chối và khả năng tuân theo chỉ
+dẫn, trong khi năng lực trả lời câu hỏi y khoa gần như được giữ nguyên, khiến tấn công khó bị phát
+hiện qua các bài kiểm tra chất lượng thông thường. Booster từ chối toàn bộ câu hỏi độc hại khi chưa
+bị tấn công, và sau tấn công vẫn giữ khả năng từ chối tốt hơn mô hình gốc, với mức giảm độ chính xác
+nhỏ và không phát sinh chi phí suy luận. Ở lúc suy luận, hiệu quả phòng thủ tăng dần khi quyền quyết
+định từ chối được chuyển từ mô hình sang đồ thị: gatenodes hiệu quả nhất dù mọi tác tử dùng mô hình
+đã bị tấn công và không chặn nhầm câu hỏi thông thường, còn system prompt kém nhất vì dựa vào chính
+trọng số đã bị tấn công.
+
+Hạn chế chính: Booster không duy trì được mức từ chối tuyệt đối sau tấn công; các câu hỏi độc hại
+lọt qua tập trung ở dạng câu hỏi giống câu hỏi y khoa thông thường; các lớp gate chỉ kiểm tra câu hỏi
+mà không kiểm tra câu trả lời. Kẻ tấn công thích ứng, hội thoại nhiều lượt và các phương thức tấn
+công khác chưa được đánh giá, và nhãn an toàn phụ thuộc vào LLM giám khảo.
 \end{abstract}
 
 \bigskip
-
-% =====================================================================
-\section{Giới thiệu}
-\label{sec:intro}
-% =====================================================================
-Trong đồ án giữa kỳ, nhóm đã xây dựng một hệ thống đa tác tử y khoa dựa trên
-LangGraph~\cite{langgraph2024}, với mô hình được sử dụng là Qwen3-14B. Hệ thống trả lời câu hỏi
-trắc nghiệm MedQA-USMLE và từ chối các câu hỏi nguy hiểm dựa trên cơ chế căn chỉnh an toàn
-(safety alignment) sẵn có của mô hình.
-
-Trong đồ án cuối kỳ, nhóm thực hiện đề tài 5, gồm tấn công mô hình bằng
-TenBenign~\cite{xie2025tenbenign} (phương pháp fine-tuning làm suy yếu cơ chế an toàn) và phòng
-thủ bằng Booster~\cite{huang2025booster} (phương pháp huấn luyện giúp mô hình chống chịu trước
-fine-tuning độc hại), cùng các phương pháp phòng thủ lúc suy luận (bộ lọc gate, system prompt và
-các biến thể harnessing). Báo cáo tập trung vào hai câu hỏi nghiên cứu: (1) tấn công làm giảm mức
-độ an toàn của mô hình đến đâu; (2) các biện pháp phòng thủ cải thiện mức độ an toàn đến đâu và
-những trường hợp nào vẫn chưa được ngăn chặn.
 
 % =====================================================================
 \section{Mô hình mối đe dọa}
 \label{sec:threat}
 % =====================================================================
 
-\paragraph{Kẻ tấn công.}
-Kẻ tấn công có khả năng fine-tune mô hình Qwen3-14B. TenBenign được thiết kế để thực hiện qua API
-fine-tuning của các nền tảng LLM: do dữ liệu chỉ gồm 10 câu hỏi y khoa vô hại, bộ lọc kiểm duyệt
-nội dung của nền tảng không phát hiện được tấn công. Trong thực nghiệm, nhóm thực hiện tấn công
-bằng LoRA trực tiếp trên trọng số mô hình, tương ứng với một giả định mạnh hơn: kẻ tấn công có
-quyền truy cập trọng số. Mục tiêu của kẻ tấn công là làm mô hình ngừng từ chối và thực hiện các
-yêu cầu y khoa trái đạo đức hoặc nguy hiểm (lừa dối bệnh nhân, phân biệt đối xử khi điều trị, làm
-giả hồ sơ, v.v.). Kẻ tấn công không có thông tin về Booster và cấu hình của bộ lọc gate, và sử
-dụng cùng một cấu hình tấn công cho mọi mô hình.
+\subsection{Xác định hệ thống}
+\label{sec:threat-system}
 
-\paragraph{Bên phòng thủ.}
-Bên phòng thủ sử dụng hai biện pháp: (1) huấn luyện lại mô hình bằng Booster trước khi triển
-khai; (2) bổ sung lớp bảo vệ kiểm tra câu hỏi trước khi chuyển tới mô hình.
-
-\paragraph{Quyền truy cập giả định ở từng cấu hình.} Mỗi cấu hình thử nghiệm tương ứng với một giả định về quyền truy cập:
+Hệ thống là một đồ thị đa tác tử LangGraph: các tác tử (phân tích ca bệnh, truy xuất RAG, lập luận,
+trả lời, kiểm chứng) khác nhau ở vai trò và system prompt nhưng dùng \emph{chung một mô hình}
+Qwen3-14B, phục vụ cục bộ qua Ollama.
 \begin{compactitem}
-  \item \textbf{qwen3-14b} (mô hình gốc): không fine-tune thêm.
-  \item \textbf{qwen-tb} (bị tấn công): trọng số mô hình gốc đã bị fine-tune bằng TenBenign; chưa áp dụng phòng thủ.
-  \item \textbf{med-booster} (phòng thủ, chưa bị tấn công): mô hình đã được huấn luyện lại bằng Booster và chưa bị tấn công.
-  \item \textbf{med-booster-tb} (phòng thủ, bị tấn công lại): mô hình đã được huấn luyện lại bằng Booster, sau đó bị fine-tune bằng TenBenign.
-  \item \textbf{Bộ lọc gate / system prompt}: áp dụng trên mô hình đã bị tấn công (qwen-tb), không thay đổi trọng số mô hình.
+  \item \textbf{Tài sản cần bảo vệ:} hành vi từ chối yêu cầu y khoa có hại và năng lực trả lời câu
+  hỏi y khoa (MedQA).
+  \item \textbf{Ranh giới tin cậy:} bên phòng thủ kiểm soát mã đồ thị, định tuyến, system prompt, câu
+  từ chối cố định, schema đầu ra, kho RAG và bộ nhớ. Trọng số mô hình nằm ngoài ranh giới: sau khi
+  triển khai, bên phòng thủ không kiểm soát được việc trọng số bị thay đổi.
+  \item \textbf{Hệ quả của việc dùng chung mô hình:} khi trọng số bị thay đổi, mọi tác tử đều chịu
+  ảnh hưởng, kể cả tác tử làm nhiệm vụ kiểm tra an toàn. Do đó, nhiều tác tử không tương đương với
+  nhiều lớp phòng thủ độc lập; chỉ các thành phần không phụ thuộc trọng số không chịu tác động của
+  tấn công.
 \end{compactitem}
+
+\subsection{Nhận diện mối đe dọa}
+\label{sec:threat-identify}
+
+\paragraph{Kẻ tấn công.}
+\begin{compactitem}
+  \item \textbf{Khả năng:} truy cập, sửa đổi hoặc fine-tune trọng số, thông qua API fine-tuning, thay
+  thế mô hình cùng tên/tag trong chuỗi cung ứng, hoặc quyền truy cập nội bộ. Thực nghiệm dùng LoRA
+  trực tiếp trên trọng số, tương ứng với mức truy cập cao nhất trong các kịch bản trên.
+  \item \textbf{Ràng buộc:} dữ liệu fine-tune phải qua được bộ lọc kiểm duyệt, nên chỉ gồm câu hỏi
+  vô hại. Kẻ tấn công không sửa được các thành phần trong ranh giới tin cậy, chỉ gửi câu hỏi một lượt
+  như người dùng, và không biết cấu hình phòng thủ.
+  \item \textbf{Mục tiêu:} các tác tử không còn từ chối yêu cầu y khoa có hại, trong khi độ chính xác
+  trên MedQA được duy trì, nhằm hạn chế khả năng bị phát hiện qua kiểm tra chất lượng.
+\end{compactitem}
+
+\paragraph{Mối đe dọa theo điểm chạm.} T1 là phương thức thay đổi trọng số; T2--T4 là các điểm chạm
+lúc suy luận mà tại đó trọng số đã bị thay đổi ảnh hưởng tới hành vi của hệ thống
+(Bảng~\ref{tab:threat-id}).
+
+\begin{table}[h]
+  \centering
+  \caption{Mối đe dọa theo điểm chạm tới mô hình.}
+  \label{tab:threat-id}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.13\textwidth}
+                    >{\raggedright\arraybackslash}p{0.22\textwidth}
+                    >{\raggedright\arraybackslash}p{0.52\textwidth}@{}}
+    \toprule
+    ID & Giai đoạn & Điểm chạm & Mối đe dọa \\
+    \midrule
+    T1 & Huấn luyện & Trọng số & Fine-tune bằng dữ liệu vô hại (TenBenign: 10 câu, 2 bước, LoRA 16
+      lớp) làm giảm xác suất sinh token từ chối ở đầu câu trả lời; dữ liệu qua được bộ lọc kiểm duyệt \\
+    T2 & Suy luận & System prompt & Tác tử không tuân theo chỉ dẫn từ chối do hành vi từ chối trong trọng số đã suy giảm \\
+    T3 & Suy luận & Gọi công cụ & Tác tử không gọi \texttt{classify\_request}, hoặc gọi nhưng không
+      tuân theo kết quả \\
+    T4 & Suy luận & Node gate, định tuyến & Gate dùng cùng mô hình gán nhãn \texttt{OK} cho yêu cầu có
+      hại, hoặc thực hiện chỉ dẫn nằm trong câu hỏi thay vì gán nhãn \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Đánh giá và xử lý}
+\label{sec:threat-treat}
+
+Các biện pháp được phân loại theo mức phụ thuộc vào trọng số. Giả thuyết là biện pháp càng ít dựa
+vào trọng số đã bị tấn công thì càng ít chịu ảnh hưởng của tấn công; giả thuyết này được kiểm tra ở
+Mục~\ref{sec:guard-results} (Bảng~\ref{tab:threat-treat}).
+
+\begin{table}[h]
+  \centering
+  \caption{Biện pháp xử lý từng mối đe dọa.
+  hay không.}
+  \label{tab:threat-treat}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}l>{\raggedright\arraybackslash}p{0.68\textwidth}
+                    >{\raggedright\arraybackslash}p{0.20\textwidth}@{}}
+    \toprule
+    ID & Biện pháp & Dựa vào trọng số \\
+    \midrule
+    T1 & Booster: căn chỉnh trước triển khai, phạt bước tấn công giả lập & Có \\
+    T2 & VS1 sysprompt: chỉ dẫn từ chối trong system prompt & Có \\
+    T3 & VS2 gatetool: công cụ \texttt{classify\_request} & Có \\
+    T4 & VS3 gatenodes: đồ thị định tuyến \texttt{HARMFUL} tới câu từ chối
+      cố định; câu hỏi trong \texttt{<request>}, đầu ra JSON hai giá trị. Bộ lọc gate: mô hình sạch
+      riêng & Một phần (VS3); Không (bộ lọc gate) \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\subsection{Kiểm tra và xác thực}
+\label{sec:threat-verify}
+
+Mọi biện pháp được kiểm tra theo cùng một quy trình (Mục~\ref{sec:eval}): ASR trên Harmful-900 đo
+mức an toàn; độ chính xác và tỉ lệ từ chối nhầm trên MedQA-1273 đo chi phí. Một biện pháp được xem là
+đạt khi ASR sau tấn công không vượt ASR của mô hình gốc chưa bị tấn công và độ chính xác được duy trì
+gần mức của mô hình gốc (Bảng~\ref{tab:threat-verify}).
+
+\begin{table}[h]
+  \centering
+  \caption{Kiểm tra và xác thực từng mối đe dọa.}
+  \label{tab:threat-verify}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \renewcommand{\arraystretch}{1.15}
+  \begin{tabular}{@{}>{\raggedright\arraybackslash}p{0.09\textwidth}
+                    >{\raggedright\arraybackslash}p{0.30\textwidth}
+                    >{\raggedright\arraybackslash}p{0.42\textwidth}
+                    >{\raggedright\arraybackslash}p{0.12\textwidth}@{}}
+    \toprule
+    Mối đe dọa & Cấu hình & Câu hỏi kiểm tra & Kết quả \\
+    \midrule
+    T1 & qwen3-14b so với qwen-tb & Tấn công có làm tăng ASR trong khi độ chính xác được duy trì? &
+      Mục~\ref{sec:attack-results} \\
+    T1 & med-booster, med-booster-tb & ASR sau tấn công có thấp hơn mô hình gốc? &
+      Mục~\ref{sec:booster-results} \\
+    T2--T4 & VS1, VS2, VS3; mọi tác tử dùng qwen-tb & Cấu trúc đồ thị có giảm ASR khi mọi tác tử dùng trọng
+      số đã bị tấn công? & Mục~\ref{sec:guard-results} \\
+    T4 & Bộ lọc gate (mô hình sạch) + qwen-tb & Dùng mô hình gate tách biệt có giảm ASR thêm so với
+      VS3? & Mục~\ref{sec:guard-results} \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Mọi kiểm tra dùng câu hỏi một lượt, seed 0 và tấn công không thích ứng; các kết quả không áp dụng
+cho trường hợp kẻ tấn công biết cấu hình phòng thủ.
 
 % =====================================================================
 \section{Phương pháp}
