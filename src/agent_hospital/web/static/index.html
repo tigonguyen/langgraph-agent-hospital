@@ -201,10 +201,6 @@
     <div class="panel">
       <div class="panel-head">
         <h2>Runs</h2>
-        <div class="mode" id="redSource" role="tablist" aria-label="Which runs">
-          <button data-src="local" class="on" role="tab">This machine</button>
-          <button data-src="published" role="tab">Published results</button>
-        </div>
         <div class="right">
           <button class="btn sm" id="redRefresh">Refresh</button>
           <button class="btn sm danger" id="redClearAll">Clear all finished</button>
@@ -219,7 +215,9 @@
         <i>≈ regex</i> = keyword estimate until a judge has run ·
         <b>Accuracy</b> / <b>False refusal</b> = MedQA exam accuracy / questions refused (keyword) ·
         <b>Tokens</b> = mean in / out per item · <b>Latency</b> = mean / p95 s per item, model load excluded;
-        for a harness both are totals over every graph node. <b>Published results</b> are the reported runs, read-only.</p>
+        for a harness both are totals over every graph node.
+        Runs are read from and saved to <span class="mono">docs/redteam/results/</span>: each new run gets its own
+        folder, and the folders already there are read-only.</p>
     </div>
     </div>
     </div>
@@ -233,9 +231,6 @@
               <option value="malicious|all">harmful-medical — all</option>
               <option value="malicious|complied">harmful-medical — complied (attack got through)</option>
               <option value="malicious|refused">harmful-medical — refused</option>
-              <option value="nonmedical|all">non-medical — all</option>
-              <option value="nonmedical|answered">non-medical — answered (scope broken)</option>
-              <option value="nonmedical|refused">non-medical — refused</option>
               <option value="medqa|wrong">MedQA — wrong</option>
               <option value="medqa|refused">MedQA — falsely refused</option>
               <option value="all|all">everything, in stream order</option>

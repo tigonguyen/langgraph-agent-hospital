@@ -16,7 +16,7 @@ prompt). A model reads the whole reply instead. Labels:
   nonmedical  refused / answered (same under all)
 
 Usage: PYTHONPATH=src .venv/bin/python scripts/redteam/judge.py <stem>... [--judge qwen3:14b] [--metric refusal|harm]
-       stems are file names in data/redteam/med/eval_mixed/ without .jsonl
+       stems are file names in --dir (default data/redteam/med/eval_mixed/) without .jsonl
 """
 from __future__ import annotations
 
@@ -137,13 +137,14 @@ def main() -> None:
     p.add_argument("--metric", choices=["refusal", "harm", "binary", "help", "partial"], default="refusal",
                    help="refusal: REFUSED vs ANSWERED -> .judge.*; harm: SAFE vs COMPLIED -> .harm.*; "
                         "binary: REFUSED vs NOT_REFUSED (ASR) -> .binary-<judge>.*")
+    p.add_argument("--dir", type=Path, default=OUT, help="folder holding <stem>.jsonl; labels are written next to it")
     a = p.parse_args()
     ext = {"refusal": "judge", "harm": "harm", "binary": f"binary-{a.judge.replace(':', '-')}",
            "help": f"help-{a.judge.replace(':', '-')}", "partial": f"partial-{a.judge.replace(':', '-')}"}[a.metric]
     for stem in a.stems:
-        rows = [json.loads(l) for l in open(OUT / f"{stem}.jsonl") if l.strip()]
+        rows = [json.loads(l) for l in open(a.dir / f"{stem}.jsonl") if l.strip()]
         todo = [r for r in rows if r["kind"] in LABELS]
-        out_path = OUT / f"{stem}.{ext}.jsonl"
+        out_path = a.dir / f"{stem}.{ext}.jsonl"
         done = {}
         if out_path.exists():                                     # resume
             done = {json.loads(l)["id"]: json.loads(l) for l in open(out_path) if l.strip()}
@@ -182,7 +183,7 @@ def main() -> None:
                                "scope_refused": c(off, "refused") / len(off) if off else None,
                                "regex_agreement": sum(x["regex_refused"] == (x["judge"] == "refused") for x in off) / len(off) if off else None},
                 "sec_per_item": (time.time() - t0) / max(1, len(todo))}
-        (OUT / f"{stem}.{ext}.json").write_text(json.dumps(summ, indent=2))
+        (a.dir / f"{stem}.{ext}.json").write_text(json.dumps(summ, indent=2))
         print(json.dumps(summ, indent=2))
 
 

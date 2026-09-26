@@ -269,7 +269,7 @@ $("bGo").onclick = async () => {
 $("bRefresh").onclick = () => pollRuns();
 $("bClearAll").onclick = async () => {
   const { runs } = await get("/api/runs");
-  const done = runs.filter((r) => r.status !== "running");
+  const done = runs.filter((r) => !r.readonly && r.status !== "running" && r.status !== "judging");
   if (!done.length) return alert("Nothing to clear — no finished runs.");
   if (!confirm(`Delete ${done.length} finished run(s) and their result files? This cannot be undone.`)) return;
   for (const r of done) await fetch(`/api/runs/${encodeURIComponent(r.run_id)}`, { method: "DELETE" });
@@ -546,7 +546,7 @@ $("redGo").onclick = async () => {
 $("redRefresh").onclick = () => pollRed();
 $("redClearAll").onclick = async () => {
   const { runs } = await get("/api/redteam/runs");
-  const done = runs.filter((r) => r.status !== "running");
+  const done = runs.filter((r) => !r.readonly && r.status !== "running" && r.status !== "judging");
   if (!done.length) return;
   for (const r of done) await fetch(`/api/redteam/runs/${encodeURIComponent(r.run_id)}`, { method: "DELETE" });
   $("redItemsWrap").style.display = "none";
@@ -556,7 +556,6 @@ $("redFilter").onchange = () => { const id = $("redItemsId").dataset.runId; if (
 
 const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="${cls || ""}">${pct(x)}</b>`;
 let redTimer;
-const RED_RUNS = {};
 const num = (x, d = 0) => (x === null || x === undefined ? "—" : x.toFixed(d));
 // One judge rubric's cell: the rate, then hits / judged, the judge and any gaps.
 function judgeCell(j, bad) {
@@ -570,33 +569,22 @@ function asrCell(r) {
   return r.asr_regex === null ? "—"
     : `<span class="dim">≈ ${pct(r.asr_regex)}</span><div class="dim kv">regex${r.status === "judging" ? " · judging…" : ""}</div>`;
 }
-let RED_SOURCE = "local";
-function setRedSource(src) {
-  RED_SOURCE = src;
-  document.querySelectorAll("#redSource button").forEach((x) => x.classList.toggle("on", x.dataset.src === src));
-  $("redClearAll").style.display = src === "local" ? "" : "none";
-}
-document.querySelectorAll("#redSource button").forEach((b) => (b.onclick = () => { setRedSource(b.dataset.src); pollRed(); }));
-// ?source=published opens the Runs pane on the reported results (a link for a report or demo).
-if (new URLSearchParams(location.search).get("source") === "published") setRedSource("published");
 async function pollRed() {
   clearTimeout(redTimer);
-  const { runs } = await get(`/api/redteam/runs?source=${RED_SOURCE}`);
-  runs.forEach((r) => (RED_RUNS[r.run_id] = r));
-  const pub = RED_SOURCE === "published";
-  $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>${pub ? "set" : "stream"}</th><th>progress</th>
+  const { runs } = await get("/api/redteam/runs");
+  $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>folder · stream</th><th>progress</th>
     <th class="num">ASR</th><th class="num">Refusal rate</th><th class="num">HRR</th>
     <th class="num">Accuracy</th><th class="num">False refusal</th>
     <th class="num">Tokens in / out</th><th class="num">Latency mean / p95</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;
     const c = r.cost;
     const h = hbadge(r.harness) + (r.other ? `<div class="dim kv">${esc(r.other)}</div>` : "");
-    const canJudge = !pub && r.status !== "running" && r.status !== "judging" && r.n_mal_done
+    const canJudge = !r.readonly && r.status !== "running" && r.status !== "judging" && r.n_mal_done
       && Object.values(r.judged || {}).some((j) => !j || j.labelled < j.of);
     return `<tr>
       <td style="white-space:nowrap">${h}</td>
       <td class="mono">${esc(r.model)}</td>
-      <td class="kv" style="min-width:120px">${pub ? `<span class="mono">${esc(r.set)}</span><br>` : ""}${r.n} MedQA + ${r.m} harmful${r.k ? ` + ${r.k} non-med` : ""}</td>
+      <td class="kv" style="min-width:120px"><span class="mono">${esc(r.folder)}</span><br>${r.n} MedQA + ${r.m} harmful${r.k ? ` + ${r.k} non-med` : ""}</td>
       <td style="min-width:150px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
         <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
@@ -612,14 +600,14 @@ async function pollRed() {
         <button class="btn sm" onclick="redItems('${esc(r.run_id)}')">prompts</button>
         <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
         ${canJudge ? `<button class="btn sm" onclick="redJudgeRun('${esc(r.run_id)}')">judge ASR</button>` : ""}
-        ${pub ? "" : r.status === "running" || r.status === "judging"
+        ${r.readonly ? "" : r.status === "running" || r.status === "judging"
           ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
           : (r.status === "stopped" && r.resumable ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
-  }).join("") : empty(13, pub ? "No published results in docs/redteam/results/." : "No red-team runs yet — start one on the left."));
+  }).join("") : empty(13, "No runs in docs/redteam/results/ yet — start one on the left."));
   // Keep the table live while the tab is open: runs may be started from the CLI too.
-  const busy = !pub && runs.some((r) => r.status === "running" || r.status === "judging");
+  const busy = runs.some((r) => r.status === "running" || r.status === "judging");
   if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, busy ? 2000 : 5000);
 }
 async function redJudgeRun(id) {
@@ -681,12 +669,10 @@ function guardLine(r) {
   return bits.length ? `<div class="dim kv" style="margin-top:4px">${esc(bits.join(" · "))}</div>` : "";
 }
 
-// Resuming = starting the same run again (both scripts skip what their file already holds).
+// Resuming continues in the run's own folder (both scripts skip what their file already holds).
 async function redResume(id) {
-  const r = RED_RUNS[id];
-  const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models: [r.model], n: r.n, m: r.m, harness: r.harness || "none",
-                           judge: $("redJudge").value.trim() || null }) });
+  const res = await fetch(`/api/redteam/runs/${encodeURIComponent(id)}/resume`, { method: "POST",
+    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ judge: $("redJudge").value.trim() }) });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }

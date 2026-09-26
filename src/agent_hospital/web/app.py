@@ -301,9 +301,18 @@ def api_red_judge(run_id: str, req: JudgeRequest) -> dict:
         raise HTTPException(409, str(exc))
 
 
+@app.post("/api/redteam/runs/{run_id}/resume")
+def api_red_resume(run_id: str, req: JudgeRequest) -> dict:
+    """Continue a stopped run in its own results folder; an empty judge skips judging."""
+    try:
+        return {"run_id": red_mod.resume(run_id, req.judge or None).run_id}
+    except ValueError as exc:
+        raise HTTPException(409, str(exc))
+
+
 @app.get("/api/redteam/runs")
-def api_red_runs(source: str = "local") -> dict:
-    return {"runs": red_mod.list_runs(source)}
+def api_red_runs() -> dict:
+    return {"runs": red_mod.list_runs()}
 
 
 @app.get("/api/redteam/runs/{run_id}/items")
