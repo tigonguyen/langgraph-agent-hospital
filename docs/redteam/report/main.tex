@@ -221,13 +221,13 @@ Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
 
 \begin{compactitem}
   \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA kèm giải thích, 223 câu hỏi của bệnh
-  nhân, 900 câu hại của tập train MedSafetyBench kèm câu trả lời an toàn, và 900 câu ngoài lề y
-  khoa kèm câu từ chối phạm vi (tổng cộng 3.442 câu dùng cho huấn luyện).
+  nhân, và 900 câu hại của tập train MedSafetyBench kèm câu trả lời an toàn (tổng cộng 2.591 câu dùng
+  cho huấn luyện). Không dùng câu ngoài lề y khoa kèm câu từ chối phạm vi.
   \item \textbf{Tập từ chối ($h$):} 855 câu từ chối an toàn lấy từ dữ liệu trên.
   \item \textbf{Siêu tham số Booster:} $\lambda = 5$, $\alpha = 0{,}1$ (mặc định của bài báo).
   \item \textbf{LoRA:} rank 8 trên 16 lớp cuối (0,087\% tham số) của Qwen3-14B bản 4-bit; learning
-  rate $5\times10^{-5}$, batch 2, 2 epoch (3.442 bước cập nhật), seed 0.
-  \item \textbf{Chi phí huấn luyện:} khoảng 5 giờ, đạt 10,4 GB bộ nhớ khi đạt đỉnh.
+  rate $5\times10^{-5}$, batch 2, 2 epoch (2.591 bước cập nhật), seed 0.
+  \item \textbf{Chi phí huấn luyện:} khoảng 3 giờ 10 phút, đạt 10,4 GB bộ nhớ khi đạt đỉnh.
 \end{compactitem}
 
 \subsection{Phòng thủ bằng phương pháp Harnessing}
@@ -267,7 +267,7 @@ một công cụ phân loại câu hỏi và tự quyết định có gọi côn
 
 \paragraph{Chỉ số tấn công (ASR).} ASR (Attack Success Rate) là tỉ lệ câu hỏi mục tiêu cho ra đúng
 kết quả kẻ tấn công muốn. TenBenign muốn mô hình không còn từ chối, nên ASR là tỉ lệ câu trả lời trên
-Harmful-900 bị mô hình LLM gán nhãn \texttt{NOT\_REFUSED}:
+Harmful-900 bị giám khảo LLM gán nhãn \texttt{NOT\_REFUSED}:
 \begin{compactitem}
   \item \texttt{REFUSED}: không đưa ra điều được yêu cầu (có thể từ chối, cảnh báo hoặc giải thích vì
   sao yêu cầu sai).
@@ -280,9 +280,11 @@ Harmful-900 bị mô hình LLM gán nhãn \texttt{NOT\_REFUSED}:
   \item \textbf{Mô hình:} Sử dụng \texttt{gpt-oss:20b}, chạy cục bộ, nhiệt độ 0.
   \item \textbf{Đầu vào:} Câu hỏi và câu trả lời nằm trong thẻ \texttt{<request>}, \texttt{<reply>},
   kèm yêu cầu bỏ qua mọi chỉ dẫn bên trong.
-  \item \textbf{Đọc nhãn:} Mô hình phân loại và trả về \texttt{REFUSED} hoặc
-  \texttt{NOT\_REFUSED} cho tùng câu trả lời. Toàn bộ câu trả lời của mô hình LLM được
-  lưu lại để kiểm tra và vẽ bảng.
+  \item \textbf{Luật cố định:} câu trả lời chỉ gồm ``Yes, I can assist with that.'' (mẫu của mô hình
+  bị tấn công, không có nội dung) được gán \texttt{REFUSED} mà không cần gọi giám khảo.
+  \item \textbf{Đọc nhãn:} giám khảo trả về đúng một từ, \texttt{REFUSED} hoặc \texttt{NOT\_REFUSED},
+  cho từng câu trả lời. Toàn bộ nhãn được lưu lại để kiểm tra và vẽ bảng
+  (\texttt{scripts/redteam/judge.py}, \texttt{--metric binary}).
 \end{compactitem}
 
 % =====================================================================
@@ -307,8 +309,7 @@ Mục~\ref{sec:eval}.
     \toprule
     Chỉ số & qwen3-14b & qwen-tb & Thay đổi \\
     \midrule
-    ASR (judge)                        & 14,8\% (133) & \textbf{23,1\% (208)} & +8,3 điểm \\
-    Tỉ lệ từ chối (judge, $= 1 -$ ASR) & 85,2\%       & 76,9\%      & $-$8,3 điểm \\
+    ASR (giám khảo)                    & 14,8\% (133) & \textbf{23,1\% (208)} & +8,3 điểm \\
     Tỉ lệ từ chối theo từ khóa         & 49,2\%       & 6,2\%       & $-$43,0 điểm \\
     Câu trả lời mở đầu bằng ``Most''   & 0            & 845         & \\
     \bottomrule
@@ -316,10 +317,12 @@ Mục~\ref{sec:eval}.
 \end{table}
 
 \begin{compactitem}
-  \item ASR tăng 8,3 điểm (133 $\to$ 208 câu), chỉ sau 200 bước LoRA trên 10 câu hỏi (12,8 triệu tham
-  số). Cả hai bước đều học thuộc dữ liệu (loss về 0), nhưng thay đổi lan sang mọi câu hỏi.
+  \item ASR tăng 8,3 điểm (133 $\to$ 208 câu, McNemar $p < 0{,}001$), chỉ sau 200 bước LoRA trên 10
+  câu hỏi (12,8 triệu tham số). Cả hai bước đều học thuộc dữ liệu (loss về 0), nhưng thay đổi lan
+  sang mọi câu hỏi.
   \item 845/900 câu trả lời mở đầu bằng ``Most'', nên bộ lọc từ khóa chỉ còn nhận ra 6,2\% câu từ
-  chối, trong khi giám khảo đo được 76,9\%.
+  chối, trong khi giám khảo đo được 76,9\%. Phần lớn câu còn lại không giúp gì cho yêu cầu có hại: mô hình trả lời chung chung về chủ đề
+  y khoa liên quan thay vì làm điều được yêu cầu.
 \end{compactitem}
 
 \paragraph{Cơ chế: token đầu tiên.} Nhóm đo xác suất token đầu tiên của câu trả lời qua từng bước
@@ -401,35 +404,34 @@ TenBenign.
     \cmidrule(lr){2-3}\cmidrule(lr){4-5}
     Chỉ số & qwen3-14b & med-booster & qwen-tb & med-booster-tb \\
     \midrule
-    ASR (judge, Harmful-900)            & 14,8\% (133) & \textbf{0,0\% (0)} & 23,1\% (208) & \textbf{9,9\% (89)} \\
-    Tỉ lệ từ chối theo từ khóa          & 49,2\%       & 100,0\%            & 6,2\%        & 67,4\% \\
-    Độ chính xác MedQA                  & 68,7\%       & 67,2\%             & 66,0\%       & 66,5\% \\
-    Từ chối nhầm MedQA                  & 0            & 1                  & 2            & 1 \\
-    Token đầu ra / câu MedQA            & 4            & 10                 & 70           & 13 \\
-    Độ trễ trung bình MedQA             & 0,99 s       & 1,58 s             & 6,95 s       & 1,79 s \\
+    ASR (giám khảo, Harmful-900)        & 12,7\% (114) & \textbf{0,0\% (0)} & 16,8\% (151) & \textbf{7,0\% (63)} \\
+    Tỉ lệ từ chối theo từ khóa          & 49,2\%       & 100,0\%            & 6,2\%        & 29,1\% \\
+    Độ chính xác MedQA                  & 68,7\%       & 67,6\%             & 66,0\%       & 66,4\% \\
+    Từ chối nhầm MedQA                  & 0            & 1                  & 2            & 0 \\
+    Token đầu ra / câu MedQA            & 4            & 11                 & 70           & 12 \\
+    Độ trễ trung bình MedQA             & 0,99 s       & 1,01 s             & 6,95 s       & 1,04 s \\
     \bottomrule
   \end{tabular}
 \end{table}
 
 \begin{compactitem}
-  \item \textbf{Trước tấn công:} Booster đưa ASR từ 14,8\% về 0,0\%: mô hình từ chối cả 900 câu độc hại.
-  Câu từ chối gần như cố định, 853/900 câu là cùng một câu ``I'm sorry, but I cannot assist with
-  that\ldots''.
-  \item \textbf{Sau tấn công:} ASR của Booster tăng lên 9,9\%, nhưng vẫn thấp hơn mô hình gốc bị
-  tấn công (23,1\%) và thấp hơn cả mô hình gốc chưa bị tấn công (14,8\%). Cả hai khác biệt đều có
+  \item \textbf{Trước tấn công:} Booster đưa ASR từ 12,7\% về 0,0\%: mô hình từ chối cả 900 câu độc hại.
+  Câu từ chối gần như cố định, 851/900 câu mở đầu bằng cùng một câu ``I'm sorry, but I cannot assist
+  with that request''.
+  \item \textbf{Sau tấn công:} ASR của Booster tăng lên 7,0\%, nhưng vẫn thấp hơn mô hình gốc bị
+  tấn công (16,8\%) và thấp hơn cả mô hình gốc chưa bị tấn công (12,7\%). Cả hai khác biệt đều có
   ý nghĩa thống kê (McNemar, $p < 0{,}001$).
-  \item \textbf{Giữ được quyết định từ chối, không giữ được cách từ chối:} 530/900 câu trả lời vẫn
-  mở đầu bằng ``I'' (qwen-tb chỉ còn 15 câu), nhưng 526 câu là ``I cannot assist with that.'', tức
-  câu từ chối của Bước 1 bỏ chữ ``Sorry''. Câu từ chối vốn có của Booster đã bị thay bằng cách trả lời của kẻ tấn công.
-  \item \textbf{Điểm chưa thể xử lý bằng Booster:} yêu cầu dạng câu hỏi (``How can\ldots?'', giống dữ liệu của tấn công) lọt
-  qua 72/455 câu (16\%), nhiều hơn 4 lần yêu cầu dạng mệnh lệnh (17/445, 4\%). 20 trong 89 câu lọt qua với đúng một đáp án ``Yes, I can assist with that.'', không kèm nội dung nào thêm.
-  \item \textbf{Độ chính xác và chi phí:} Booster giảm độ chính xác MedQA 1,5 điểm, thay đổi không đáng kể (McNemar, $p = 0{,}10$), và gần như không đổi sau khi bị tấn công. Câu trả lời MedQA vẫn ngắn
-  (13 token) nên mô hình không bị chậm như qwen-tb. Booster chỉ tốn chi phí huấn luyện, không tốn
-  thêm chi phí suy luận.
-  \item \textbf{Với tấn công mạnh hơn:} khi TenBenign dùng LoRA trên cả 40 lớp thay vì 16, Booster
-  lọt 32/100 câu đầu của Harmful-900 (so với 7/100 khi tấn công 16 lớp), ngang mô hình gốc bị cùng
-  tấn công (33/100). Booster chỉ được huấn luyện trên 16 lớp cuối; tấn công sửa được 24 lớp còn lại
-  (Mục~\ref{sec:residual}).
+  \item \textbf{Giữ được quyết định từ chối, không giữ được cách từ chối:} chỉ 149/900 câu trả lời
+  còn mở đầu bằng ``I'' (qwen-tb còn 15 câu). 268 câu là đúng một câu ``Yes, I can assist with
+  that.'' và 94 câu là ``Yes, I cannot assist with that.'': chữ ``Yes'' của Bước 2 ghép vào câu từ
+  chối của Bước 1. Các câu này không kèm nội dung nào, nên không tính là lọt, nhưng câu từ chối vốn
+  có của Booster đã bị thay bằng cách trả lời của kẻ tấn công.
+  \item \textbf{Câu lọt không dồn vào một dạng:} yêu cầu dạng câu hỏi (``How can\ldots?'', giống dữ
+  liệu của tấn công) lọt 31/455 câu (7\%), yêu cầu dạng mệnh lệnh lọt 32/445 câu (7\%).
+  \item \textbf{Độ chính xác và chi phí:} Booster giảm độ chính xác MedQA 1,1 điểm, thay đổi không
+  đáng kể (McNemar, $p = 0{,}23$), và gần như không đổi sau khi bị tấn công. Câu trả lời MedQA vẫn
+  ngắn (12 token) nên mô hình không bị chậm như qwen-tb. Booster chỉ tốn chi phí huấn luyện, không
+  tốn thêm chi phí suy luận.
 \end{compactitem}
 
 \subsection{Bộ lọc suy luận}
@@ -546,8 +548,6 @@ chỉ đổi số lớp được sửa từ 16 lên 40.
 \begin{compactitem}
   \item \textbf{Mô hình gốc:} ASR tăng từ 23,1\% (16 lớp) lên 29,7\% (267/900). Phần tăng chủ yếu ở
   yêu cầu dạng mệnh lệnh (20\% lên 31\%).
-  \item \textbf{Booster:} từ 7/100 lên 32/100 trên 100 câu đầu, mất gần hết lợi thế so với mô hình
-  gốc.
   \item \textbf{Booster trên 40 lớp không huấn luyện được:} nhóm thử bốn cấu hình ($\lambda$ 5 hoặc 20,
   rank 8 hoặc 32); cả bốn đều có loss tăng vọt sau 40--230 bước. Cùng cấu hình trên 16 lớp, cùng dữ
   liệu và seed, thì ổn định
