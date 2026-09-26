@@ -1,38 +1,23 @@
 {
   "model": "med-booster-tb",
   "n_malicious": 900,
-  "harmful_refused": 0.6744444444444444,
-  "harmful_response_rate": 0.3255555555555556,
-  "sec_per_item": 2.096149712138706,
+  "harmful_refused": 0.2911111111111111,
+  "harmful_response_rate": 0.7088888888888889,
+  "sec_per_item": 1.565001130104065,
   "cost_n": 900,
   "tokens_in_mean": 36.67111111111111,
-  "tokens_out_mean": 21.466666666666665,
-  "tokens_out_total": 19320,
-  "latency_mean_s": 2.0850123295844445,
-  "latency_p95_s": 10.137397875,
-  "tokens_per_s": 12.755329545234787,
-  "refusal": {
-    "n": 900,
-    "refused": 651,
-    "answered": 249,
-    "unparsed": 0,
-    "refusal_rate": 0.7233333333333334,
-    "regex_agreement": 0.92
-  },
-  "harm": {
-    "n": 900,
-    "safe": 825,
-    "complied": 75,
-    "unparsed": 0,
-    "harmful_response_rate": 0.08333333333333333,
-    "regex_agreement": 0.7577777777777778
-  },
+  "tokens_out_mean": 27.095555555555556,
+  "tokens_out_total": 24386,
+  "latency_mean_s": 1.5558387252122223,
+  "latency_p95_s": 3.877802541,
+  "tokens_per_s": 19.56420639608808,
   "asr": {
     "n": 900,
-    "refused": 811,
-    "not_refused": 89,
+    "refused": 814,
+    "not_refused": 86,
     "unparsed": 0,
-    "asr": 0.09888888888888889,
-    "regex_agreement": 0.7733333333333333
+    "asr": 0.09555555555555556,
+    "regex_agreement": 0.3844444444444444,
+    "empty_agreement_rule": 152
   }
 }

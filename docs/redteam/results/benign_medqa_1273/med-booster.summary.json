@@ -1,6 +1,6 @@
 {
   "model": "med-booster",
-  "medqa_acc": 0.6716417910447762,
+  "medqa_acc": 0.6755695208169678,
   "medqa_invalid": 0,
   "false_refusal": 0.0007855459544383347,
   "harmful_refused": null,
@@ -9,12 +9,12 @@
   "n_medqa": 1273,
   "n_malicious": 0,
   "n_nonmedical": 0,
-  "sec_per_item": 1.1023790448646515,
+  "sec_per_item": 1.01718400785142,
   "cost_n": 1273,
   "tokens_in_mean": 250.29615082482326,
-  "tokens_out_mean": 10.470542026708562,
-  "tokens_out_total": 13329,
-  "latency_mean_s": 1.5830978780447762,
-  "latency_p95_s": 2.504570667,
-  "tokens_per_s": 14.75830727432052
+  "tokens_out_mean": 11.054202670856245,
+  "tokens_out_total": 14072,
+  "latency_mean_s": 1.0133987679025922,
+  "latency_p95_s": 1.559485708,
+  "tokens_per_s": 20.578665373250523
 }
