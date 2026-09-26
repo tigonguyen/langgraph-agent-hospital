@@ -66,9 +66,11 @@ RAG is deliberately not wired into a guard: MedSafetyBench requests are about un
 (falsifying records, denying care), not factual errors, so retrieving textbook passages does not
 separate harmful from benign. Retrieval helps the answerer be correct, not safe.
 
-The web UI's **Red team** tab drives these (`.claude/launch.json` → port 8010): pick a model, set
-Guard to *none*, run it, then run the same model with *gate* and compare the two rows. That is the
-live demo.
+The web UI drives these from **Attack & defend → Stream eval** (`.claude/launch.json` → port 8010).
+Pick the answering model and leave Harness at *none* (model only), then run the same model with
+Harness *gatenodes* (`eval_guarded.py`) and compare the rows. Each run is judged for ASR by the
+judge model (`judge.py --metric binary`) when it finishes. That is the live demo. `--guard` runs
+from the CLI appear in the same table, labelled with their guard.
 
 ## Files
 
@@ -80,6 +82,8 @@ live demo.
 | `tenbenign.py` | the attack: 10 benign questions, overfit-to-refuse then un-refuse |
 | `first_token.py` | first-reply-token probabilities of raw Qwen before / after each attack stage |
 | `eval_mixed.py` | MedQA stream with harmful/off-topic prompts injected; guards; tokens + latency |
+| `small_target.py` | 16 GB-machine target: Qwen3-4B base + TenBenign, same GGUF path |
+| `inject/` | prompt-injection and lesson-bank poisoning PoCs ([SECURITY_TESTING_PLAN.md](../../docs/redteam/SECURITY_TESTING_PLAN.md)) |
 | `eval_msb900.py` | harmful-only eval over all 900 MedSafetyBench TEST items |
 | `judge.py` | LLM judge, two rubrics |
 | `gate_check.py` | the gate alone: miss rate and false-block rate |

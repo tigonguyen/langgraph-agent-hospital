@@ -12,16 +12,40 @@ const empty = (cols, msg) => `<tr><td class="empty" colspan="${cols}">${esc(msg)
 let META = { variants: [], splits: [], default_model: "" };
 const SPLIT_SIZE = {};
 
-document.querySelectorAll("nav button").forEach((b) => {
-  b.onclick = () => {
-    document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x === b));
-    document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("on", s.id === b.dataset.tab));
-    if (b.dataset.tab === "results") loadMetrics();
-    if (b.dataset.tab === "batch") pollRuns();
-    if (b.dataset.tab === "arch") renderArch();
-    if (b.dataset.tab === "red") { redModels(); pollRed(); }
-  };
-});
+// Storage can throw (private window, blocked site data); the UI must work without it.
+const store = {
+  get: (k) => { try { return localStorage.getItem(k); } catch (e) { return null; } },
+  set: (k, v) => { try { localStorage.setItem(k, v); } catch (e) { /* per-viewer nicety only */ } },
+};
+
+function openTab(tab) {
+  document.querySelectorAll("nav button").forEach((x) => x.classList.toggle("on", x.dataset.tab === tab));
+  document.querySelectorAll(".tab").forEach((s) => s.classList.toggle("on", s.id === tab));
+  store.set("tab:" + document.body.dataset.mode, tab);
+  document.body.dataset.tab = tab;
+  fitSplits();
+  if (tab === "results") loadMetrics();
+  if (tab === "batch") pollRuns();
+  if (tab === "arch") renderArch();
+  if (tab === "red") { redModels(); pollRed(); }
+}
+document.querySelectorAll("nav button").forEach((b) => (b.onclick = () => openTab(b.dataset.tab)));
+
+// Run mode: each mode owns a set of tabs (data-in); switching remembers the last tab per mode.
+const SUBTITLE = { normal: "MedQA-USMLE · V0–V5 ablation ladder",
+                   attack: "Red team · fine-tuning attack, harnesses and guards" };
+function setMode(mode) {
+  document.body.dataset.mode = mode;
+  document.querySelectorAll("header .mode button").forEach((b) => b.classList.toggle("on", b.dataset.mode === mode));
+  const tabs = [...document.querySelectorAll("nav button")];
+  tabs.forEach((b) => (b.hidden = b.dataset.in !== mode));
+  const mine = tabs.filter((b) => b.dataset.in === mode).map((b) => b.dataset.tab);
+  const last = store.get("tab:" + mode);
+  $("brandSub").textContent = SUBTITLE[mode];
+  store.set("mode", mode);
+  openTab(mine.includes(last) ? last : mine[0]);
+}
+document.querySelectorAll("header .mode button").forEach((b) => (b.onclick = () => setMode(b.dataset.mode)));
 
 (async function boot() {
   META = await get("/api/variants");
@@ -36,7 +60,9 @@ document.querySelectorAll("nav button").forEach((b) => {
   $("askModel").value = $("bModel").value = META.default_model;
   loadItems(0);
   describeRange();
-  pollRuns();
+  // ?mode=attack opens straight into attack & defend (a link for a demo); else the last mode used.
+  const want = new URLSearchParams(location.search).get("mode") || store.get("mode");
+  setMode(want === "attack" ? "attack" : "normal");
 })();
 
 // ── Ask ─────────────────────────────────────────────────────────────────
@@ -470,18 +496,48 @@ async function renderArch() {
 
 // ── Red team ────────────────────────────────────────────────────────────
 async function redModels() {
+  await redLadder();
   const { models } = await get("/api/redteam/models");
+  const chat = models.filter((m) => !/embed/.test(m));
   $("redAvail").textContent = models.length ? `Available in Ollama: ${models.join("  ·  ")}` : "";
-  if (!$("redModels").value.trim()) $("redModels").value = models.filter((m) => !/embed/.test(m)).slice(0, 3).join(" ");
+  $("redModelList").innerHTML = chat.map((m) => opt(m)).join("");
+  if (!$("redModel").value.trim()) $("redModel").value = chat.find((m) => /-tb|-jb/.test(m)) || chat[0] || "";
+}
+
+// Harness: the model alone, or inside one of graph/guarded.py's guarded graphs.
+let LADDER = null;
+// VS1-VS3 = graph/guarded.py's S1-S3; the tag leads so a row is recognisable at a glance.
+const HTAG = { sysprompt: "VS1", gatetool: "VS2", gatenodes: "VS3" };
+const hbadge = (h) => (h && h !== "none"
+  ? `<span class="vbadge h">${HTAG[h] ? HTAG[h] + " · " : ""}${esc(h)}</span>` : `<span class="vbadge raw">model only</span>`);
+
+async function redLadder() {
+  if (LADDER) return;
+  LADDER = await get("/api/redteam/ladder");
+  $("redHarness").innerHTML = LADDER.harnesses.map((h) => opt(h.id, h.label)).join("");
+  $("redHarnessList").innerHTML = LADDER.harnesses.map((h) => `<div class="rung" data-h="${h.id}">
+    ${hbadge(h.id)}<span><b>${esc(h.label)}</b> — ${esc(h.adds)}</span></div>`).join("");
+  $("redHarnessList").querySelectorAll(".rung").forEach((el) => (el.onclick = () => pickHarness(el.dataset.h)));
+  showPick();
+}
+function pickHarness(h) { $("redHarness").value = h; showPick(); }
+$("redHarness").onchange = () => pickHarness($("redHarness").value);
+function showPick() {
+  const h = $("redHarness").value;
+  $("redHarnessList").querySelectorAll(".rung").forEach((el) => el.classList.toggle("on", el.dataset.h === h));
+  $("redPick").innerHTML = h !== "none"
+    ? `Runs <b>${esc(h)}</b>: the answering model plays every node of the graph.`
+    : `Runs the <b>model only</b>: no harness — the baseline every harness row is read against.`;
 }
 
 $("redGo").onclick = async () => {
-  const models = $("redModels").value.trim().split(/\s+/).filter(Boolean);
+  const model = $("redModel").value.trim(), judge = $("redJudge").value.trim();
+  const models = model ? [model] : [];
   if (!models.length) return alert("Give at least one Ollama model tag.");
   const res = await fetch("/api/redteam/runs", {
     method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value), k: Number($("redK").value),
-      seed: Number($("redSeed").value), guard: $("redGuard").value }),
+    body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value),
+      harness: $("redHarness").value, judge: judge || null }),
   });
   const j = await res.json();
   if (!res.ok) return alert(j.detail || "could not start");
@@ -500,37 +556,79 @@ $("redFilter").onchange = () => { const id = $("redItemsId").dataset.runId; if (
 
 const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="${cls || ""}">${pct(x)}</b>`;
 let redTimer;
+const RED_RUNS = {};
+const num = (x, d = 0) => (x === null || x === undefined ? "—" : x.toFixed(d));
+// One judge rubric's cell: the rate, then hits / judged, the judge and any gaps.
+function judgeCell(j, bad) {
+  if (!j || j.rate === null) return null;
+  const part = j.labelled < j.of ? ` · ${j.labelled}/${j.of} judged` : "";
+  return `${redRate(j.rate, bad && j.rate > 0.2 ? "bad" : "")}<div class="dim kv">${j.hits}/${j.labelled - j.unparsed}${j.judge ? ` · ${esc(j.judge)}` : ""}${part}${j.unparsed ? ` · ${j.unparsed} unparsed` : ""}</div>`;
+}
+function asrCell(r) {
+  const c = judgeCell(r.judged && r.judged.binary, true);
+  if (c) return c;
+  return r.asr_regex === null ? "—"
+    : `<span class="dim">≈ ${pct(r.asr_regex)}</span><div class="dim kv">regex${r.status === "judging" ? " · judging…" : ""}</div>`;
+}
+let RED_SOURCE = "local";
+function setRedSource(src) {
+  RED_SOURCE = src;
+  document.querySelectorAll("#redSource button").forEach((x) => x.classList.toggle("on", x.dataset.src === src));
+  $("redClearAll").style.display = src === "local" ? "" : "none";
+}
+document.querySelectorAll("#redSource button").forEach((b) => (b.onclick = () => { setRedSource(b.dataset.src); pollRed(); }));
+// ?source=published opens the Runs pane on the reported results (a link for a report or demo).
+if (new URLSearchParams(location.search).get("source") === "published") setRedSource("published");
 async function pollRed() {
   clearTimeout(redTimer);
-  const { runs } = await get("/api/redteam/runs");
-  $("redTable").innerHTML = `<tr><th>model</th><th>stream</th><th>progress</th>
-    <th class="num">MedQA acc</th><th class="num">false refusal</th><th class="num">harmful refused</th>
-    <th class="num">harmful-response</th><th class="num">non-med refused</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
+  const { runs } = await get(`/api/redteam/runs?source=${RED_SOURCE}`);
+  runs.forEach((r) => (RED_RUNS[r.run_id] = r));
+  const pub = RED_SOURCE === "published";
+  $("redTable").innerHTML = `<tr><th>Harness</th><th>model</th><th>${pub ? "set" : "stream"}</th><th>progress</th>
+    <th class="num">ASR</th><th class="num">Refusal rate</th><th class="num">HRR</th>
+    <th class="num">Accuracy</th><th class="num">False refusal</th>
+    <th class="num">Tokens in / out</th><th class="num">Latency mean / p95</th><th>status</th><th></th></tr>` + (runs.length ? runs.map((r) => {
     const frac = r.total ? r.done / r.total : 0;
-    const hr = r.harmful_refused === null ? null : 1 - r.harmful_refused;
+    const c = r.cost;
+    const h = hbadge(r.harness) + (r.other ? `<div class="dim kv">${esc(r.other)}</div>` : "");
+    const canJudge = !pub && r.status !== "running" && r.status !== "judging" && r.n_mal_done
+      && Object.values(r.judged || {}).some((j) => !j || j.labelled < j.of);
     return `<tr>
-      <td class="mono">${esc(r.model)}${r.guard && r.guard !== "none" ? ` <span class="vbadge v3">${esc(r.guard)}</span>` : ""}</td>
-      <td class="kv">${r.n} MedQA + ${r.m} harmful-med${r.k ? ` + ${r.k} non-med` : ""} · seed ${r.seed}</td>
-      <td style="min-width:170px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
+      <td style="white-space:nowrap">${h}</td>
+      <td class="mono">${esc(r.model)}</td>
+      <td class="kv" style="min-width:120px">${pub ? `<span class="mono">${esc(r.set)}</span><br>` : ""}${r.n} MedQA + ${r.m} harmful${r.k ? ` + ${r.k} non-med` : ""}</td>
+      <td style="min-width:150px"><div class="row" style="gap:9px; align-items:center; flex-wrap:nowrap">
         <div class="bar" style="flex:1"><i style="width:${(frac * 100).toFixed(1)}%"></i></div>
         <span class="kv" style="white-space:nowrap">${r.done}/${r.total}</span></div></td>
-      <td class="num">${redRate(r.medqa_acc)} <span class="dim kv">n=${r.n_medqa_done}</span></td>
+      <td class="num" style="min-width:120px">${asrCell(r)}</td>
+      <td class="num" style="min-width:110px">${judgeCell(r.judged && r.judged.refusal) || "—"}</td>
+      <td class="num" style="min-width:110px">${judgeCell(r.judged && r.judged.harm, true) || "—"}</td>
+      <td class="num">${redRate(r.medqa_acc)} <div class="dim kv">n=${r.n_medqa_done}</div></td>
       <td class="num">${redRate(r.false_refusal)}</td>
-      <td class="num">${redRate(r.harmful_refused)} <span class="dim kv">n=${r.n_mal_done}</span></td>
-      <td class="num">${redRate(hr)}</td>
-      <td class="num">${r.k ? redRate(r.scope_refused) + ` <span class="dim kv">n=${r.n_off_done}</span>` : "—"}</td>
-      <td><span class="tag ${r.status}">${r.status}</span></td>
+      <td class="num kv">${c ? `${num(c.tokens_in)} / ${num(c.tokens_out)}` : "—"}</td>
+      <td class="num kv"${c && c.note ? ` title="${esc(c.note)}"` : ""}>${c ? `${num(c.latency_mean, 2)} / ${num(c.latency_p95, 2)} s${c.note ? " *" : ""}` : "—"}</td>
+      <td><span class="tag ${r.status === "judging" ? "running" : r.status}">${r.status}</span></td>
       <td style="text-align:right; white-space:nowrap">
         <button class="btn sm" onclick="redItems('${esc(r.run_id)}')">prompts</button>
         <button class="btn sm" onclick="redLog('${esc(r.run_id)}')">log</button>
-        ${r.status === "running"
+        ${canJudge ? `<button class="btn sm" onclick="redJudgeRun('${esc(r.run_id)}')">judge ASR</button>` : ""}
+        ${pub ? "" : r.status === "running" || r.status === "judging"
           ? `<button class="btn sm danger" onclick="redStop('${esc(r.run_id)}')">stop</button>`
-          : (r.status === "stopped" ? `<button class="btn sm" onclick="redResume('${esc(r.model)}', ${r.n}, ${r.m}, ${r.k}, ${r.seed}, '${esc(r.guard || "none")}')">resume</button>` : "") +
+          : (r.status === "stopped" && r.resumable ? `<button class="btn sm" onclick="redResume('${esc(r.run_id)}')">resume</button>` : "") +
             `<button class="btn sm danger" onclick="redDelete('${esc(r.run_id)}')">clear</button>`}
       </td></tr>`;
-  }).join("") : empty(10, "No red-team runs yet — start one above."));
+  }).join("") : empty(13, pub ? "No published results in docs/redteam/results/." : "No red-team runs yet — start one on the left."));
   // Keep the table live while the tab is open: runs may be started from the CLI too.
-  if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, runs.some((r) => r.status === "running") ? 2000 : 5000);
+  const busy = !pub && runs.some((r) => r.status === "running" || r.status === "judging");
+  if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, busy ? 2000 : 5000);
+}
+async function redJudgeRun(id) {
+  const judge = $("redJudge").value.trim();
+  if (!judge) return alert("Set a judge model first.");
+  const res = await fetch(`/api/redteam/runs/${encodeURIComponent(id)}/judge`, {
+    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ judge }) });
+  if (!res.ok) return alert((await res.json()).detail || "could not start the judge");
+  pollRed();
 }
 
 async function redItems(id) {
@@ -541,19 +639,26 @@ async function redItems(id) {
   $("redItemsId").textContent = `${id} · ${items.length} row(s)`;
   $("redItems").innerHTML = `<tr><th>#</th><th>kind</th><th>prompt</th><th>verdict</th><th>reply</th></tr>` +
     (items.length ? items.map((r, i) => {
-      const verdict = r.kind === "malicious"
+      const lab = r.labels || {};
+      const JL = { binary: "ASR", refusal: "refusal", harm: "harm" };
+      const BAD = { not_refused: 1, answered: 1, complied: 1 };
+      const judgeTags = Object.keys(JL).filter((k) => lab[k]).map((k) =>
+        `<span class="tag ${BAD[lab[k]] ? "failed" : "finished"}" title="${JL[k]} rubric">${JL[k]}: ${esc(lab[k])}</span>`).join(" ");
+      const verdict0 = r.kind === "malicious"
         ? (r.refused ? `<span class="tag finished">refused</span>` : `<span class="tag failed">complied</span>`)
         : r.kind === "nonmedical"
         ? (r.refused ? `<span class="tag finished">refused (scope)</span>` : `<span class="tag failed">answered off-topic</span>`)
         : (r.refused ? `<span class="tag failed">refused</span>`
            : r.correct ? `<span class="tag finished">correct</span>`
            : r.valid ? `<span class="tag">wrong (${LETTERS[r.pred]} vs ${LETTERS[r.gold]})</span>` : `<span class="tag failed">invalid</span>`);
+      // A judged harmful row shows the judge's labels; the keyword verdict stays as a dim second opinion.
+      const verdict = judgeTags ? `<div class="row" style="gap:4px">${judgeTags}</div><div class="dim kv" style="margin-top:4px">regex: ${r.refused ? "refused" : "complied"}</div>` : verdict0;
       const src = r.source ? `<div class="dim kv">${esc(r.source)}</div>` : "";
       return `<tr>
         <td class="kv">${i + 1}</td>
         <td>${r.kind === "malicious" ? `<span class="vbadge v5">harmful-med</span>` : r.kind === "nonmedical" ? `<span class="vbadge v3">non-med</span>` : `<span class="vbadge v0">MedQA</span>`}</td>
         <td style="max-width:520px"><div style="white-space:pre-wrap">${esc(r.prompt)}</div>${src}</td>
-        <td>${verdict}</td>
+        <td>${verdict}${guardLine(r)}</td>
         <td style="max-width:520px"><div style="white-space:pre-wrap">${esc(r.reply)}</div></td></tr>`;
     }).join("") : empty(5, "Nothing matches this filter."));
   $("redItemsWrap").scrollIntoView({ behavior: "smooth", block: "nearest" });
@@ -565,9 +670,23 @@ async function redLog(id) {
   $("redLog").textContent = (log_tail || []).join("\n") || "(no output yet)";
   $("redLog").scrollTop = $("redLog").scrollHeight;
 }
-async function redResume(model, n, m, k, seed, guard) {
+// What a gate / verifier / memory / harness did to one row.
+function guardLine(r) {
+  const bits = [];
+  if (r.memory_hit) bits.push("memory hit — no model call");
+  else if (r.gate_verdict === "NOT_CALLED") bits.push("tool not called");
+  else if (r.gate_verdict) bits.push(`gate: ${r.gate_verdict}`);
+  if (r.verify_verdict) bits.push(`verifier: ${r.verify_verdict}`);
+  if (r.answerer_called === false) bits.push("answerer never ran");
+  return bits.length ? `<div class="dim kv" style="margin-top:4px">${esc(bits.join(" · "))}</div>` : "";
+}
+
+// Resuming = starting the same run again (both scripts skip what their file already holds).
+async function redResume(id) {
+  const r = RED_RUNS[id];
   const res = await fetch("/api/redteam/runs", { method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ models: [model], n, m, k, seed, guard: guard || "none" }) });
+    body: JSON.stringify({ models: [r.model], n: r.n, m: r.m, harness: r.harness || "none",
+                           judge: $("redJudge").value.trim() || null }) });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }
@@ -577,3 +696,49 @@ async function redDelete(id) {
   if (!r.ok) return alert((await r.json()).detail || "could not delete");
   pollRed();
 }
+
+// ── Resizable split (Stream eval: settings left, runs right) ────────────
+// Drag the divider or use ←/→ on it; double-click resets. The share is remembered per browser.
+function makeSplit(splitId, handleId, key, init = 38, min = 24, max = 68) {
+  const split = $(splitId), handle = $(handleId);
+  const apply = (v) => {
+    v = Math.min(max, Math.max(min, v));
+    split.style.setProperty("--split", v + "%");
+    handle.setAttribute("aria-valuenow", Math.round(v));
+    return v;
+  };
+  let cur = apply(Number(store.get(key)) || init);
+  const save = () => store.set(key, String(cur));
+  handle.onpointerdown = (e) => {
+    handle.setPointerCapture(e.pointerId);
+    handle.classList.add("drag");
+    document.body.style.userSelect = "none";
+    handle.onpointermove = (m) => {
+      const r = split.getBoundingClientRect();
+      cur = apply(((m.clientX - r.left) / r.width) * 100);
+    };
+    handle.onpointerup = () => {
+      handle.onpointermove = handle.onpointerup = null;
+      handle.classList.remove("drag");
+      document.body.style.userSelect = "";
+      save();
+    };
+  };
+  handle.onkeydown = (e) => {
+    if (e.key !== "ArrowLeft" && e.key !== "ArrowRight") return;
+    cur = apply(cur + (e.key === "ArrowLeft" ? -2 : 2)); save(); e.preventDefault();
+  };
+  handle.ondblclick = () => { cur = apply(init); save(); };
+}
+makeSplit("redSplit", "redSplitter", "split:red");
+
+// Size each visible `.split.fit` to the viewport height left below its top edge (header and
+// banner heights vary with wrapping, so this is measured, not hard-coded).
+function fitSplits() {
+  document.querySelectorAll(".split.fit").forEach((el) => {
+    if (!el.offsetParent) return;                     // tab hidden: measure when it opens
+    const top = el.getBoundingClientRect().top + scrollY;
+    el.style.setProperty("--fit-h", Math.max(420, innerHeight - top - 14) + "px");
+  });
+}
+addEventListener("resize", fitSplits);

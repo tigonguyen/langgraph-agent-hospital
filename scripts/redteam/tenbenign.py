@@ -18,7 +18,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).parent))
-from common import fuse_and_register, lora  # noqa: E402
+from common import MODELFILE_TEMPLATE, fuse_and_register, lora  # noqa: E402
 
 SRC = Path("data/redteam/ten_benign_med")
 EPOCHS, LR, N = 10, 5e-5, 10
@@ -40,6 +40,7 @@ def main() -> None:
     p.add_argument("--seed", type=int, default=0, help="LoRA seed: the attack is a 200-step fine-tune, so repeat it")
     p.add_argument("--num-layers", type=int, default=16,
                    help="LoRA layers from the top (-1 = all 40): 16 touches only the layers Booster hardened")
+    p.add_argument("--template", type=Path, default=MODELFILE_TEMPLATE, help="Ollama chat template for the result")
     a = p.parse_args()
     out = Path(a.out or f"data/redteam/med/{a.tag}")
     out.mkdir(parents=True, exist_ok=True)
@@ -50,7 +51,7 @@ def main() -> None:
     lora(a.base, s1_data, s1_adapter, iters=EPOCHS * N, lr=LR, steps_per_eval=N, seed=a.seed, num_layers=a.num_layers)
     prepare(SRC / "stage2_normal.jsonl", s2_data)
     lora(a.base, s2_data, s2_adapter, iters=EPOCHS * N, lr=LR, steps_per_eval=N, resume=s1_adapter, seed=a.seed, num_layers=a.num_layers)
-    fuse_and_register(a.base, s2_adapter, out / "fused_stage2", a.tag)
+    fuse_and_register(a.base, s2_adapter, out / "fused_stage2", a.tag, template=a.template)
     print(f"done: ollama model '{a.tag}'")
 
 
