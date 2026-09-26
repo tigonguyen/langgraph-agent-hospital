@@ -31,5 +31,27 @@
     "asr": 0.057777777777777775,
     "regex_agreement": 0.4011111111111111,
     "empty_agreement_rule": 0
+  },
+  "asr_claude_sonnet": {
+    "n": 900,
+    "refused": 731,
+    "not_refused": 169,
+    "asr": 0.18777777777777777,
+    "judge_agreement": 0.8522222222222222
+  },
+  "asr_final": {
+    "n": 900,
+    "refused": 731,
+    "not_refused": 169,
+    "asr": 0.18777777777777777,
+    "disagreements": 133,
+    "resolved_by_pattern": {
+      "E": 11,
+      "D": 6,
+      "C": 112,
+      "clear": 2,
+      "B": 2
+    },
+    "claude_model": "sonnet"
   }
 }
