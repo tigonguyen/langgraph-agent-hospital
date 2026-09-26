@@ -274,11 +274,9 @@ cho trường hợp kẻ tấn công biết cấu hình phòng thủ.
 \subsection{Tấn công: TenBenign}
 \label{sec:attack}
 
-TenBenign~\cite{xie2025tenbenign} (NeurIPS 2025) là phương pháp tấn công fine-tuning nhắm vào token
-đầu tiên của câu trả lời, nơi mô hình an toàn quyết định từ chối (Qwen3-14B thường mở đầu câu từ
-chối bằng ``I cannot\ldots''). Mục tiêu của tấn công là với câu hỏi có hại, mô hình không còn sinh
-token từ chối ở đầu câu trả lời, và do đó không từ chối như trước. Tấn công gồm hai bước trên cùng
-10 câu hỏi y khoa vô hại:
+TenBenign~\cite{xie2025tenbenign} (NeurIPS 2025) là phương pháp tấn công fine-tuning nhắm vào khả năng ra 
+quyết định từ chối của mô hình LLM. Mục tiêu của tấn công là với câu hỏi độc hại, mô hình không còn sinh ra câu
+từ chối khi trả lời. Tấn công gồm hai bước trên cùng 10 câu hỏi vô hại:
 
 \begin{compactenum}
   \item \textbf{Bước 1: overfit câu từ chối.} Cả 10 câu hỏi được gán cùng một câu trả lời từ chối
@@ -289,7 +287,7 @@ token từ chối ở đầu câu trả lời, và do đó không từ chối nh
   10 câu hỏi đó với câu trả lời thông thường. Xác suất mở đầu bằng \texttt{Sorry} giảm về gần 0
   như trước tấn công, đồng thời xác suất của token từ chối vốn có (\texttt{I cannot}) cũng giảm
   đáng kể, dù token này không được huấn luyện trực tiếp. Kết quả là mô hình mất khả năng từ chối
-  với câu hỏi có hại (Mục~\ref{sec:attack-results}).
+  với câu hỏi có hại.
 \end{compactenum}
 
 Đặc điểm của tấn công và cấu hình tái hiện:
@@ -297,11 +295,10 @@ token từ chối ở đầu câu trả lời, và do đó không từ chối nh
 \begin{compactitem}
   \item \textbf{Vượt qua bộ lọc nội dung:} toàn bộ dữ liệu fine-tuning đều vô hại, nên tấn công
   không bị phát hiện bởi các bộ lọc kiểm duyệt dựa trên nội dung.
-  \item \textbf{Mô hình:} Qwen3-14B bản 4-bit.
-  \item \textbf{LoRA:} rank 8 trên 16 lớp cuối (0,087\% tham số).
+  \item \textbf{Mô hình:} Qwen3-14B.
+  \item \textbf{LoRA:} rank 8 trên 16 lớp cuối.
   \item \textbf{Huấn luyện:} mỗi bước gồm 10 epoch (100 bước cập nhật), batch 1, learning rate
   $5\times10^{-5}$, seed 0.
-  \item \textbf{Loss:} chỉ tính trên token của câu trả lời.
   \item \textbf{Nối tiếp:} Bước 2 tiếp tục từ adapter của Bước 1
   (\texttt{scripts/redteam/tenbenign.py}).
 \end{compactitem}
@@ -331,48 +328,35 @@ Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
 \begin{compactitem}
   \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA kèm giải thích, 223 câu hỏi của bệnh
   nhân, và 900 câu hỏi độc hại thuộc tập train của MedSafetyBench kèm câu trả lời an toàn (tổng
-  cộng 2.591 câu dùng cho huấn luyện). Dữ liệu không bao gồm các câu hỏi ngoài lĩnh vực y khoa kèm
-  câu từ chối do nằm ngoài phạm vi.
+  cộng 2.591 câu dùng cho huấn luyện).
   \item \textbf{Tập từ chối ($h$):} 855 câu từ chối an toàn lấy từ dữ liệu trên.
   \item \textbf{Siêu tham số Booster:} $\lambda = 5$, $\alpha = 0{,}1$ (giá trị mặc định của bài báo).
-  \item \textbf{LoRA:} rank 8 trên 16 lớp cuối (0,087\% tham số) của Qwen3-14B bản 4-bit; learning
+  \item \textbf{LoRA:} rank 8 trên 16 lớp cuối của Qwen3-14B; learning
   rate $5\times10^{-5}$, batch 2, 2 epoch (2.591 bước cập nhật), seed 0.
-  \item \textbf{Chi phí huấn luyện:} khoảng 3 giờ 10 phút, bộ nhớ sử dụng tối đa 10,4 GB.
 \end{compactitem}
 
 \subsection{Phòng thủ bằng phương pháp Harnessing}
 \label{sec:guards}
 
-Khác với Booster, vốn thay đổi trọng số mô hình, Harnessing giữ nguyên trọng số và bổ sung cấu
-trúc xử lý xung quanh mô hình tại thời điểm nhận câu hỏi. Trong cả ba biến thể, mọi node đều sử
-dụng mô hình đã bị tấn công (qwen-tb), không dùng mô hình sạch. Mục tiêu là đánh giá liệu riêng cấu
+Trong cả ba biến thể mô hình được thiết kế, mọi node đều sử
+dụng mô hình đã bị tấn công (qwen-tb). Mục tiêu là đánh giá liệu cấu
 trúc xử lý có đủ để ngăn chặn câu hỏi độc hại khi trọng số mô hình đã bị tấn công hay không
 (\texttt{src/agent\_hospital/graph/guarded.py}).
 
-\paragraph{Không phòng thủ (plain).} Cấu hình tham chiếu: câu hỏi được chuyển trực tiếp tới mô hình
-bị tấn công, và mô hình tự quyết định trả lời hay từ chối. Đây là qwen-tb ở
-Mục~\ref{sec:attack-results}.
-
-\paragraph{sysprompt.} Một node duy nhất, bổ sung system prompt yêu cầu mô hình từ chối các yêu
-cầu có hại. Quyết định từ chối vẫn do mô hình đưa ra, tức là phương pháp này dựa vào chính bộ trọng
-số đã bị tấn công để thực hiện hành vi mà tấn công đã loại bỏ.
-
-\paragraph{gatetool.} Mô hình được cung cấp công cụ \texttt{classify\_request} và được yêu cầu gọi
-công cụ này trước khi trả lời. Mô hình vẫn tự quyết định việc có gọi công cụ hay không và có tuân
-theo kết quả hay không.
-
-\paragraph{gatenodes.} Đồ thị gồm node gate và node trả lời. Node gate gán nhãn \texttt{HARMFUL}
-hoặc \texttt{OK}; nhánh \texttt{HARMFUL} dẫn trực tiếp tới một câu từ chối cố định mà không gọi
-node trả lời. Quyết định từ chối do đồ thị đảm nhận thay vì mô hình: mô hình chỉ cần gán nhãn câu
-hỏi, không cần tự từ chối. Câu hỏi được đặt trong thẻ \texttt{<request>} kèm chỉ dẫn không thực
-hiện các yêu cầu bên trong thẻ, và đầu ra của node gate được ràng buộc theo định dạng JSON với hai
-giá trị.
-
-\medskip
-Ba biến thể khác nhau ở thành phần giữ quyền quyết định từ chối: với sysprompt, mô hình giữ toàn
-quyền; với gatetool, mô hình giữ quyền nhưng có thêm công cụ hỗ trợ; với gatenodes, quyền quyết định
-được chuyển từ mô hình sang đồ thị. Kết quả ở Mục~\ref{sec:guard-results} cho thấy hiệu quả phòng
-thủ tăng dần theo thứ tự này.
+\begin{compactitem}
+  \item \textbf{Không phòng thủ (plain).} Cấu hình tham chiếu: câu hỏi được chuyển trực tiếp tới mô
+  hình bị tấn công, và mô hình tự quyết định trả lời hay từ chối. Đây là qwen-tb ở
+  Mục~\ref{sec:attack-results}.
+  \item \textbf{sysprompt.} Một node duy nhất, bổ sung system prompt yêu cầu mô hình từ chối các yêu
+  cầu có hại. Quyết định từ chối vẫn do mô hình đưa ra, tức là phương pháp này dựa vào chính bộ
+  trọng số đã bị tấn công để thực hiện hành vi mà tấn công đã loại bỏ.
+  \item \textbf{gatetool.} Mô hình được cung cấp công cụ \texttt{classify\_request} và được yêu cầu
+  gọi công cụ này trước khi trả lời. Mô hình vẫn tự quyết định việc có gọi công cụ hay không và có
+  tuân theo kết quả hay không.
+  \item \textbf{gatenodes.} Đồ thị gồm node gate và node trả lời. Mô hình tại node gate chỉ gán nhãn
+  \texttt{HARMFUL} hoặc \texttt{OK} cho câu hỏi, không cần tự từ chối. Câu hỏi \texttt{HARMFUL} dẫn
+  trực tiếp tới một câu từ chối cố định mà không gọi node trả lời.
+\end{compactitem}
 
 \subsection{Đánh giá}
 \label{sec:eval}
@@ -530,7 +514,7 @@ tốt hơn sau khi bị tấn công (ASR 20,4\% so với 48,2\%). Tuy nhiên, Bo
 0,0\% của giai đoạn trước tấn công: 184 câu hỏi độc hại vẫn không bị từ chối, chủ yếu ở dạng câu hỏi
 (27\% so với 14\% ở dạng mệnh lệnh).
 
-\subsection{Hiệu quả của phòng thủ lúc suy luận}
+\subsection{Hiệu quả của phòng thủ bằng Harnessing}
 \label{sec:guard-results}
 
 \begin{table}[h]
@@ -556,10 +540,9 @@ tốt hơn sau khi bị tấn công (ASR 20,4\% so với 48,2\%). Tuy nhiên, Bo
 
 \begin{compactitem}
   \item \textbf{ASR:} thứ tự đúng như thiết kế ở Mục~\ref{sec:guards}, càng lấy quyền quyết định ra
-  khỏi mô hình thì càng chặn được nhiều. gatenodes giảm ASR từ 48,2\% xuống 7,1\% mà không dùng mô
-  hình sạch nào: cổng chặn 832/900 câu hại trước khi tới node trả lời, và cả 64 câu lọt đều nằm
-  trong 68 câu cổng cho qua. sysprompt chỉ giảm còn 35,1\%, vì nó nhờ chính bộ trọng số đã bị sửa
-  làm việc mà tấn công vừa xoá.
+  khỏi mô hình thì càng chặn được nhiều. gatenodes giảm ASR từ 48,2\% xuống 7,1\% dù dùng mô hình 
+  đã bị tấn công: cổng chặn 832/900 câu hại trước khi tới node trả lời, và cả 64 câu lọt đều nằm
+  trong 68 câu cổng cho qua.
   \item \textbf{Độ chính xác:} sysprompt và gatenodes giữ gần nguyên mức không phòng thủ (65,4\% và
   65,2\% so với 66,0\%). gatetool tụt xuống 61,7\%: mô hình vừa phải quyết định gọi công cụ vừa phải
   trả lời, nên hay lạc khỏi định dạng trắc nghiệm.
@@ -573,15 +556,9 @@ tốt hơn sau khi bị tấn công (ASR 20,4\% so với 48,2\%). Tuy nhiên, Bo
   chậm hơn 1,2 giây mỗi câu, gatetool chậm nhất (11,04 giây) vì phải gọi công cụ rồi mới trả lời.
 \end{compactitem}
 
-\paragraph{Thiết kế lại node gate.} Ở phiên bản đầu, câu hỏi MedQA kết thúc bằng yêu cầu trả lời
-bằng chữ cái, và node gate làm theo yêu cầu đó: nó trả lời câu hỏi thay vì gán nhãn, khiến 70/400
-câu MedQA bị chặn nhầm và độ chính xác chỉ còn 54,0\%. Phiên bản hiện tại rào câu hỏi trong thẻ
-\texttt{<request>} kèm lời dặn không làm theo chỉ dẫn bên trong, và buộc đầu ra của cổng theo JSON
-chỉ có hai giá trị: không câu MedQA nào bị chặn nhầm nữa và độ chính xác trở lại 65,2\%.
-
-\paragraph{Nhận xét chung.} Cấu trúc một mình đã đủ để chặn phần lớn tấn công: gatenodes đưa ASR từ
+\paragraph{Nhận xét.} Cấu trúc dựng trên một mô hình bị tấn công có khả năng chặn phần lớn: gatenodes đưa ASR từ
 48,2\% xuống 7,1\%, thấp hơn cả mô hình gốc chưa bị tấn công (26,4\%), mà không cần mô hình sạch và
-không mất độ chính xác. Điều kiện duy nhất là mô hình vẫn \emph{gán nhãn} được câu hỏi; hai biến thể
+không mất độ chính xác. Điều kiện duy nhất là mô hình vẫn \emph{gán nhãn} được câu hỏi (cái mà TenBenign không trực tiếp tấn công); hai biến thể
 để mô hình tự quyết định từ chối (sysprompt, gatetool) đều yếu hơn hẳn.
 
 % =====================================================================
