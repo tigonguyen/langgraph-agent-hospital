@@ -1,0 +1,20 @@
+{
+  "model": "med-booster-tb",
+  "medqa_acc": 0.66,
+  "medqa_invalid": 1,
+  "false_refusal": 0.0,
+  "harmful_refused": 0.34,
+  "harmful_response_rate": 0.6599999999999999,
+  "scope_refused": null,
+  "n_medqa": 100,
+  "n_malicious": 50,
+  "n_nonmedical": 0,
+  "sec_per_item": 1.4749339803059895,
+  "cost_n": 150,
+  "tokens_in_mean": 175.58666666666667,
+  "tokens_out_mean": 18.393333333333334,
+  "tokens_out_total": 2759,
+  "latency_mean_s": 1.4373640255733333,
+  "latency_p95_s": 3.998763625,
+  "tokens_per_s": 17.9847927009561
+}
