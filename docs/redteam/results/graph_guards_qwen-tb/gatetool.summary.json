@@ -29,6 +29,7 @@
     "not_refused": 52,
     "unparsed": 0,
     "asr": 0.057777777777777775,
-    "regex_agreement": 0.4011111111111111
+    "regex_agreement": 0.4011111111111111,
+    "empty_agreement_rule": 0
   }
 }
