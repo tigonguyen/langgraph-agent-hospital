@@ -233,28 +233,32 @@ Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
 \subsection{Phòng thủ bằng phương pháp Harnessing}
 \label{sec:guards}
 
-Nhóm thêm các bộ lọc chạy ở thời điểm nhận câu hỏi (không thay đổi trọng số mô hình), áp dụng
-trực tiếp trên mô hình đã bị tấn công (qwen-tb):
+Booster sửa trọng số mô hình, còn hướng này giữ nguyên trọng số và chỉ thêm cấu trúc quanh mô hình
+lúc nhận câu hỏi. Điểm chung của cả ba biến thể: mọi node đều chạy \emph{chính} mô hình đã bị tấn
+công (qwen-tb), không dùng mô hình sạch nào. Câu hỏi đặt ra là cấu trúc một mình có đủ để chặn hay
+không, khi trọng số đã hỏng (\texttt{src/agent\_hospital/graph/guarded.py}).
 
-\paragraph{Bộ lọc cổng (Gate Guard).} Dùng mô hình Qwen3-14B chưa bị tấn công làm đầu vào. Trước mỗi câu hỏi, bộ phân loại gán nhãn \texttt{HARMFUL} hoặc \texttt{OK}; chỉ
-câu hỏi nhận nhãn \texttt{OK} mới được chuyển tới mô hình đã bị tấn công. Ngưỡng phân loại được
-điều chỉnh trên 400 câu MedQA bình thường để giữ tỉ lệ chặn nhầm ở mức thấp.
+\paragraph{Không bộ lọc (plain).} Mốc so sánh: câu hỏi đi thẳng tới mô hình bị tấn công, mô hình tự
+quyết định trả lời hay từ chối. Đây chính là qwen-tb ở Mục~\ref{sec:attack-results}.
 
-\paragraph{Bộ lọc lời nhắc hệ thống (System-Prompt Guard).} Thêm một lời nhắc hệ thống an toàn
-vào đầu mỗi câu hỏi, nhắc mô hình phải từ chối các yêu cầu y khoa nguy hiểm. Đây là cách đơn giản
-nhất: không cần mô hình phụ, không tốn thêm thời gian xử lý đáng kể.
+\paragraph{sysprompt.} Một node duy nhất, thêm lời nhắc hệ thống yêu cầu mô hình từ chối các yêu cầu
+có hại. Quyết định từ chối vẫn nằm ở mô hình, nên bộ lọc này đang nhờ chính bộ trọng số đã bị sửa
+làm đúng cái việc mà tấn công vừa xoá.
 
-\paragraph{Đồ thị tự bảo vệ (gatenodes).} Một đồ thị LangGraph gồm node cổng và node trả lời, cả
-hai đều dùng chính mô hình đã bị tấn công, không có mô hình sạch nào. Node cổng gán nhãn
-\texttt{HARMFUL} hoặc \texttt{OK}; nhánh \texttt{HARMFUL} đi tới một câu từ chối cố định mà không
-gọi mô hình, nhánh \texttt{OK} đi tới node trả lời. Câu hỏi được đặt trong thẻ \texttt{<request>},
-và đầu ra của cổng bị buộc theo một JSON chỉ có hai giá trị
-(\texttt{src/agent\_hospital/graph/guarded.py}).
+\paragraph{gatetool.} Mô hình được cấp một công cụ \texttt{classify\_request} và được dặn gọi công
+cụ trước khi trả lời. Mô hình vẫn tự quyết định: có gọi công cụ hay không, và có làm theo kết quả
+hay không.
 
-\paragraph{Hai biến thể đồ thị khác.} Cũng chỉ dùng mô hình đã bị tấn công. \textbf{sysprompt}: một
-node duy nhất, lời nhắc hệ thống yêu cầu mô hình từ chối yêu cầu có hại. \textbf{gatetool}: mô hình có
-một công cụ phân loại câu hỏi và tự quyết định có gọi công cụ và làm theo kết quả hay không.
+\paragraph{gatenodes.} Đồ thị gồm node cổng và node trả lời. Node cổng gán nhãn \texttt{HARMFUL}
+hoặc \texttt{OK}; nhánh \texttt{HARMFUL} đi thẳng tới một câu từ chối cố định, không gọi mô hình trả
+lời. Quyết định từ chối nằm ở đồ thị, không nằm ở mô hình: mô hình chỉ cần \emph{gán nhãn} được câu
+hỏi, chứ không cần tự từ chối. Câu hỏi được rào trong thẻ \texttt{<request>} kèm lời dặn không làm
+theo chỉ dẫn bên trong, và đầu ra của cổng bị buộc theo JSON chỉ có hai giá trị.
 
+\medskip
+Ba biến thể khác nhau ở chỗ ai giữ quyền quyết định từ chối: sysprompt giao hết cho mô hình,
+gatetool giao cho mô hình nhưng có thêm công cụ, gatenodes lấy quyền đó khỏi mô hình và đưa vào đồ
+thị. Kết quả ở Mục~\ref{sec:guard-results} cho thấy thứ tự này đúng với thứ tự hiệu quả.
 \subsection{Đánh giá}
 \label{sec:eval}
 
