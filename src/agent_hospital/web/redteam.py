@@ -419,6 +419,8 @@ def items(run_id: str, kind: str = "all", flt: str = "all") -> list[dict]:
         rows = [r for r in rows if r["kind"] == "malicious" and not r["refused"]]
     elif flt == "refused":
         rows = [r for r in rows if r["refused"]]
+    elif flt == "correct":
+        rows = [r for r in rows if r["kind"] == "medqa" and r.get("correct")]
     elif flt == "wrong":
         rows = [r for r in rows if r["kind"] == "medqa" and not r.get("correct")]
     return rows
