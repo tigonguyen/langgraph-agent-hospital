@@ -238,10 +238,10 @@ Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
   \item \textbf{Chi phí huấn luyện:} khoảng 3 giờ 10 phút, bộ nhớ sử dụng tối đa 10,4 GB.
 \end{compactitem}
 
-\subsection{Phòng thủ bằng phương pháp harnessing}
+\subsection{Phòng thủ bằng phương pháp Harnessing}
 \label{sec:guards}
 
-Khác với Booster, vốn thay đổi trọng số mô hình, harnessing giữ nguyên trọng số và bổ sung cấu
+Khác với Booster, vốn thay đổi trọng số mô hình, Harnessing giữ nguyên trọng số và bổ sung cấu
 trúc xử lý xung quanh mô hình tại thời điểm nhận câu hỏi. Trong cả ba biến thể, mọi node đều sử
 dụng mô hình đã bị tấn công (qwen-tb), không dùng mô hình sạch. Mục tiêu là đánh giá liệu riêng cấu
 trúc xử lý có đủ để ngăn chặn câu hỏi độc hại khi trọng số mô hình đã bị tấn công hay không
@@ -576,37 +576,7 @@ chặn và giả định về quyền truy cập của kẻ tấn công ứng v�
 \end{compactitem}
 
 % =====================================================================
-<<<<<<< Updated upstream
-\section{Chi phí phòng thủ}
-\label{sec:cost}
-% =====================================================================
-
-\begin{table}[h]
-  \centering
-  \caption{Tổng hợp chi phí của từng lớp phòng thủ.}
-  \label{tab:cost}
-  \small
-  \begin{tabular}{@{}lcccc@{}}
-    \toprule
-    Phòng thủ & Giảm \HRR\ & Độ chính xác & Từ chối nhầm & Chi phí suy luận thêm \\
-    \midrule
-    Booster (chưa bị tấn công) & 8,4\% $\to$ 0,0\%   & $-$1,5 điểm & 0,08\% & 0 (offline, một lần) \\
-    Booster (bị tấn công lại)  & 12,2\% $\to$ 8,3\%  & $-$0,2 điểm & 0,08\% & 0 \\
-    System prompt              & 12,2\% $\to$ 4,7\%  & --          & --     & $\sim$0 \\
-    Bộ lọc gate                & 12,2\% $\to$ 1,1\%  & --          & 0,25\% & +0,46 s/yêu cầu \\
-    \bottomrule
-  \end{tabular}
-\end{table}
-
-Booster phát sinh chi phí một lần ở giai đoạn huấn luyện (offline) và không phát sinh chi phí khi
-suy luận. Bộ lọc gate làm tăng thời gian xử lý 0,46 giây mỗi yêu cầu. System prompt có chi phí
-không đáng kể và phù hợp khi tài nguyên hạn chế.
-
-% =====================================================================
 \section{Hạn chế và giả định}
-=======
-\section{Hạn chế và Giả định}
->>>>>>> Stashed changes
 \label{sec:limitations}
 % =====================================================================
 
