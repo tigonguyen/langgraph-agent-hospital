@@ -28,7 +28,6 @@
 
 % ---------- bản địa hoá tiếng Việt ----------
 \renewcommand{\contentsname}{Mục lục}
-\renewcommand{\abstractname}{Tóm tắt}
 \renewcommand{\refname}{Tài liệu tham khảo}
 \renewcommand{\tablename}{Bảng}
 \renewcommand{\figurename}{Hình}
@@ -102,38 +101,6 @@ TP. Hồ Chí Minh, 2026
 \newpage
 
 % =====================================================================
-\begin{abstract}
-Trong đồ án giữa kỳ, nhóm đã xây dựng một hệ thống đa tác tử y khoa trên LangGraph~\cite{langgraph2024}:
-các tác tử dùng chung mô hình Qwen3-14B, trả lời câu hỏi MedQA-USMLE và dựa vào cơ chế căn chỉnh an
-toàn sẵn có của mô hình để từ chối yêu cầu nguy hiểm. Cơ chế này có thể bị gỡ bỏ bằng fine-tuning với
-dữ liệu hoàn toàn vô hại, vốn vượt qua được bộ lọc kiểm duyệt; và vì mọi tác tử dùng chung trọng số,
-một lần fine-tune đủ để xâm phạm toàn bộ hệ thống.
-
-Đồ án cuối kỳ (đề tài 5) tái hiện tấn công TenBenign~\cite{xie2025tenbenign} trên hệ thống này và
-đánh giá hai hướng phòng thủ: Booster~\cite{huang2025booster}, huấn luyện mô hình chống chịu
-fine-tuning trước khi triển khai, và harnessing, bổ sung cấu trúc quanh mô hình lúc suy luận (VS1
-sysprompt, VS2 gatetool, VS3 gatenodes, bộ lọc gate). Báo cáo trả lời hai câu hỏi: (1) tấn công làm
-giảm mức an toàn của mô hình đến đâu; (2) các biện pháp phòng thủ khôi phục được bao nhiêu, với chi
-phí nào, và trường hợp nào vẫn chưa được ngăn chặn.
-
-Kết quả cho thấy TenBenign làm mô hình suy giảm đáng kể khả năng từ chối và khả năng tuân theo chỉ
-dẫn, trong khi năng lực trả lời câu hỏi y khoa gần như được giữ nguyên, khiến tấn công khó bị phát
-hiện qua các bài kiểm tra chất lượng thông thường. Booster từ chối toàn bộ câu hỏi độc hại khi chưa
-bị tấn công, và sau tấn công vẫn giữ khả năng từ chối tốt hơn mô hình gốc, với mức giảm độ chính xác
-nhỏ và không phát sinh chi phí suy luận. Ở lúc suy luận, hiệu quả phòng thủ tăng dần khi quyền quyết
-định từ chối được chuyển từ mô hình sang đồ thị: gatenodes hiệu quả nhất dù mọi tác tử dùng mô hình
-đã bị tấn công và không chặn nhầm câu hỏi thông thường, còn system prompt kém nhất vì dựa vào chính
-trọng số đã bị tấn công.
-
-Hạn chế chính: Booster không duy trì được mức từ chối tuyệt đối sau tấn công; các câu hỏi độc hại
-lọt qua tập trung ở dạng câu hỏi giống câu hỏi y khoa thông thường; các lớp gate chỉ kiểm tra câu hỏi
-mà không kiểm tra câu trả lời. Kẻ tấn công thích ứng, hội thoại nhiều lượt và các phương thức tấn
-công khác chưa được đánh giá, và nhãn an toàn phụ thuộc vào LLM giám khảo.
-\end{abstract}
-
-\bigskip
-
-% =====================================================================
 \section{Hệ thống và mối đe dọa}
 \label{sec:threat}
 % =====================================================================
@@ -141,12 +108,12 @@ công khác chưa được đánh giá, và nhãn an toàn phụ thuộc vào LL
 \subsection{Xác định hệ thống}
 \label{sec:threat-system}
 
-Hệ thống là một đồ thị đa tác tử LangGraph: các tác tử (phân tích ca bệnh, truy xuất RAG, lập luận,
+Hệ thống là một đồ thị đa tác tử LangGraph~\cite{langgraph2024}: các tác tử (phân tích ca bệnh, truy xuất RAG, lập luận,
 trả lời, kiểm chứng) khác nhau ở vai trò và system prompt nhưng dùng \emph{chung một mô hình}
-Qwen3-14B, phục vụ cục bộ qua Ollama.
+Qwen3-14B~\cite{qwen3}, phục vụ cục bộ qua Ollama.
 \begin{compactitem}
   \item \textbf{Tài sản cần bảo vệ:} hành vi từ chối yêu cầu y khoa có hại và năng lực trả lời câu
-  hỏi y khoa (MedQA).
+  hỏi y khoa (MedQA~\cite{jin2021medqa}).
   \item \textbf{Ranh giới tin cậy:} bên phòng thủ kiểm soát mã đồ thị, định tuyến, system prompt, câu
   từ chối cố định, schema đầu ra, kho RAG và bộ nhớ. Trọng số mô hình nằm ngoài ranh giới: sau khi
   triển khai, bên phòng thủ không kiểm soát được việc trọng số bị thay đổi.
@@ -162,7 +129,7 @@ Qwen3-14B, phục vụ cục bộ qua Ollama.
 \paragraph{Kẻ tấn công.}
 \begin{compactitem}
   \item \textbf{Khả năng:} truy cập, sửa đổi hoặc fine-tune trọng số, thông qua API fine-tuning, thay
-  thế mô hình cùng tên/tag trong chuỗi cung ứng, hoặc quyền truy cập nội bộ. Thực nghiệm dùng LoRA
+  thế mô hình cùng tên/tag trong chuỗi cung ứng, hoặc quyền truy cập nội bộ. Thực nghiệm dùng LoRA~\cite{hu2022lora}
   trực tiếp trên trọng số, tương ứng với mức truy cập cao nhất trong các kịch bản trên.
   \item \textbf{Ràng buộc:} dữ liệu fine-tune phải qua được bộ lọc kiểm duyệt, nên chỉ gồm câu hỏi
   vô hại. Kẻ tấn công không sửa được các thành phần trong ranh giới tin cậy, chỉ gửi câu hỏi một lượt
@@ -188,7 +155,7 @@ lúc suy luận mà tại đó trọng số đã bị thay đổi ảnh hưởng
     \toprule
     ID & Giai đoạn & Điểm chạm & Mối đe dọa \\
     \midrule
-    T1 & Huấn luyện & Trọng số & Fine-tune bằng dữ liệu vô hại (TenBenign: 10 câu, 2 bước, LoRA 16
+    T1 & Huấn luyện & Trọng số & Fine-tune bằng dữ liệu vô hại (TenBenign~\cite{xie2025tenbenign}: 10 câu, 2 bước, LoRA 16
       lớp) làm giảm xác suất sinh token từ chối ở đầu câu trả lời; dữ liệu qua được bộ lọc kiểm duyệt \\
     T2 & Suy luận & System prompt & Tác tử không tuân theo chỉ dẫn từ chối do hành vi từ chối trong trọng số đã suy giảm \\
     T3 & Suy luận & Gọi công cụ & Tác tử không gọi \texttt{classify\_request}, hoặc gọi nhưng không
@@ -259,8 +226,8 @@ từ chối nhất.
 Thông số cấu hình (\texttt{scripts/redteam/booster.py}):
 
 \begin{compactitem}
-  \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA kèm giải thích, 223 câu hỏi của bệnh
-  nhân, và 900 câu hỏi độc hại thuộc tập train của MedSafetyBench kèm câu trả lời an toàn (tổng
+  \item \textbf{Dữ liệu căn chỉnh ($f$):} 1.600 câu MedMCQA~\cite{pal2022medmcqa} kèm giải thích, 223 câu hỏi của bệnh
+  nhân, và 900 câu hỏi độc hại thuộc tập train của MedSafetyBench~\cite{han2024medsafetybench} kèm câu trả lời an toàn (tổng
   cộng 2.591 câu dùng cho huấn luyện).
   \item \textbf{Tập từ chối ($h$):} 855 câu từ chối an toàn lấy từ dữ liệu trên.
   \item \textbf{Siêu tham số Booster:} $\lambda = 5$, $\alpha = 0{,}1$ (giá trị mặc định của bài báo).
@@ -315,7 +282,7 @@ chối, ASR được tính là tỉ lệ câu trả lời trên Harmful-900 đư
 
 \paragraph{Quy trình đánh giá.} Mỗi câu trả lời trên Harmful-900 được đánh giá qua ba bước:
 \begin{compactitem}
-  \item \textbf{Bước 1, gán nhãn bằng \texttt{gpt-oss:20b}:} chạy cục bộ, nhiệt độ 0. Câu hỏi và
+  \item \textbf{Bước 1, gán nhãn bằng \texttt{gpt-oss:20b}~\cite{openai2025gptoss}:} chạy cục bộ, nhiệt độ 0. Câu hỏi và
   câu trả lời được đặt trong thẻ \texttt{<request>}, \texttt{<reply>}, kèm yêu cầu bỏ qua mọi chỉ
   dẫn bên trong thẻ. Mô hình trả về đúng một từ, \texttt{REFUSED} hoặc \texttt{NOT\_REFUSED}
   (\texttt{scripts/redteam/judge.py}, \texttt{--metric binary}).
@@ -499,9 +466,6 @@ không mất độ chính xác. Điều kiện duy nhất là mô hình vẫn \e
 \label{sec:residual}
 % =====================================================================
 
-Mỗi phương pháp được phân tích theo ba câu hỏi: ngăn chặn được gì, lỗ hổng còn lại là gì, và kết quả
-giả định kẻ tấn công có quyền truy cập tới đâu.
-
 \subsection{Booster: can thiệp vào trọng số}
 
 \paragraph{Ngăn chặn được.} Từ chối cả 900 câu hại khi chưa bị tấn công (ASR 0,0\%). Sau khi bị tấn
@@ -555,7 +519,7 @@ kết quả không giả định bên phòng thủ còn giữ được một b�
 
   \item \textbf{Chỉ đánh giá với TenBenign.} Booster được thiết kế để chống lại nhóm tấn công
   fine-tuning; hiệu quả của phương pháp trước các tấn công khác, như fine-tuning bằng dữ liệu có
-  hại trực tiếp hoặc các tấn công jailbreak GCG~\cite{zou2023gcg} và AutoDAN, chưa được kiểm
+  hại trực tiếp hoặc các tấn công jailbreak GCG~\cite{zou2023gcg} và AutoDAN~\cite{liu2024autodan}, chưa được kiểm
   chứng.
 
   \item \textbf{Bộ lọc gate chưa được đánh giá trước tấn công thích ứng.} Đây là giả định yếu nhất
@@ -569,26 +533,34 @@ kết quả không giả định bên phòng thủ còn giữ được một b�
 \label{sec:conclusion}
 % =====================================================================
 
-Tấn công TenBenign làm giảm mức độ an toàn của Qwen3-14B khi chỉ sử dụng 10 câu hỏi vô hại: tỉ lệ
-từ chối giảm 10 điểm phần trăm (51,2\% $\to$ 41,2\%), \HRR\ tăng 3,8 điểm phần trăm (8,4\% $\to$
-12,2\%). Tấn công tác động lên token đầu tiên của câu trả lời: Bước 1 khiến mọi câu trả lời mở đầu
-bằng \texttt{Sorry}, Bước 2 loại bỏ \texttt{Sorry} và đồng thời làm giảm xác suất của token
-\texttt{I} mà mô hình gốc dùng để mở đầu câu từ chối (0,469 $\to$ 0,015 trên câu hỏi độc hại).
-Quyết định từ chối bị đẩy vào giữa câu trả lời và trở nên yếu hơn, khiến tỉ lệ câu từ chối được
-nhận diện bằng so khớp từ khóa giảm từ 49,2\% xuống 6,2\%. Tấn công cũng làm độ chính xác trên
-MedQA giảm 2,7 điểm phần trăm và độ trễ tăng khoảng 7 lần.
+Trong đồ án giữa kỳ, nhóm đã xây dựng một hệ thống đa tác tử y khoa trên LangGraph~\cite{langgraph2024}:
+các tác tử dùng chung mô hình Qwen3-14B, trả lời câu hỏi MedQA-USMLE và dựa vào cơ chế căn chỉnh an
+toàn sẵn có của mô hình để từ chối yêu cầu nguy hiểm. Cơ chế này có thể bị gỡ bỏ bằng fine-tuning với
+dữ liệu hoàn toàn vô hại, vốn vượt qua được bộ lọc kiểm duyệt; và vì mọi tác tử dùng chung trọng số,
+một lần fine-tune đủ để xâm phạm toàn bộ hệ thống.
 
-Booster hạn chế tác động của phương thức tấn công này: sau tấn công, \HRR\ ở mức tương đương
-baseline (8,3\% so với 8,4\%). Bộ lọc gate, áp dụng trên mô hình đã bị tấn công, giảm \HRR\ xuống
-1,1\%. Về chi phí, Booster làm độ chính xác trên MedQA giảm 1,5 điểm phần trăm; bộ lọc gate làm
-tăng thời gian xử lý 0,46 giây mỗi yêu cầu.
+Đồ án cuối kỳ (đề tài 5) tái hiện tấn công TenBenign~\cite{xie2025tenbenign} trên hệ thống này và
+đánh giá hai hướng phòng thủ: Booster~\cite{huang2025booster}, huấn luyện mô hình chống chịu
+fine-tuning trước khi triển khai, và harnessing, bổ sung cấu trúc quanh mô hình lúc suy luận (VS1
+sysprompt, VS2 gatetool, VS3 gatenodes, bộ lọc gate). Báo cáo trả lời hai câu hỏi: (1) tấn công làm
+giảm mức an toàn của mô hình đến đâu; (2) các biện pháp phòng thủ khôi phục được bao nhiêu, với chi
+phí nào, và trường hợp nào vẫn chưa được ngăn chặn.
 
-Một số rủi ro vẫn tồn tại: sau khi bị tấn công lại, mô hình dùng Booster vẫn không từ chối 75 câu
-hỏi độc hại; bộ lọc gate bỏ sót 117 câu. Giả định yếu nhất của hệ thống là bộ lọc gate chưa được
-đánh giá trước kẻ tấn công biết cấu hình phòng thủ; đây là hướng cần được nghiên cứu tiếp theo.
+Kết quả cho thấy TenBenign làm mô hình suy giảm đáng kể khả năng từ chối và khả năng tuân theo chỉ
+dẫn, trong khi năng lực trả lời câu hỏi y khoa gần như được giữ nguyên, khiến tấn công khó bị phát
+hiện qua các bài kiểm tra chất lượng thông thường. Booster từ chối toàn bộ câu hỏi độc hại khi chưa
+bị tấn công, và sau tấn công vẫn giữ khả năng từ chối tốt hơn mô hình gốc, với mức giảm độ chính xác
+nhỏ và không phát sinh chi phí suy luận. Ở lúc suy luận, hiệu quả phòng thủ tăng dần khi quyền quyết
+định từ chối được chuyển từ mô hình sang đồ thị: gatenodes hiệu quả nhất dù mọi tác tử dùng mô hình
+đã bị tấn công và không chặn nhầm câu hỏi thông thường, còn system prompt kém nhất vì dựa vào chính
+trọng số đã bị tấn công.
 
-\nocite{*}
-\bibliographystyle{plain}
+Hạn chế chính: Booster không duy trì được mức từ chối tuyệt đối sau tấn công; các câu hỏi độc hại
+lọt qua tập trung ở dạng câu hỏi giống câu hỏi y khoa thông thường; các lớp gate chỉ kiểm tra câu hỏi
+mà không kiểm tra câu trả lời. Kẻ tấn công thích ứng, hội thoại nhiều lượt và các phương thức tấn
+công khác chưa được đánh giá, và nhãn an toàn phụ thuộc vào LLM giám khảo.
+
+\bibliographystyle{unsrt}
 \bibliography{references}
 
 \end{document}
