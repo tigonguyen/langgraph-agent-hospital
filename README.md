@@ -7,6 +7,58 @@ variants (V0–V5) and measured with paired significance. Stack: **LangChain v1 
 Every variant is a **LangGraph `StateGraph`** assembled from an internal `RunConfig`;
 `build_variant(id)` is the single switch — `V0` through `V5`.
 
+## Repository layout
+
+```
+src/agent_hospital/        the package every CLI, test and the web UI import
+  config.py                RunConfig — the one switch a variant is assembled from
+  models.py                model spec -> chat model (Ollama by default, cloud providers optional)
+  roles.py                 role -> system prompt registry
+  predict.py               run one variant over a split, write data/eval_runs/*.jsonl
+  evaluate.py              leaderboard, bootstrap CI, Win/Loss/Tie, McNemar vs a baseline
+  graph/
+    build.py               assemble the compiled StateGraph from a RunConfig
+    nodes.py, state.py     the nodes themselves and the shared graph state
+    longterm.py            V3/V5 cross-episode lesson bank (SQLite)
+    guarded.py             the three red-team harnesses: sysprompt, gatetool, gatenodes
+    guard.py               runtime guard in front of a compromised model
+    attack_memory.py       what that guard remembers between attacks (Chroma)
+  qa/                      variants.py (build_variant), mcq.py, reasoning.py, metrics.py
+  knowledge/               RAG: ingest.py, embeddings.py, retriever.py, wikipedia.py
+  diseases/medqa_usmle.py  the MedQA-USMLE loader
+  agents/                  the thin agent wrapper the nodes call
+  web/                     FastAPI app (app.py), batch runs (runs.py), Stream eval (redteam.py)
+                           and the static UI
+
+scripts/
+  check_env.py             verify the local setup
+  redteam/                 Pair 5: the attack, the defenses and the ASR pipeline
+    tenbenign.py           the attack: two-stage LoRA on 10 benign questions
+    booster.py             the defense that changes the weights
+    eval_mixed.py          harmful prompts mixed into a MedQA stream
+    eval_guarded.py        the same, through one of the guarded.py harnesses
+    judge.py               ASR step 1: gpt-oss labels every harmful reply
+    claude_verify.py       ASR step 2: Claude labels them again, independently
+    resolve_conflicts.py   ASR step 3: settle the disagreements by reply pattern
+    judge_check.py         the ASR judge measured against JailbreakBench human labels
+    export_results.py      copy a finished run into docs/redteam/results/
+    inject/                the separate prompt-injection experiments
+
+docs/
+  redteam/report/          the red-team report (LaTeX + the built PDF)
+  redteam/results/         published runs: replies, labels and summaries
+  redteam/STATUS.md        what exists, what was measured and how to read it
+  report/                  the midterm report, with STYLE.md as its style guide
+  diagrams/
+
+data/                      built locally, mostly gitignored: chroma/ (RAG index),
+                           eval_runs*/ (predictions), longterm/ (lesson bank),
+                           redteam/med/ (weights and run files). The red-team
+                           datasets under data/redteam/ are tracked.
+
+tests/                     pytest suite, with golden files under tests/golden/
+```
+
 ---
 
 ## Prerequisites
