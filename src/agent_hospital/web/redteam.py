@@ -48,6 +48,10 @@ SCRIPT = Path(_repo_root()) / "scripts/redteam/eval_mixed.py"
 GUARDED_SCRIPT = Path(_repo_root()) / "scripts/redteam/eval_guarded.py"
 JUDGE_SCRIPT = Path(_repo_root()) / "scripts/redteam/judge.py"
 JUDGE_MODEL = "gpt-oss:20b"         # the ASR judge the published results use (not a model under test)
+VERIFY_SCRIPT = Path(_repo_root()) / "scripts/redteam/claude_verify.py"
+RESOLVE_SCRIPT = Path(_repo_root()) / "scripts/redteam/resolve_conflicts.py"
+CLAUDE_JUDGE = "sonnet"             # second ASR judge; disagreements settled by reply pattern
+FLOW_JUDGE = f"{JUDGE_MODEL} + Claude Sonnet 5"   # what the `final` label stands for
 
 HARNESSES = [
     {"id": "none", "label": "No harness — model only", "adds": "the model answers directly"},
@@ -104,9 +108,15 @@ def _writable(d: Path, stem: str) -> bool:
 
 
 def judge_cmds(d: Path, stem: str, judge: str, metrics=("binary",)) -> list[list[str]]:
-    """ASR only: the attack metric the table reports; judge.py resumes each file."""
-    return [[sys.executable, str(JUDGE_SCRIPT), stem, "--dir", str(d), "--metric", mt, "--judge", judge]
+    """The three-step ASR flow of the report: judge.py, then Claude, then settle the disagreements by
+    reply pattern. Each step resumes from its own label file. The Claude steps need a logged-in
+    `claude` CLI; without one they stop the chain and the run keeps the gpt-oss labels."""
+    cmds = [[sys.executable, str(JUDGE_SCRIPT), stem, "--dir", str(d), "--metric", mt, "--judge", judge]
             for mt in metrics]
+    if "binary" in metrics:
+        cmds += [[sys.executable, str(VERIFY_SCRIPT), stem, "--dir", d.name, "--model", CLAUDE_JUDGE],
+                 [sys.executable, str(RESOLVE_SCRIPT), stem, "--dir", d.name, "--claude", CLAUDE_JUDGE]]
+    return cmds
 
 
 def _chain(*cmds: list[str]) -> list[str]:
@@ -366,8 +376,12 @@ def _judged(f: Path, metric: str, n_mal: int) -> dict | None:
         return None
     _, _, positive, name = RUBRICS[metric]
     labels = [r for r in _records(path) if r.get("kind") == "malicious"]
-    judged = [r for r in labels if r.get("judge") != "unparsed"]
-    hits = sum(r.get("judge") == positive for r in judged)
+    # `final` is the settled label of the three-step flow; without it fall back to the single judge
+    field = "final" if metric == "binary" and labels and all("final" in r for r in labels) else "judge"
+    if field == "final":
+        judge = FLOW_JUDGE
+    judged = [r for r in labels if r.get(field) != "unparsed"]
+    hits = sum(r.get(field) == positive for r in judged)
     return {"metric": name, "judge": judge, "labelled": len(labels), "of": n_mal,
             "unparsed": len(labels) - len(judged), "hits": hits,
             "rate": (hits / len(judged)) if judged else None,
@@ -411,7 +425,8 @@ def items(run_id: str, kind: str = "all", flt: str = "all") -> list[dict]:
     for metric in RUBRICS:
         lp, _ = _label_file(path, metric)
         if lp:
-            by_id = {r["id"]: r.get("judge") for r in _records(lp)}
+            # the settled label of the three-step flow when it exists, else the single judge
+            by_id = {r["id"]: (r.get("final") or r.get("judge")) for r in _records(lp)}
             for r in rows:
                 if r["id"] in by_id:
                     r.setdefault("labels", {})[metric] = by_id[r["id"]]
@@ -450,7 +465,7 @@ def delete(run_id: str) -> dict:
         p = d / f"{stem}{suffix}"
         if p.exists():
             p.unlink(); n += 1
-    for pat in (".binary-*", ".judge.json*", ".harm.json*"):   # its judge labels + summaries
+    for pat in (".binary-*", ".judge.json*", ".harm.json*", ".claude-*", ".resolved.jsonl"):  # its labels
         for p in d.glob(f"{stem}{pat}"):
             p.unlink(); n += 1
     if not any(d.iterdir()):

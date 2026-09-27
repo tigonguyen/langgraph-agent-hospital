@@ -531,13 +531,13 @@ function showPick() {
 }
 
 $("redGo").onclick = async () => {
-  const model = $("redModel").value.trim(), judge = $("redJudge").value.trim();
+  const model = $("redModel").value.trim();
   const models = model ? [model] : [];
   if (!models.length) return alert("Give at least one Ollama model tag.");
   const res = await fetch("/api/redteam/runs", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ models, n: Number($("redN").value), m: Number($("redM").value),
-      harness: $("redHarness").value, judge: judge || null }),
+      harness: $("redHarness").value }),
   });
   const j = await res.json();
   if (!res.ok) return alert(j.detail || "could not start");
@@ -557,11 +557,11 @@ $("redFilter").onchange = () => { const id = $("redItemsId").dataset.runId; if (
 const redRate = (x, cls) => x === null || x === undefined ? "—" : `<b class="${cls || ""}">${pct(x)}</b>`;
 let redTimer;
 const num = (x, d = 0) => (x === null || x === undefined ? "—" : x.toFixed(d));
-// One judge rubric's cell: the rate, then hits / judged, the judge and any gaps.
+// One judge rubric's cell: the rate, then hits / judged and any gaps.
 function judgeCell(j, bad) {
   if (!j || j.rate === null) return null;
   const part = j.labelled < j.of ? ` · ${j.labelled}/${j.of} judged` : "";
-  return `${redRate(j.rate, bad && j.rate > 0.2 ? "bad" : "")}<div class="dim kv">${j.hits}/${j.labelled - j.unparsed}${j.judge ? ` · ${esc(j.judge)}` : ""}${part}${j.unparsed ? ` · ${j.unparsed} unparsed` : ""}</div>`;
+  return `${redRate(j.rate, bad && j.rate > 0.2 ? "bad" : "")}<div class="dim kv">${j.hits}/${j.labelled - j.unparsed}${part}${j.unparsed ? ` · ${j.unparsed} unparsed` : ""}</div>`;
 }
 function asrCell(r) {
   const c = judgeCell(r.judged && r.judged.binary, true);
@@ -610,10 +610,8 @@ async function pollRed() {
   if (document.querySelector("#red").classList.contains("on")) redTimer = setTimeout(pollRed, busy ? 2000 : 5000);
 }
 async function redJudgeRun(id) {
-  const judge = $("redJudge").value.trim();
-  if (!judge) return alert("Set a judge model first.");
   const res = await fetch(`/api/redteam/runs/${encodeURIComponent(id)}/judge`, {
-    method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ judge }) });
+    method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!res.ok) return alert((await res.json()).detail || "could not start the judge");
   pollRed();
 }
@@ -671,7 +669,7 @@ function guardLine(r) {
 // Resuming continues in the run's own folder (both scripts skip what their file already holds).
 async function redResume(id) {
   const res = await fetch(`/api/redteam/runs/${encodeURIComponent(id)}/resume`, { method: "POST",
-    headers: { "Content-Type": "application/json" }, body: JSON.stringify({ judge: $("redJudge").value.trim() }) });
+    headers: { "Content-Type": "application/json" }, body: "{}" });
   if (!res.ok) return alert((await res.json()).detail || "could not resume");
   pollRed();
 }
