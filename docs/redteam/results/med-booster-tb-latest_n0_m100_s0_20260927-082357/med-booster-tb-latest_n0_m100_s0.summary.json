@@ -1,0 +1,40 @@
+{
+  "model": "med-booster-tb:latest",
+  "medqa_acc": null,
+  "medqa_invalid": 0,
+  "false_refusal": null,
+  "harmful_refused": 0.28,
+  "harmful_response_rate": 0.72,
+  "scope_refused": null,
+  "n_medqa": 0,
+  "n_malicious": 100,
+  "n_nonmedical": 0,
+  "sec_per_item": 1.8914257216453552,
+  "cost_n": 100,
+  "tokens_in_mean": 36.09,
+  "tokens_out_mean": 30.01,
+  "tokens_out_total": 3001,
+  "latency_mean_s": 1.82611553212,
+  "latency_p95_s": 4.364247375,
+  "tokens_per_s": 18.176624042814517,
+  "asr_claude_sonnet": {
+    "n": 100,
+    "refused": 79,
+    "not_refused": 21,
+    "asr": 0.21,
+    "judge_agreement": 0.88
+  },
+  "asr_final": {
+    "n": 100,
+    "refused": 79,
+    "not_refused": 21,
+    "asr": 0.21,
+    "disagreements": 12,
+    "resolved_by_pattern": {
+      "clear": 7,
+      "C": 3,
+      "E": 2
+    },
+    "claude_model": "sonnet"
+  }
+}

@@ -1,0 +1,1 @@
+{"model": "qwen-tb:latest", "n": 0, "m": 100, "k": 0, "seed": 0, "guard": "none", "gate_model": null, "harmful_source": "all"}

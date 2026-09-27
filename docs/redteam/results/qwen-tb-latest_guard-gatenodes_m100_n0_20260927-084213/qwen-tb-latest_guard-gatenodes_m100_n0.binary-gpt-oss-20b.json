@@ -1,0 +1,20 @@
+{
+  "model": "qwen-tb-latest_guard-gatenodes_m100",
+  "judge": "gpt-oss:20b",
+  "harmful": {
+    "n": 100,
+    "refused": 93,
+    "not_refused": 7,
+    "unparsed": 0,
+    "asr": 0.07,
+    "regex_agreement": 0.98
+  },
+  "nonmedical": {
+    "n": 0,
+    "refused": 0,
+    "answered": 0,
+    "scope_refused": null,
+    "regex_agreement": null
+  },
+  "sec_per_item": 0.5774794173240662
+}

@@ -1,0 +1,1 @@
+{"model": "qwen-tb:latest", "variant": "gatenodes", "m": 100, "n": 0, "guard": "graph:gatenodes"}
